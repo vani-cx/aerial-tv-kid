@@ -20,6 +20,7 @@ import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import androidx.core.content.getSystemService
 import app.orchard.tv.MainActivity
+import app.orchard.tv.settings.AerialSettings
 
 /**
  * Keeps Aerial as the home screen on firmwares that will not let a third-party app own HOME
@@ -50,6 +51,9 @@ class HomeGuardService : AccessibilityService() {
     private var lastWindow: Pair<String, String>? = null
 
     private val handler = Handler(Looper.getMainLooper())
+
+    /** When the screen last lit, for take-overs that are really a wake (issue #111). */
+    private var screenOnAt = Long.MIN_VALUE / 2
 
     private var takeOverReason = ""
     private var takeOverOnWake = false
@@ -82,6 +86,7 @@ class HomeGuardService : AccessibilityService() {
         override fun onReceive(context: Context, intent: Intent) {
             // Firmwares put their own launcher back in front while the TV is in standby, and no
             // window change follows on wake. Look once things have settled after the screen lights.
+            screenOnAt = SystemClock.elapsedRealtime()
             takeOverOnceSettled("screen on", woke = true)
         }
     }
@@ -151,6 +156,11 @@ class HomeGuardService : AccessibilityService() {
         handler.postDelayed(takeOver, SETTLE_MS)
     }
 
+    private fun hasBootSource(): Boolean = runCatching {
+        AerialSettings.init(this)
+        AerialSettings.bootSource != null
+    }.getOrDefault(false)
+
     private fun justUpdated(): Boolean = runCatching {
         System.currentTimeMillis() - packageManager.getPackageInfo(packageName, 0).lastUpdateTime < 2 * 60_000
     }.getOrDefault(false)
@@ -173,6 +183,15 @@ class HomeGuardService : AccessibilityService() {
             return
         }
         val stockInFront = last == null || last.first in stockHomes
+        // Aerial is in front after a wake because the guard already brought it back when the stock
+        // launcher showed, or because it survived standby; either way the input the TV starts on
+        // still has to open. Only with one chosen: bringing Aerial back also resets its focus.
+        // Xiaomi MiTV-MTEQ0, where the guard is revived after the screen lights (issue #111).
+        if (woke && last?.first == packageName && hasBootSource()) {
+            Log.i(TAG, "$reason with Aerial itself in front; flagging the wake")
+            goHome(woke = true)
+            return
+        }
         if (!stockInFront && last != null) Log.i(TAG, "$reason with ${last.first} in front; leaving it there")
         if (!stockInFront || SystemClock.uptimeMillis() < allowStockUntil) return
         Log.i(TAG, "$reason with the stock launcher in front; bringing Aerial back")
@@ -206,11 +225,21 @@ class HomeGuardService : AccessibilityService() {
     private fun filterKeys(on: Boolean) {
         val info = serviceInfo ?: return
         val flag = AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
-        val want = if (on || Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) info.flags or flag else info.flags and flag.inv()
+        val want = if (!keysPassThrough && (on || Build.VERSION.SDK_INT <= Build.VERSION_CODES.R)) info.flags or flag else info.flags and flag.inv()
         if (want == info.flags) return
         info.flags = want
         serviceInfo = info
         Log.i(TAG, if (want and flag != 0) "filtering keys" else "stopped filtering keys")
+    }
+
+    /**
+     * Hisense VIDAA handles volume in its own firmware, which never sees keys that went through an
+     * accessibility filter: with the filter on, the volume keys did nothing anywhere, though this
+     * service passes them on (VIDAA_TV, RTD2851D, Android 10, issue #7). Home is no help there
+     * either: VIDAA starts its launcher by component, or Aerial through persist.vt.use_home_pkg.
+     */
+    private val keysPassThrough by lazy {
+        VIDAA_PACKAGES.any { runCatching { packageManager.getPackageInfo(it, 0) }.isSuccess }
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
@@ -240,7 +269,8 @@ class HomeGuardService : AccessibilityService() {
             // Not gated on isDefaultHome(): see takeOverIfStockHomeInFront.
             if (cls !in stockHomes.getValue(pkg) || allowed) return
             Log.i(TAG, "stock home $pkg came to the front; bringing Aerial back")
-            goHome()
+            // Shortly after the screen lit, this is the wake itself (issue #111).
+            goHome(woke = SystemClock.elapsedRealtime() - screenOnAt < WAKE_WINDOW_MS)
             return
         }
         filterKeys(false)
@@ -305,6 +335,10 @@ class HomeGuardService : AccessibilityService() {
         private const val TAG = "AerialGuard"
         private const val BOOT_WINDOW_MS = 3 * 60 * 1000L
         private const val SETTLE_MS = 1500L
+        private const val WAKE_WINDOW_MS = 15_000L
+
+        /** VIDAA's assistant and its launcher (聚好看), on the two VIDAA builds reported (issues #7, #40). */
+        private val VIDAA_PACKAGES = listOf("com.hisense.vidaaassistant", "com.jamdeo.tv.vod")
         private const val VENDOR_HOME_PREFIX = "android.intent.category.HOME."
 
         @Volatile

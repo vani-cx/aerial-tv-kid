@@ -163,9 +163,13 @@ class MainActivity : ComponentActivity() {
         if (SystemClock.elapsedRealtime() - bootSourceOpenedAt < 15_000) return
         bootSourceOpenedAt = SystemClock.elapsedRealtime()
         lifecycleScope.launch {
-            val source = withTimeoutOrNull(8_000) {
+            // Inputs can take a while to list right after a wake (Xiaomi MiTV-MTEQ0, issue #111).
+            val source = withTimeoutOrNull(30_000) {
                 snapshotFlow { vm.sources.firstOrNull { it.id == id } }.filterNotNull().first()
-            } ?: return@launch
+            } ?: run {
+                android.util.Log.w("Aerial", "$reason: input $id not listed; not opening it")
+                return@launch
+            }
             android.util.Log.i("Aerial", "$reason: opening ${source.label}, the input the TV starts on")
             openedAppSinceHome = true
             open(source.intent)
