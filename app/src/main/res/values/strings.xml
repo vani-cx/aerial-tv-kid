@@ -64,6 +64,7 @@
     <string name="wp_daily_latest">Always Today\'s</string>
     <string name="wp_builtin">Built-in</string>
     <string name="wp_photos">My Photos</string>
+    <string name="wp_photos_rotate">One a Day</string>
     <string name="wp_screensaver">Screensaver</string>
     <string name="ss_aerial">Aerial</string>
     <string name="ss_photos">Photos</string>
@@ -76,6 +77,9 @@
     <string name="ss_minutes">%d min</string>
     <string name="ss_back_hint">Tip: press Back on the top row of Home to start the screensaver.</string>
     <string name="st_focus_style">Focus Style</string>
+    <string name="st_names">App Names</string>
+    <string name="st_names_focused">Selected App</string>
+    <string name="st_names_all">All Apps</string>
     <string name="st_focus_high">High Contrast</string>
     <string name="st_focus_standard">Standard</string>
     <string name="st_focus_high_hint">A white frame around the selected app, easy to spot from across the room.</string>

@@ -72,7 +72,8 @@ import kotlin.random.Random
  * (ad-carrying) one would start. Three kinds, chosen in Personalize:
  *
  * - Aerial: Apple TV's aerial films, streamed from Apple, with the place named as the camera moves.
- * - Photos: daily photos and the owner's own, slowly drifting, each with where it was taken.
+ * - Photos: the owner's own photos (the daily ones when there are none), slowly drifting, each
+ *   with where it was taken.
  * - Clock: a large clock over the wallpaper, moving once a minute so nothing burns in.
  *
  * If the films cannot be reached, Aerial falls back to Photos. Left and right step to the previous
@@ -276,7 +277,9 @@ private const val STALL_MS = 8_000L
 private fun PhotoSaver(now: LocalDateTime, steps: SharedFlow<Int>) {
     val reduced = LocalReducedMotion.current
     val pool = remember(Wallpapers.items) {
-        val pictures = Wallpapers.items.filter { it.kind == WallpaperKind.Daily || it.kind == WallpaperKind.Photo }
+        // The owner's own photos when there are any, else the daily ones (issue #27).
+        val pictures = Wallpapers.items.filter { it.kind == WallpaperKind.Photo }
+            .ifEmpty { Wallpapers.items.filter { it.kind == WallpaperKind.Daily } }
         (pictures.ifEmpty { Wallpapers.items.filter { it.kind == WallpaperKind.Builtin } }).shuffled()
     }
     var slide by remember { mutableIntStateOf(0) }

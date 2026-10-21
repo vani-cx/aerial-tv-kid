@@ -51,7 +51,8 @@ enum class ScreensaverMode(val key: String) {
  * - Built-in: Aerial's own generated light fields ([Gradients]).
  * - Daily: Bing's photo of the day (cn.bing.com, reachable from China without a proxy). The last
  *   eight are kept; "daily:latest" always follows the newest.
- * - Photos: pictures uploaded from a phone through the setup page ([PhoneServer]).
+ * - Photos: pictures uploaded from a phone through the setup page ([PhoneServer]). "photos:rotate"
+ *   shows a different one of them each day (issue #27).
  * - Auto: the previous behaviour, light taken from the focused app's artwork.
  *
  * State is Compose snapshot state, written on the main thread only.
@@ -60,6 +61,7 @@ object Wallpapers {
     private const val TAG = "AerialWallpaper"
     const val LATEST_DAILY = "daily:latest"
     const val AUTO = "auto"
+    const val ROTATE_PHOTOS = "photos:rotate"
     private const val DEFAULT_FALLBACK = "grad:aurora"
 
     private lateinit var app: Context
@@ -119,7 +121,21 @@ object Wallpapers {
     /** The concrete wallpaper the selection points at today. */
     fun resolve(id: String = selectedId): Wallpaper? = when (id) {
         LATEST_DAILY -> items.firstOrNull { it.kind == WallpaperKind.Daily }
+        ROTATE_PHOTOS -> items.filter { it.kind == WallpaperKind.Photo }.sortedBy { it.id }.let { photos ->
+            if (photos.isEmpty()) resolve(LATEST_DAILY) else photos[Math.floorMod(today(), photos.size)]
+        }
         else -> items.firstOrNull { it.id == id }
+    }
+
+    private fun today(): Long = java.time.LocalDate.now().toEpochDay()
+
+    /** The day the rotating photo was last picked for; a new day picks the next one. */
+    private var rotatedOn = 0L
+
+    /** Moves "My Photos, rotating" on to today's photo; Aerial calls it whenever Home comes back. */
+    fun rotateIfDue() {
+        if (!started || selectedId != ROTATE_PHOTOS || rotatedOn == today()) return
+        rebuildBackdrop()
     }
 
     // ---- pictures ----
@@ -140,7 +156,7 @@ object Wallpapers {
     /** A 16:9 thumbnail for pickers and the phone page. Call off the main thread. */
     fun thumbnail(id: String): Bitmap? {
         synchronized(thumbs) { thumbs[id] }?.let { return it }
-        val wp = (if (id == LATEST_DAILY) resolve(id) else items.firstOrNull { it.id == id }) ?: return null
+        val wp = (if (id == LATEST_DAILY || id == ROTATE_PHOTOS) resolve(id) else items.firstOrNull { it.id == id }) ?: return null
         val b = if (wp.kind == WallpaperKind.Auto) Gradients.render(Gradients.presets.last(), 384, 216) else picture(wp, 384, 216)
         if (b != null) synchronized(thumbs) { thumbs[id] = b }
         return b
@@ -155,6 +171,7 @@ object Wallpapers {
                 frosted = null
                 return@launch
             }
+            rotatedOn = today()
             val wp = resolve(id) ?: resolve(DEFAULT_FALLBACK)
             val (bmp, frost) = withContext(Dispatchers.Default) {
                 val picture = wp?.let { picture(it, screenW, screenH) }
@@ -262,6 +279,7 @@ object Wallpapers {
             }
         }
         if (id != null) {
+            synchronized(thumbs) { thumbs.remove(ROTATE_PHOTOS) }
             rebuildList()
             select(id)
         }
@@ -273,8 +291,9 @@ object Wallpapers {
         // would otherwise reach other files (#57).
         val photo = items.firstOrNull { it.id == id && it.kind == WallpaperKind.Photo } ?: return
         fileFor(photo)?.delete()
-        synchronized(thumbs) { thumbs.remove(id) }
+        synchronized(thumbs) { thumbs.remove(id); thumbs.remove(ROTATE_PHOTOS) }
         rebuildList()
         if (selectedId == id) select(LATEST_DAILY)
+        else if (selectedId == ROTATE_PHOTOS) rebuildBackdrop()
     }
 }

@@ -42,6 +42,9 @@ object AerialSettings {
      * Minutes of no input on Home before Aerial's screensaver starts (issue #66). The firmware's own
      * screensaver still caps it: Aerial starts just ahead of that one, see MainActivity.
      */
+    /** Every app's name under its tile, not only the focused one's (issue #28). */
+    var showAllNames by mutableStateOf(false); private set
+
     var screensaverMinutes by mutableStateOf(DEFAULT_SCREENSAVER_MINUTES); private set
 
     val screensaverChoices = listOf(2, 5, 10, 20)
@@ -55,12 +58,18 @@ object AerialSettings {
         focusStyle = FocusStyle.of(prefs.getString("focus_style", null))
         pinnedSources = prefs.getStringSet("pinned_sources", null)?.toSet() ?: emptySet()
         bootSource = prefs.getString("boot_source", null)
+        showAllNames = prefs.getBoolean("show_all_names", false)
         screensaverMinutes = prefs.getInt("screensaver_minutes", DEFAULT_SCREENSAVER_MINUTES)
     }
 
     fun chooseBootSource(id: String?) {
         bootSource = id
         app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putString("boot_source", id) }
+    }
+
+    fun chooseShowAllNames(on: Boolean) {
+        showAllNames = on
+        app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean("show_all_names", on) }
     }
 
     fun chooseScreensaverMinutes(minutes: Int) {

@@ -63,6 +63,7 @@
     <string name="wp_daily_latest">每日自动更新</string>
     <string name="wp_builtin">内置</string>
     <string name="wp_photos">我的照片</string>
+    <string name="wp_photos_rotate">每天换一张</string>
     <string name="wp_screensaver">屏幕保护程序</string>
     <string name="ss_aerial">航拍</string>
     <string name="ss_photos">照片</string>
@@ -75,6 +76,9 @@
     <string name="ss_minutes">%d 分钟</string>
     <string name="ss_back_hint">提示：在主页第一行按返回键，也可以立即开始屏保。</string>
     <string name="st_focus_style">焦点样式</string>
+    <string name="st_names">App 名称</string>
+    <string name="st_names_focused">只显示选中的</string>
+    <string name="st_names_all">全部显示</string>
     <string name="st_focus_high">高对比度</string>
     <string name="st_focus_standard">标准</string>
     <string name="st_focus_high_hint">选中的 App 外面加一圈白色描边，离得远也看得清。</string>

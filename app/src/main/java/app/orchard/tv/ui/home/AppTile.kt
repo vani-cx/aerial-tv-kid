@@ -387,7 +387,8 @@ fun AppTile(
                 .offset(y = height + 10.dp)
                 .requiredSize(width + 36.dp, 24.dp)
                 .graphicsLayer {
-                    alpha = lift
+                    // With every name shown, the others stay a little dimmer than the focused one.
+                    alpha = if (AerialSettings.showAllNames) 0.7f + 0.3f * lift else lift
                     // Sits just under the lifted tile, and rises into place as it appears.
                     translationY = height.toPx() * (scale - 1f) / 2f - (1f - lift) * 6.dp.toPx() +
                         ring * (RingGap + RingWidth).toPx() * scale

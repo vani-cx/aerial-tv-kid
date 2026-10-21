@@ -149,13 +149,17 @@ fun WallpaperSheet(visible: Boolean, onDismiss: () -> Unit, onStartScreensaver: 
 
                     Spacer(Modifier.height(24.dp))
                     SectionTitle(R.string.st_focus_style)
-                    // The last row that takes focus: bring the weather below it into view too.
-                    FocusChoice(onFocused = { scope.launch { scroll.animateScrollTo(scroll.maxValue) } })
+                    FocusChoice()
                     Spacer(Modifier.height(8.dp))
                     BasicText(
                         stringResource(if (AerialSettings.focusStyle == FocusStyle.HighContrast) R.string.st_focus_high_hint else R.string.st_focus_standard_hint),
                         style = Type.Caption.copy(color = Palette.TertiaryLabel),
                     )
+
+                    Spacer(Modifier.height(24.dp))
+                    SectionTitle(R.string.st_names)
+                    // The last row that takes focus: bring the weather below it into view too.
+                    NamesChoice(onFocused = { scope.launch { scroll.animateScrollTo(scroll.maxValue) } })
 
                     Spacer(Modifier.height(24.dp))
                     SectionTitle(R.string.wp_weather)
@@ -182,7 +186,11 @@ private fun WallpaperRows() {
         if (daily.isNotEmpty()) {
             add(R.string.wp_daily to listOf(Wallpaper(Wallpapers.LATEST_DAILY, WallpaperKind.Daily, stringResource(R.string.wp_daily_latest))) + daily)
         }
-        items.filter { it.kind == WallpaperKind.Photo }.takeIf { it.isNotEmpty() }?.let { add(R.string.wp_photos to it) }
+        items.filter { it.kind == WallpaperKind.Photo }.takeIf { it.isNotEmpty() }?.let { photos ->
+            // With two or more, the first card takes turns through all of them, one a day (#27).
+            val rotate = if (photos.size > 1) listOf(Wallpaper(Wallpapers.ROTATE_PHOTOS, WallpaperKind.Photo, stringResource(R.string.wp_photos_rotate))) else emptyList()
+            add(R.string.wp_photos to rotate + photos)
+        }
         add(R.string.wp_builtin to items.filter { it.kind == WallpaperKind.Builtin || it.kind == WallpaperKind.Auto })
     }
     rows.forEachIndexed { r, (title, list) ->
@@ -254,13 +262,23 @@ private fun SectionTitle(title: Int) {
 }
 
 @Composable
-private fun FocusChoice(onFocused: () -> Unit) {
+private fun FocusChoice() {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         listOf(
             FocusStyle.HighContrast to R.string.st_focus_high,
             FocusStyle.Standard to R.string.st_focus_standard,
         ).forEach { (style, label) ->
-            Chip(stringResource(label), on = AerialSettings.focusStyle == style, onFocused = onFocused) { AerialSettings.chooseFocusStyle(style) }
+            Chip(stringResource(label), on = AerialSettings.focusStyle == style) { AerialSettings.chooseFocusStyle(style) }
+        }
+    }
+}
+
+/** App names: only under the focused app, as on tvOS, or under every app (issue #28). */
+@Composable
+private fun NamesChoice(onFocused: () -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        listOf(false to R.string.st_names_focused, true to R.string.st_names_all).forEach { (all, label) ->
+            Chip(stringResource(label), on = AerialSettings.showAllNames == all, onFocused = onFocused) { AerialSettings.chooseShowAllNames(all) }
         }
     }
 }

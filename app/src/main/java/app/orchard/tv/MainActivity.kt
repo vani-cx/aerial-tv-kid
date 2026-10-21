@@ -304,6 +304,7 @@ class MainActivity : ComponentActivity() {
         // Apps can change while Aerial is in the background without it hearing about it.
         vm.reload()
         Wallpapers.refreshDailyIfStale()
+        Wallpapers.rotateIfDue()
         Weather.refreshIfStale()
         Updates.checkIfStale()
     }
