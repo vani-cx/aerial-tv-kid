@@ -127,7 +127,10 @@ private fun darkened(src: ImageBitmap, alpha: Float): ImageBitmap {
     return out.asImageBitmap()
 }
 
-/** Date over a large, light clock: the lock-screen arrangement. The weather follows the date. */
+/**
+ * Date over a large, light clock: the lock-screen arrangement. The weather follows the date, with
+ * the city it is for (issue #59). The clock screensaver shows the same.
+ */
 @Composable
 fun ShelfClock(now: LocalDateTime, modifier: Modifier = Modifier) {
     val dim = Color.White.copy(alpha = 0.86f)
@@ -136,7 +139,8 @@ fun ShelfClock(now: LocalDateTime, modifier: Modifier = Modifier) {
             BasicText(dateText(now), style = Type.Title.copy(color = dim))
             Weather.now?.let { w ->
                 GlyphIcon(glyphFor(w), dim, 22.dp, Modifier.padding(start = 18.dp, end = 6.dp))
-                BasicText("${w.celsius}°", style = Type.Title.copy(color = dim))
+                val place = Weather.place?.takeIf { it.length <= 12 }
+                BasicText(listOfNotNull(place, "${w.celsius}°").joinToString(" "), style = Type.Title.copy(color = dim))
             }
         }
         BasicText(timeText(now), style = Type.Clock, modifier = Modifier.padding(top = 2.dp))
