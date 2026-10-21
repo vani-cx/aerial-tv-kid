@@ -275,10 +275,11 @@ object SystemProbe {
     private fun xiaomiRoute(info: TvInputInfo, kind: SourceKind, profile: DeviceProfile): Intent? {
         val n = hw(info.id) ?: return null
         return when (kind) {
-            // MediaTek hardware ids HW5.. map onto Xiaomi's source ids 23.. for HDMI.
+            // MediaTek hardware ids HW5.. map onto Xiaomi's source ids 23.. for HDMI; models that
+            // number theirs otherwise have them in their profile (MiTV-ANTL0, #64).
             SourceKind.Hdmi -> Intent("com.xiaomi.mitv.tvplayer.EXTSRC_PLAY")
                 .setComponent(ComponentName(XIAOMI_PLAYER, "$XIAOMI_PLAYER.ExternalSourceActivity"))
-                .putExtra("input", n + 18)
+                .putExtra("input", profile.xiaomiSourceIds[n] ?: (n + 18))
             // DP and USB-C numbers do not follow the HDMI ones (#62), so only models whose numbers
             // are known get a route; the rest fall back to the generic intent.
             SourceKind.DisplayPort -> profile.xiaomiSourceIds[n]?.let {
@@ -314,11 +315,13 @@ object SystemProbe {
  * (HW8) with no connector behind it, and its two tuners are better named by what they receive.
  * MiTV-MFFU1 (Redmi monitor G Pro 27U) registers its DP port (HW9) and its USB-C port (HW10) both
  * as DisplayPort; its tvplayer knows them as source 29 and 30 (#62, found in its MonitorUtils).
+ * MiTV-ANTL0 (L42R7-RA, Amlogic, Android 5.1) registers only one HDMI input, HW6, labelled
+ * HDMI2, but it is the HDMI 1 port and source 23 (#64, from the reporter's logcat).
  */
 private class DeviceProfile(
     val hiddenHardware: Set<Int?> = emptySet(),
     val labels: Map<Int?, String> = emptyMap(),
-    /** Xiaomi tvplayer source ids for inputs that have no rule, by MediaTek hardware id. */
+    /** Xiaomi tvplayer source ids for inputs that have no rule or another one, by hardware id. */
     val xiaomiSourceIds: Map<Int, Int> = emptyMap(),
 ) {
     companion object {
@@ -330,6 +333,10 @@ private class DeviceProfile(
             "MiTV_MFFU1", "MiTV-MFFU1" -> DeviceProfile(
                 labels = mapOf(9 to "DP", 10 to "USB-C"),
                 xiaomiSourceIds = mapOf(9 to 29, 10 to 30),
+            )
+            "MiTV_ANTL0", "MiTV-ANTL0" -> DeviceProfile(
+                labels = mapOf(6 to "HDMI 1"),
+                xiaomiSourceIds = mapOf(6 to 23),
             )
             else -> DeviceProfile()
         }
