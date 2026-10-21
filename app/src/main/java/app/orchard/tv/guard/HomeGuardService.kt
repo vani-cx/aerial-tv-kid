@@ -259,10 +259,18 @@ class HomeGuardService : AccessibilityService() {
         )?.activityInfo?.packageName == packageName
 
     private fun refreshStockHomes() {
-        stockHomes = packageManager.queryIntentActivities(
+        val standard = packageManager.queryIntentActivities(
             Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME),
             PackageManager.MATCH_DEFAULT_ONLY,
         )
+        // Coocaa's launcher (Skyworth 9H89_G91 and 9S60_G60, Android 8) declares only private
+        // categories such as android.intent.category.HOME.CC; the firmware starts it by component
+        // (issues #69, #73). Every MAIN activity is listed so their filters can be read.
+        val vendor = runCatching {
+            packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN), PackageManager.GET_RESOLVED_FILTER)
+                .filter { ri -> ri.filter?.categoriesIterator()?.asSequence()?.any { it.startsWith(VENDOR_HOME_PREFIX) } == true }
+        }.getOrDefault(emptyList())
+        stockHomes = (standard + vendor)
             // Negative priority entries are fallbacks shown only while nothing else can be Home.
             .filter { it.activityInfo.packageName != packageName && it.priority >= 0 }
             .groupBy({ it.activityInfo.packageName }, { it.activityInfo.name })
@@ -276,6 +284,12 @@ class HomeGuardService : AccessibilityService() {
      */
     private fun goHome(woke: Boolean = false) {
         if (!GuardSetup.isUserUnlocked(this)) return
+        // Starting an activity can light the screen: on OPPO K9 the TV came back on by itself a few
+        // seconds into standby (issue #22). The screen-on check takes over at wake instead.
+        if (getSystemService<PowerManager>()?.isInteractive == false) {
+            Log.i(TAG, "screen off; leaving Home to the screen-on check")
+            return
+        }
         runCatching {
             startActivity(MainActivity.bringBackIntent(this).putExtra(MainActivity.EXTRA_WOKE, woke))
         }.onFailure { Log.w(TAG, "could not bring Aerial Home to the front", it) }
@@ -285,6 +299,7 @@ class HomeGuardService : AccessibilityService() {
         private const val TAG = "AerialGuard"
         private const val BOOT_WINDOW_MS = 3 * 60 * 1000L
         private const val SETTLE_MS = 1500L
+        private const val VENDOR_HOME_PREFIX = "android.intent.category.HOME."
 
         @Volatile
         private var instance: HomeGuardService? = null
