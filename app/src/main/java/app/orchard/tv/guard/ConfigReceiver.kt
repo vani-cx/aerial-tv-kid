@@ -4,12 +4,14 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import app.orchard.tv.apps.TileSheet
+import app.orchard.tv.settings.AerialSettings
 import kotlinx.coroutines.launch
 
 /**
  * Options set from a computer over ADB, e.g.
  *   adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver --ez keep_adb true
  *   ... --ez own_screensaver true   (keep Aerial as the system screensaver; see GuardSetup)
+ *   ... --ez clear_pin true         (turn the parental PIN off, for an owner who forgot it)
  * The manifest requires the sender to hold WRITE_SECURE_SETTINGS, which the ADB shell has and
  * ordinary apps cannot get, so no other app on the TV can flip these.
  */
@@ -25,6 +27,10 @@ class ConfigReceiver : BroadcastReceiver() {
             }
             resultData = "exporting $name"
             return
+        }
+        if (intent.getBooleanExtra("clear_pin", false)) {
+            AerialSettings.init(context)
+            AerialSettings.choosePin(null)
         }
         if (intent.hasExtra("keep_adb")) GuardSetup.setKeepAdb(context, intent.getBooleanExtra("keep_adb", false))
         if (intent.hasExtra("own_screensaver")) GuardSetup.setOwnScreensaver(context, intent.getBooleanExtra("own_screensaver", false))

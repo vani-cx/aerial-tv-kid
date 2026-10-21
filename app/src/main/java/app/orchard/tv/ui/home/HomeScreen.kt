@@ -68,6 +68,7 @@ import app.orchard.tv.CcPage
 import app.orchard.tv.HomeViewModel
 import app.orchard.tv.Overlay
 import app.orchard.tv.R
+import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.apps.AppEntry
 import app.orchard.tv.ui.control.ControlCenter
 import app.orchard.tv.ui.wallpaper.WallpaperSheet
@@ -439,6 +440,18 @@ fun HomeScreen(
                 vm.overlay = Overlay.None
                 onStartScreensaver()
             },
+            onPin = { on ->
+                if (on) vm.overlay = Overlay.Pin(PinMode.Create) { vm.overlay = Overlay.Wallpaper }
+                else vm.whenUnlocked { AerialSettings.choosePin(null); vm.overlay = Overlay.Wallpaper }
+            },
+        )
+
+        val pin = overlay as? Overlay.Pin
+        PinPad(
+            visible = pin != null,
+            mode = pin?.mode,
+            onDone = { pin?.onDone?.invoke() },
+            onCancel = { vm.overlay = Overlay.None },
         )
 
         Screensaver(visible = vm.screensaverVisible, apps = apps, now = now, skips = vm.screensaverSkips)

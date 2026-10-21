@@ -199,8 +199,8 @@ private fun MainPage(vm: HomeViewModel, now: LocalDateTime, takeFocus: Boolean, 
             RoundButton(
                 when (vm.network.kind) { NetKind.Ethernet -> Glyph.Ethernet; NetKind.Offline -> Glyph.Offline; else -> Glyph.Wifi },
                 stringResource(R.string.cc_network),
-            ) { onOpen(SystemProbe.networkSettingsIntent(context)) }
-            RoundButton(Glyph.Gear, stringResource(R.string.cc_settings)) { onOpen(SystemProbe.settingsIntent(context)) }
+            ) { vm.whenUnlocked { onOpen(SystemProbe.networkSettingsIntent(context)) } }
+            RoundButton(Glyph.Gear, stringResource(R.string.cc_settings)) { vm.whenUnlocked { onOpen(SystemProbe.settingsIntent(context)) } }
         }
 
         Spacer(Modifier.height(16.dp))
@@ -218,7 +218,7 @@ private fun MainPage(vm: HomeViewModel, now: LocalDateTime, takeFocus: Boolean, 
         MenuRow(
             Glyph.EyeSlash,
             stringResource(R.string.cc_hidden_apps),
-            onClick = { vm.overlay = Overlay.HiddenApps },
+            onClick = { vm.whenUnlocked { vm.overlay = Overlay.HiddenApps } },
             trailing = vm.hiddenApps.size.toString(),
         )
         Updates.available?.let { latest ->

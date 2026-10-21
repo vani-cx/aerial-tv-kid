@@ -45,6 +45,7 @@ import app.orchard.tv.ui.theme.LocalReducedMotion
 import app.orchard.tv.ui.theme.canvasDensity
 import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.wallpaper.Wallpapers
+import app.orchard.tv.system.SystemProbe
 import app.orchard.tv.update.Updates
 import app.orchard.tv.weather.Weather
 import kotlinx.coroutines.flow.filterNotNull
@@ -336,6 +337,11 @@ class MainActivity : ComponentActivity() {
 
     /** Opens an app, growing it out of its tile. */
     private fun launch(app: AppEntry, bounds: Rect?) {
+        // The TV's settings app behind the parental PIN as well, not only Control Center's button.
+        if (AerialSettings.locked && SystemProbe.isSettingsApp(this, app.packageName)) {
+            vm.whenUnlocked { launch(app, bounds) }
+            return
+        }
         openedAppSinceHome = true
         // The stock launcher (Xiaomi's PatchWall, with the maker's own iQIYI / Mango content) can
         // only be opened through the system Home action; see HomeGuardService.openStockLauncher.

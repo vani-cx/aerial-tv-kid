@@ -126,6 +126,13 @@ object SystemProbe {
 
     // ---- Settings entries: the TV maker's own settings app where there is one ----
 
+    /** Whether [pkg] is the TV's settings app (behind the parental PIN when one is set). */
+    fun isSettingsApp(context: Context, pkg: String): Boolean =
+        pkg in SETTINGS_PACKAGES ||
+            context.packageManager.resolveActivity(Intent(Settings.ACTION_SETTINGS), 0)?.activityInfo?.packageName == pkg
+
+    private val SETTINGS_PACKAGES = setOf("com.android.settings", "com.android.tv.settings", "com.xiaomi.mitv.settings", "com.tcl.settings")
+
     fun settingsIntent(context: Context): Intent =
         firstResolvable(
             context,

@@ -86,7 +86,7 @@ import kotlin.math.roundToInt
  * right opens the same settings on a phone, where sending photos is easy.
  */
 @Composable
-fun WallpaperSheet(visible: Boolean, onDismiss: () -> Unit, onStartScreensaver: () -> Unit) {
+fun WallpaperSheet(visible: Boolean, onDismiss: () -> Unit, onStartScreensaver: () -> Unit, onPin: (on: Boolean) -> Unit) {
     val context = LocalContext.current
     var phoneUrl by remember { mutableStateOf<String?>(null) }
     var qr by remember { mutableStateOf<ImageBitmap?>(null) }
@@ -158,8 +158,14 @@ fun WallpaperSheet(visible: Boolean, onDismiss: () -> Unit, onStartScreensaver: 
 
                     Spacer(Modifier.height(24.dp))
                     SectionTitle(R.string.st_names)
+                    NamesChoice()
+
+                    Spacer(Modifier.height(24.dp))
+                    SectionTitle(R.string.st_pin)
                     // The last row that takes focus: bring the weather below it into view too.
-                    NamesChoice(onFocused = { scope.launch { scroll.animateScrollTo(scroll.maxValue) } })
+                    PinChoice(onPin, onFocused = { scope.launch { scroll.animateScrollTo(scroll.maxValue) } })
+                    Spacer(Modifier.height(8.dp))
+                    BasicText(stringResource(R.string.st_pin_hint), style = Type.Caption.copy(color = Palette.TertiaryLabel))
 
                     Spacer(Modifier.height(24.dp))
                     SectionTitle(R.string.wp_weather)
@@ -275,10 +281,22 @@ private fun FocusChoice() {
 
 /** App names: only under the focused app, as on tvOS, or under every app (issue #28). */
 @Composable
-private fun NamesChoice(onFocused: () -> Unit) {
+private fun NamesChoice() {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         listOf(false to R.string.st_names_focused, true to R.string.st_names_all).forEach { (all, label) ->
-            Chip(stringResource(label), on = AerialSettings.showAllNames == all, onFocused = onFocused) { AerialSettings.chooseShowAllNames(all) }
+            Chip(stringResource(label), on = AerialSettings.showAllNames == all) { AerialSettings.chooseShowAllNames(all) }
+        }
+    }
+}
+
+/** Parental PIN on or off; either way goes through the PIN pad (issue #10). */
+@Composable
+private fun PinChoice(onPin: (on: Boolean) -> Unit, onFocused: () -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        listOf(false to R.string.st_pin_off, true to R.string.st_pin_on).forEach { (on, label) ->
+            Chip(stringResource(label), on = AerialSettings.pinSet == on, onFocused = onFocused) {
+                if (AerialSettings.pinSet != on) onPin(on)
+            }
         }
     }
 }

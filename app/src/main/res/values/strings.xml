@@ -97,4 +97,15 @@
     <string name="cc_update_command">To update, run the install command again on a computer on the same network:</string>
     <string name="cc_update_agent">Or ask an AI agent: “Update Aerial on the TV at %s, following aerial.qust.me/agent.md.”</string>
     <string name="cc_update_keeps">Your apps, layout, wallpaper and settings stay as they are.</string>
+    <string name="st_pin">Parental PIN</string>
+    <string name="st_pin_off">Off</string>
+    <string name="st_pin_on">On</string>
+    <string name="st_pin_hint">Asked before TV settings open and before hidden apps come back.</string>
+    <string name="pin_enter">Enter PIN</string>
+    <string name="pin_enter_hint">Use the number keys or the keypad below.</string>
+    <string name="pin_create">Choose a PIN</string>
+    <string name="pin_create_hint">Four digits. Keep it somewhere safe: if it is forgotten, only a computer over ADB can clear it.</string>
+    <string name="pin_confirm">Enter It Again</string>
+    <string name="pin_wrong">Wrong PIN. Try again.</string>
+    <string name="pin_mismatch">The two PINs differ. Choose one again.</string>
 </resources>

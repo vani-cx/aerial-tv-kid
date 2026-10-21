@@ -5,6 +5,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.edit
+import android.os.SystemClock
+import java.security.MessageDigest
 
 /**
  * How the focused app shows itself, named after tvOS's Accessibility > Increase Contrast > Focus Style.
@@ -45,6 +47,15 @@ object AerialSettings {
     /** Every app's name under its tile, not only the focused one's (issue #28). */
     var showAllNames by mutableStateOf(false); private set
 
+    /**
+     * Parental PIN (issue #10): asked before TV settings open and before hidden apps come back.
+     * Kept as a SHA-256 hash. One right entry holds for a while, until Home is pressed.
+     */
+    var pinSet by mutableStateOf(false); private set
+    private var pinHash: String? = null
+    private var unlockedUntil = 0L
+    private const val UNLOCK_MS = 10 * 60 * 1000L
+
     var screensaverMinutes by mutableStateOf(DEFAULT_SCREENSAVER_MINUTES); private set
 
     val screensaverChoices = listOf(2, 5, 10, 20)
@@ -58,6 +69,8 @@ object AerialSettings {
         focusStyle = FocusStyle.of(prefs.getString("focus_style", null))
         pinnedSources = prefs.getStringSet("pinned_sources", null)?.toSet() ?: emptySet()
         bootSource = prefs.getString("boot_source", null)
+        pinHash = prefs.getString("pin_hash", null)
+        pinSet = pinHash != null
         showAllNames = prefs.getBoolean("show_all_names", false)
         screensaverMinutes = prefs.getInt("screensaver_minutes", DEFAULT_SCREENSAVER_MINUTES)
     }
@@ -66,6 +79,27 @@ object AerialSettings {
         bootSource = id
         app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putString("boot_source", id) }
     }
+
+    val locked: Boolean get() = pinSet && SystemClock.elapsedRealtime() > unlockedUntil
+
+    fun unlock(pin: String): Boolean {
+        if (hash(pin) != pinHash) return false
+        unlockedUntil = SystemClock.elapsedRealtime() + UNLOCK_MS
+        return true
+    }
+
+    fun relock() { unlockedUntil = 0L }
+
+    /** Sets the PIN, or turns it off with null. */
+    fun choosePin(pin: String?) {
+        pinHash = pin?.let(::hash)
+        pinSet = pinHash != null
+        unlockedUntil = if (pin != null) SystemClock.elapsedRealtime() + UNLOCK_MS else 0L
+        app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putString("pin_hash", pinHash) }
+    }
+
+    private fun hash(pin: String): String =
+        MessageDigest.getInstance("SHA-256").digest("aerial:$pin".toByteArray()).joinToString("") { "%02x".format(it) }
 
     fun chooseShowAllNames(on: Boolean) {
         showAllNames = on

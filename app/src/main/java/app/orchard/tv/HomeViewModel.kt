@@ -21,6 +21,7 @@ import app.orchard.tv.system.NetworkStatus
 import app.orchard.tv.system.SystemProbe
 import app.orchard.tv.system.TvSource
 import app.orchard.tv.system.VolumeStatus
+import app.orchard.tv.ui.home.PinMode
 import app.orchard.tv.ui.home.ScreensaverSkips
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -34,6 +35,7 @@ sealed interface Overlay {
     data class AppMenu(val key: String, val anchor: Rect) : Overlay
     data object HiddenApps : Overlay
     data object Wallpaper : Overlay
+    data class Pin(val mode: PinMode, val onDone: () -> Unit) : Overlay
 }
 
 enum class CcPage { Main, Inputs, InputSettings, Update }
@@ -165,6 +167,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         volume = SystemProbe.volume(context)
     }
 
+    /** Runs [action] at once, or after the parental PIN when one is set (issue #10). */
+    fun whenUnlocked(action: () -> Unit) {
+        if (!AerialSettings.locked) action()
+        else overlay = Overlay.Pin(PinMode.Unlock) { overlay = Overlay.None; action() }
+    }
+
     fun hide(key: String) {
         store.hide(key)
         arrange()
@@ -199,6 +207,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun onHomePressed(resetFocus: Boolean = true) {
         screensaverVisible = false
+        AerialSettings.relock()
         overlay = Overlay.None
         movingKey = null
         if (resetFocus) homeResetPending = true

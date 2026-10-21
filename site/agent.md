@@ -205,6 +205,7 @@ adb shell cmd role remove-role-holder --user 0 android.app.role.HOME app.orchard
 - **验收第 3 条是 0，但第 2 条里有 Aerial**：常见于升级之后，系统还在找旧的安装目录（小米 Android 9，#72）。运行 `adb shell am force-stop app.orchard.tv`，等 3 秒，再 `adb shell am start -W -n app.orchard.tv/.MainActivity`，然后重新验收。macOS / Linux 也可以直接运行 `curl -fsSL https://aerial.qust.me/install.sh | TV=<IP> bash -s repair`。
 - **用了一段时间后按主页键又回到原桌面**：同上，先试一次上面的强停再打开。
 - **验收第 3 条是 0，第 2 条里也没有 Aerial**：有的固件拦截侧载的无障碍服务。请用户在电视的安全中心或权限管理里允许 Aerial 自启动、无障碍，然后重新运行 `adb shell am start -n app.orchard.tv/.MainActivity` 再验收。
+- **忘了家长密码**：`adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver --ez clear_pin true`，密码就关掉了。
 - **不支持**：LG webOS、三星 Tizen、华为智慧屏（鸿蒙）、Android 4.4 及更老的电视。
 
 ## 用户常问
