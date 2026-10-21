@@ -17,6 +17,7 @@
 #      firmware), Aerial Home Guard takes over: an accessibility service that answers the Home key
 #      and steps in front of the stock launcher. Firmwares that force-stop third-party apps on standby
 #      (Xiaomi) switch accessibility services off; a notification-listener binding brings Aerial back
+#      (or, where Android refuses listeners, a sync adapter about 30 s later: guard/RevivalSync.kt)
 #      and Aerial switches the guard on again, which is what WRITE_SECURE_SETTINGS is granted for.
 #
 # Firmwares that block every ADB install (TCL's package verifier) get it through TCL's own 多屏互动,
@@ -184,10 +185,13 @@ adb shell pm grant "$PKG" android.permission.WRITE_SECURE_SETTINGS 2>/dev/null |
 adb shell appops set "$PKG" SYSTEM_ALERT_WINDOW allow 2>/dev/null || true             # open Aerial after boot
 adb shell appops set "$PKG" WRITE_SETTINGS allow 2>/dev/null || true                  # brightness
 adb shell cmd notification allow_listener "$PKG/$PKG.guard.RevivalListener" 2>/dev/null || true  # come back after a kill
-# Android 9 on Xiaomi MiTV-MFTP0 reports success but never binds it (issue #72).
+# Android 9 on Xiaomi MiTV-MFTP0 reports success but never binds it (issue #72): low-RAM devices
+# get no notification listeners at all. Aerial's sync adapter brings it back there instead, later.
 if ! adb shell dumpsys notification 2>/dev/null | grep -q "$PKG/$PKG.guard.RevivalListener"; then
-  echo "Note: this TV did not allow Aerial's notification listener, so Aerial cannot bring itself back" >&2
-  echo "after the TV stops it. If Home ever opens the TV's launcher again: TV=$TV $0 repair" >&2
+  echo "Note: this TV refuses notification listeners. After the TV stops Aerial (Xiaomi does at standby)," >&2
+  echo "Aerial comes back through Android's sync service about 30-60 seconds later, not at once: after a" >&2
+  echo "short standby the TV's launcher can show for up to a minute. Keep auto-sync on. If Home ever stays" >&2
+  echo "on the TV's launcher: TV=$TV $0 repair" >&2
 fi
 # Compose runs much smoother ahead-of-time compiled on TV chips.
 adb shell cmd package compile -m speed -f "$PKG" >/dev/null 2>&1 || true

@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.os.SystemClock
 import android.os.UserManager
 import android.provider.Settings
@@ -60,6 +61,9 @@ object GuardSetup {
      * nothing in front it knew, took Home, and pulled the viewer out of the app they were in.
      */
     fun noteRevival(context: Context) {
+        // Brought back with the screen off: a standby kill (Xiaomi), not eUI stopping Aerial in use.
+        // Counting those, a few standbys in a row made the guard leave PatchWall in front at wake.
+        if (context.getSystemService(PowerManager::class.java)?.isInteractive == false) return
         val now = System.currentTimeMillis()
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val recent = recentRevivals(context, now) + now
@@ -160,22 +164,25 @@ object GuardSetup {
         }.onFailure { Log.w(TAG, "could not set the system screensaver", it) }
     }
 
-    fun ensureEnabled(context: Context) {
+    /** Returns whether Home Guard had been switched off and was put back. */
+    fun ensureEnabled(context: Context): Boolean {
         ensureAdb(context)
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_SECURE_SETTINGS) != PackageManager.PERMISSION_GRANTED) return
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_SECURE_SETTINGS) != PackageManager.PERMISSION_GRANTED) return false
         keepScreensaver(context)
+        RevivalSync.ensure(context)
         val me = ComponentName(context, HomeGuardService::class.java).flattenToString()
         val resolver = context.contentResolver
         val current = Settings.Secure.getString(resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
         val entries = current.split(':').filter { it.isNotBlank() }
         val alreadyOn = entries.any { ComponentName.unflattenFromString(it)?.flattenToString() == me }
-        runCatching {
+        return runCatching {
             if (!alreadyOn) {
                 lastRevivedAt = SystemClock.elapsedRealtime()
                 Settings.Secure.putString(resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, (entries + me).joinToString(":"))
                 Log.i(TAG, "Home Guard had been switched off; turned it back on")
             }
             Settings.Secure.putInt(resolver, Settings.Secure.ACCESSIBILITY_ENABLED, 1)
-        }.onFailure { Log.w(TAG, "could not re-enable Home Guard", it) }
+            !alreadyOn
+        }.onFailure { Log.w(TAG, "could not re-enable Home Guard", it) }.getOrDefault(false)
     }
 }

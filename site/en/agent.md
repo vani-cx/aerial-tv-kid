@@ -197,6 +197,7 @@ Then:
 ## Common cases
 
 - **Xiaomi**: `resolve-activity` still names PatchWall (`com.mitv.tvhome`); that's expected, Home Guard takes over. Never disable `com.mitv.tvhome`. `KEEP_ADB` is recommended.
+- **Xiaomi on Android 9 with low RAM (`adb shell getprop ro.config.low_ram` prints `true`, e.g. MFTP0)**: Android allows no third-party notification listener there, so `allow_listener` prints nothing and does nothing. That is expected; don't keep retrying. Xiaomi force-stops Aerial at standby; from 1.21 Android's sync service brings Aerial back about 30-60 seconds after the stop, and Home Guard then turns ADB back on. Woken after more than a minute, the TV shows Aerial straight away; woken after a few seconds, it shows the stock launcher first and switches to Aerial within about a minute. To test standby, stay in standby for over a minute and look 30 seconds after waking, without pressing Home or opening an app meanwhile. 1.20 and earlier do not come back after standby on these TVs.
 - **TCL**: `adb install` always fails (`INSTALL_FAILED_VERIFICATION_FAILURE`); use 多屏互动 as in "TCL". If the user didn't see the prompt on the TV, run it again.
 - **TVs with only Wireless debugging** (FFALCON 55S595C Ultra, MT9655): adb can't be authorized there, so Aerial installs but can't take over Home.
 - **Hisense VIDAA**: once item 7 has changed `persist.vt.use_home_pkg`, Home goes straight to Aerial; the TV still starts into its own launcher after a reboot (the firmware holds third-party apps back until boot completes), so press Home once.

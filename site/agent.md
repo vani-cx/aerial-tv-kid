@@ -198,6 +198,7 @@ adb shell cmd role remove-role-holder --user 0 android.app.role.HOME app.orchard
 ## 常见情况
 
 - **小米**：`resolve-activity` 仍然显示 PatchWall（`com.mitv.tvhome`）是正常的，由桌面守护接管。千万不要停用 `com.mitv.tvhome`。建议开 `KEEP_ADB`。
+- **小米 Android 9 低内存机型（`adb shell getprop ro.config.low_ram` 是 `true`，比如 MFTP0）**：系统不许任何第三方通知监听，`allow_listener` 没有输出但不生效，这是正常的，不要反复重试。小米待机时会强停 Aerial，1.21 起 Aerial 改由系统的同步服务在强停后约 30–60 秒拉回来，之后守护会把 ADB 也打开。所以待机超过一分钟再唤醒，直接是 Aerial；只待机十几秒就唤醒，会先看到原桌面，最多再等一分钟左右才切回 Aerial。测待机时请待机 1 分钟以上，唤醒后等 30 秒再看结果，不要在这期间按主页键或打开别的 App。1.20 及更早的版本在这类电视上待机后回不来。
 - **TCL**：`adb install` 一定失败（`INSTALL_FAILED_VERIFICATION_FAILURE`），按「TCL 安装」走多屏互动。用户没看到电视上的提示时，重新运行一次。
 - **雷鸟 55S595C Ultra（MT9655）等只有「无线调试」的机型**：拿不到授权，能装但接管不了主页键。
 - **海信 VIDAA**：第 7 步改了 `persist.vt.use_home_pkg` 以后，主页键直接进 Aerial；但开机仍会先进聚好看（固件在开机完成前拦截第三方 App），按一次主页键即可。
