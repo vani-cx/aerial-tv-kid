@@ -4,7 +4,8 @@
 
 ## 现状（2026-10-21）
 
-- 版本 **1.20（versionCode 22）**，2026-10-21 发布（[v1.20](https://github.com/pengchujin/aerial-tv/releases/tag/v1.20)）：个性化里加「主屏幕：标准 / 只显示一排」（只显示一排时第一排放到屏幕下方，不显示大时钟，把屏幕让给壁纸）和「时钟：左上 / 右上」；个性化面板改成 tvOS 设置那样的分组卡片。小米 MiTV-MFTR0（`standard`）和 TCL MT5879 国行（`guard`，多屏互动推送，用 ADB 点的「同意」）装的都是 1.20；新功能只在小米上逐项验证过（两种布局、两个时钟位置、面板各组），两台电视上的这两项都保持默认（标准、左上）。1.19 的修复（#82、#95、#87）见 v1.19 的 Release 说明，1.18 的内容见 v1.18。酷开、乐视、OPPO K9、小米 ANTL0 / Android 9 相关的改动没有真机，只按用户日志改。海信 VIDAA 的主页键见 [devices/hisense-vidaa.md](devices/hisense-vidaa.md)。主要改动见 Release 说明和 ARCHITECTURE.md。
+- 版本 **1.21（versionCode 23）**，2026-10-21 发布（[v1.21](https://github.com/pengchujin/aerial-tv/releases/tag/v1.21)）：系统不许通知监听的电视（低内存 Android 9，小米 MFTP0）上，待机强停后改由同步适配器（`guard/RevivalSync.kt`）约 30–60 秒后拉回 Aerial 并重开守护和 ADB，详见 [devices/xiaomi-mitv-mftp0.md](devices/xiaomi-mitv-mftp0.md)；在 Android 9 低内存模拟器和关掉通知监听的 MFTR0 上验证过，**MFTP0 本机还没用 1.21 实测**。小米 MFTR0 装的是 1.21 的测试包（设置 → 账号里多了「Aerial 桌面守护」账号，卸载时自动删除）。
+- 1.20（versionCode 22）：个性化里加「主屏幕：标准 / 只显示一排」（只显示一排时第一排放到屏幕下方，不显示大时钟，把屏幕让给壁纸）和「时钟：左上 / 右上」；个性化面板改成 tvOS 设置那样的分组卡片。小米 MiTV-MFTR0（`standard`）和 TCL MT5879 国行（`guard`，多屏互动推送，用 ADB 点的「同意」）装的都是 1.20；新功能只在小米上逐项验证过（两种布局、两个时钟位置、面板各组），两台电视上的这两项都保持默认（标准、左上）。1.19 的修复（#82、#95、#87）见 v1.19 的 Release 说明，1.18 的内容见 v1.18。酷开、乐视、OPPO K9、小米 ANTL0 / Android 9 相关的改动没有真机，只按用户日志改。海信 VIDAA 的主页键见 [devices/hisense-vidaa.md](devices/hisense-vidaa.md)。主要改动见 Release 说明和 ARCHITECTURE.md。
 - 具体 IP、每台电视上改过的设置、户主自己的数据：见 **`local/TVS.md`**（不在版本库，需要单独私下拿到）。
 - 开源在 https://github.com/pengchujin/aerial-tv（MIT）。官网在 `site/`，已部署到 https://aerial.qust.me（Cloudflare Worker 静态资源）。还没有自动化测试，以下结论都来自真机操作和日志。
 
@@ -15,7 +16,7 @@
 | 安装 | `adb install` | 多屏互动推送，电视上点一次「同意」（没有多屏互动时用当贝） |
 | 接管 HOME（按 HOME 会闪一下原桌面，约 0.5 秒回到 Aerial） | ✅（1.11 起，adb 测） | 未测 1.11 |
 | 从「桌面」磁贴进入原桌面（小米 PatchWall 的爱奇艺、芒果等内容） | ✅（1.11 起） | 未测 |
-| 待机唤醒后仍是 Aerial | ✅（靠复活机制） | ✅ |
+| 待机唤醒后仍是 Aerial | ✅（靠复活机制；同步适配器这条备用路径在 MFTR0 上关掉通知监听后测过，见 [MFTP0](devices/xiaomi-mitv-mftp0.md)） | ✅ |
 | 信号源磁贴（HDMI 等加到主屏幕，一键切换） | ✅（1.13） | 未测 |
 | 断电重启后仍是 Aerial | ✅（2026-10-20 实测） | ✅（要放行 TCL 的 `APP_AUTO_START`，2026-10-20 实测） |
 | ADB 被关后自动打开 | ✅（小米会主动关） | 不需要（不会关） |
