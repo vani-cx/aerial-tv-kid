@@ -1,6 +1,7 @@
 package app.orchard.tv.ui.home
 
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Build
 import android.view.KeyEvent as NativeKeyEvent
 import androidx.activity.compose.BackHandler
@@ -15,8 +16,13 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,10 +34,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -47,6 +56,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
@@ -65,6 +76,8 @@ import app.orchard.tv.ui.theme.LocalReducedMotion
 import app.orchard.tv.ui.theme.Motion
 import app.orchard.tv.ui.theme.Palette
 import app.orchard.tv.ui.theme.Type
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 private const val COLUMNS = 5
@@ -110,6 +123,7 @@ fun HomeScreen(
     val reduced = LocalReducedMotion.current
     val density = LocalDensity.current
     val now by rememberNow()
+    val scope = rememberCoroutineScope()
 
     val requesters = remember { HashMap<String, FocusRequester>() }
     fun requester(key: String) = requesters.getOrPut(key) { FocusRequester() }
@@ -121,6 +135,12 @@ fun HomeScreen(
     val focusedIndex = apps.indexOfFirst { it.key == focusedKey }
     val focusedRow = if (pillFocused || focusedIndex < 0) 0 else focusedIndex / COLUMNS
     val gridEnabled = overlay == Overlay.None
+
+    // Grid scroll offset (px). The remote sets it from the focused row; a finger drags it freely
+    // (issue #60), and then it stays where the finger left it until the next key press.
+    val scroll = remember { Animatable(0f) }
+    var dragged by remember { mutableStateOf(false) }
+    val movingNow by rememberUpdatedState(moving)
 
     fun focusApp(index: Int) {
         val app = apps.getOrNull(index.coerceIn(0, (apps.size - 1).coerceAtLeast(0))) ?: return
@@ -153,6 +173,7 @@ fun HomeScreen(
     LaunchedEffect(windowFocused, vm.homeResetPending, vm.loaded) {
         if (windowFocused && vm.homeResetPending && vm.loaded) {
             withFrameNanos { }
+            dragged = false
             focusApp(0)
             vm.homeResetPending = false
         }
@@ -160,14 +181,20 @@ fun HomeScreen(
 
     BackHandler(enabled = overlay == Overlay.None && moving == null) {
         // tvOS: Back from inside the grid returns to the top row; Back on the top row starts the
-        // screensaver.
-        if (focusedRow > 0) focusApp(focusedIndex % COLUMNS) else onStartScreensaver()
+        // screensaver. A grid scrolled by touch counts as being inside it.
+        val scrolled = dragged && scroll.value > 1f
+        dragged = false
+        if (focusedRow > 0 || scrolled) focusApp(focusedIndex.coerceAtLeast(0) % COLUMNS) else onStartScreensaver()
     }
 
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
             .onPreviewKeyEvent { e ->
+                // The remote takes the grid back from the finger: scroll follows focus again.
+                // Back leaves it to BackHandler, which needs to know the grid was dragged
+                // (gesture navigation sends Back as a key too).
+                if (e.nativeKeyEvent.keyCode != NativeKeyEvent.KEYCODE_BACK) dragged = false
                 // Moving takes the remote here rather than on the moving tile: the tile does not
                 // always get focus back when the menu closes, and focus then landed on the first
                 // tile, which moved focus instead of the app (#58).
@@ -207,9 +234,13 @@ fun HomeScreen(
         val rows = (apps.size + COLUMNS - 1) / COLUMNS
         val collapsePx = with(density) { (metrics.topRowY - metrics.restY).toPx() }
 
-        val scroll = remember { Animatable(0f) }
         val target = with(density) { metrics.scrollFor(focusedRow, rows).toPx() }
-        LaunchedEffect(target) {
+        val maxScroll = with(density) { metrics.scrollFor(rows - 1, rows).toPx() }.coerceAtLeast(0f)
+        LaunchedEffect(maxScroll) { scroll.updateBounds(0f, maxScroll) }
+        val pastShelf by remember(collapsePx) { derivedStateOf { scroll.value > collapsePx / 2 } }
+        val decay = rememberSplineBasedDecay<Float>()
+        LaunchedEffect(target, dragged) {
+            if (dragged) return@LaunchedEffect
             if (reduced) scroll.snapTo(target)
             // A spring keeps its velocity when a quick second press retargets it mid-flight.
             else scroll.animateTo(target, spring(dampingRatio = 1f, stiffness = 170f))
@@ -222,9 +253,23 @@ fun HomeScreen(
 
         val ambientApp = apps.getOrNull(focusedIndex) ?: apps.firstOrNull()
 
+        val dragState = rememberDraggableState { delta ->
+            dragged = true
+            scope.launch(start = CoroutineStart.UNDISPATCHED) { scroll.snapTo(scroll.value - delta) }
+        }
         Box(
             Modifier
                 .fillMaxSize()
+                .draggable(
+                    dragState,
+                    Orientation.Vertical,
+                    enabled = gridEnabled && rows > 1,
+                    onDragStopped = { velocity ->
+                        if (!reduced) scroll.animateDecay(-velocity, decay)
+                    },
+                )
+                // While moving an app, a tap on empty space ends the move, as OK does.
+                .pointerInput(Unit) { detectTapGestures { if (movingNow != null) vm.endMove() } }
                 .graphicsLayer {
                     val r = backdropBlur.toPx()
                     renderEffect = if (r > 0.5f && Build.VERSION.SDK_INT >= 31) BlurEffect(r, r, TileMode.Clamp) else null
@@ -268,9 +313,19 @@ fun HomeScreen(
                                 lastFocusedIndex = index
                                 pillFocused = false
                             },
-                            onClick = { bounds -> onLaunch(app, bounds) },
+                            onClick = { bounds ->
+                                val mover = moving
+                                if (mover == null) onLaunch(app, bounds)
+                                // While moving, tapping a tile puts the app there; tapping the app
+                                // itself is done.
+                                else if (mover == app.key) vm.endMove()
+                                else {
+                                    vm.moveBy(index - apps.indexOfFirst { it.key == mover })
+                                    runCatching { requester(mover).requestFocus() }
+                                }
+                            },
                             onLongPress = { bounds ->
-                                vm.overlay = Overlay.AppMenu(app.key, bounds ?: Rect.Zero)
+                                if (moving == null) vm.overlay = Overlay.AppMenu(app.key, bounds ?: Rect.Zero)
                             },
                             modifier = Modifier.offset { slot.value },
                         )
@@ -292,7 +347,7 @@ fun HomeScreen(
         StatusPill(
             now = now,
             network = vm.network,
-            showTime = focusedRow > 0,
+            showTime = if (dragged) pastShelf else focusedRow > 0,
             enabled = gridEnabled && moving == null,
             focusRequester = pillRequester,
             onFocused = { gained ->
@@ -305,7 +360,12 @@ fun HomeScreen(
                     }
                 }
             },
-            onClick = { vm.overlay = Overlay.ControlCenter() },
+            onClick = {
+                // A tap focuses the pill and opens Control Center in the same frame, before
+                // onFocused hears of it: note it here so focus comes back to the pill.
+                pillFocused = true
+                vm.overlay = Overlay.ControlCenter()
+            },
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(top = 28.dp, end = metrics.margin - 14.dp)
@@ -318,8 +378,10 @@ fun HomeScreen(
             exit = fadeOut(tween(150)) + slideOutVertically(tween(150, easing = Motion.EaseOut)) { it / 2 },
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
         ) {
+            // Screens that can be touched also say how to move with a finger.
+            val touch = LocalConfiguration.current.touchscreen != Configuration.TOUCHSCREEN_NOTOUCH
             BasicText(
-                stringResource(R.string.move_hint),
+                stringResource(if (touch) R.string.move_hint_touch else R.string.move_hint),
                 style = Type.Body,
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))

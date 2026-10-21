@@ -13,6 +13,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
@@ -26,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +49,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalFocusManager
@@ -107,6 +110,8 @@ fun AppTile(
     var longPressJob by remember { mutableStateOf<Job?>(null) }
     var longFired by remember { mutableStateOf(false) }
     var menuPressed by remember { mutableStateOf(false) }
+    val click by rememberUpdatedState(onClick)
+    val longPress by rememberUpdatedState(onLongPress)
 
     // Lean (degrees) and push (px) used by the edge nudge.
     val leanY = remember { Animatable(0f) }
@@ -261,6 +266,29 @@ fun AppTile(
                         pressed = false
                     }
                     true
+                }
+                // Touch (issue #60): a tap opens the app and a long press opens its menu, both
+                // focusing the tile first. The lift that ends a long press belongs to this tile's
+                // gesture, so it cannot choose the menu's first row. A drag that scrolls the grid
+                // cancels both.
+                .pointerInput(enabled) {
+                    if (!enabled) return@pointerInput
+                    detectTapGestures(
+                        onPress = {
+                            pressed = true
+                            tryAwaitRelease()
+                            pressed = false
+                        },
+                        onTap = {
+                            runCatching { focusRequester.requestFocus() }
+                            click(bounds)
+                        },
+                        onLongPress = {
+                            pressed = false
+                            runCatching { focusRequester.requestFocus() }
+                            longPress(bounds)
+                        },
+                    )
                 }
                 .focusable(enabled),
         ) {

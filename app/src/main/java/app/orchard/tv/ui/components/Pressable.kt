@@ -5,12 +5,14 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -21,6 +23,7 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import app.orchard.tv.ui.theme.LocalReducedMotion
 import app.orchard.tv.ui.theme.Motion
 
@@ -33,12 +36,31 @@ fun KeyEvent.isSelect(): Boolean = when (nativeKeyEvent.keyCode) {
 class PressState {
     var focused by mutableStateOf(false)
     var pressed by mutableStateOf(false)
+
+    /** The press under way came from the remote; a finger on the control must not end it. */
+    internal var byKey = false
 }
+
+/**
+ * Takes taps that land on an overlay's panel, so they neither fall through to Home nor reach a
+ * scrim around the panel that closes it.
+ */
+fun Modifier.consumeTaps(): Modifier = pointerInput(Unit) { detectTapGestures { } }
+
+/**
+ * A tap here closes the overlay. Add it only while the overlay is up: an idle pointer handler
+ * still takes every touch from Home beneath it.
+ */
+fun Modifier.dismissOnTap(onDismiss: () -> Unit): Modifier = pointerInput(Unit) { detectTapGestures { onDismiss() } }
 
 /**
  * A focusable control for the remote. It fires on key up, and only for a press that began on it:
  * when a long press opens a menu, the key-up that ends that press must not also choose the menu's
  * first item.
+ *
+ * A tap (touch screen or mouse, issue #60) does the same: it focuses the control and fires when the
+ * finger lifts. Touches already go only to the control they began on, and a drag that turns into a
+ * scroll cancels the tap.
  */
 @Composable
 fun Pressable(
@@ -51,6 +73,9 @@ fun Pressable(
     content: @Composable BoxScope.(PressState) -> Unit,
 ) {
     val state = remember { PressState() }
+    val ownRequester = remember { FocusRequester() }
+    val requester = focusRequester ?: ownRequester
+    val click by rememberUpdatedState(onClick)
     val reduced = LocalReducedMotion.current
     val scale by animateFloatAsState(
         targetValue = when {
@@ -65,22 +90,43 @@ fun Pressable(
     Box(
         modifier
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            .focusRequester(requester)
             .onFocusChanged {
                 state.focused = it.isFocused
-                if (!it.isFocused) state.pressed = false
+                if (!it.isFocused) {
+                    state.pressed = false
+                    state.byKey = false
+                }
+            }
+            .pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+                detectTapGestures(
+                    onPress = {
+                        state.pressed = true
+                        tryAwaitRelease()
+                        if (!state.byKey) state.pressed = false
+                    },
+                    onTap = {
+                        runCatching { requester.requestFocus() }
+                        click()
+                    },
+                )
             }
             .onKeyEvent { e ->
                 if (onKey?.invoke(e) == true) return@onKeyEvent true
                 if (!e.isSelect()) return@onKeyEvent false
                 when (e.type) {
                     KeyEventType.KeyDown -> {
-                        if (e.nativeKeyEvent.repeatCount == 0) state.pressed = true
+                        if (e.nativeKeyEvent.repeatCount == 0) {
+                            state.pressed = true
+                            state.byKey = true
+                        }
                         true
                     }
                     KeyEventType.KeyUp -> {
-                        val was = state.pressed
+                        val was = state.pressed && state.byKey
                         state.pressed = false
+                        state.byKey = false
                         if (was) onClick()
                         true
                     }

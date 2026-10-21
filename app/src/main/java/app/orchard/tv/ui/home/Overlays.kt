@@ -53,6 +53,8 @@ import app.orchard.tv.R
 import app.orchard.tv.apps.AppEntry
 import app.orchard.tv.apps.CustomIcons
 import app.orchard.tv.ui.components.Pressable
+import app.orchard.tv.ui.components.consumeTaps
+import app.orchard.tv.ui.components.dismissOnTap
 import app.orchard.tv.ui.theme.Glyph
 import app.orchard.tv.ui.theme.GlyphIcon
 import app.orchard.tv.ui.theme.Motion
@@ -141,6 +143,8 @@ fun AppMenu(
     Box(
         Modifier
             .fillMaxSize()
+            // A tap beside the menu closes it, as Back does.
+            .then(if (visible) Modifier.dismissOnTap(onDismiss) else Modifier)
             .layout { measurable, constraints ->
                 val p = measurable.measure(Constraints())
                 val gap = 18.dp.roundToPx()
@@ -157,6 +161,7 @@ fun AppMenu(
             Column(
                 Modifier
                     .width(250.dp)
+                    .consumeTaps()
                     .clip(RoundedCornerShape(20.dp))
                     .background(Palette.Glass)
                     .border(1.dp, Palette.Hairline, RoundedCornerShape(20.dp))
@@ -229,10 +234,11 @@ fun HiddenAppsSheet(
         exit = fadeOut(tween(150)) + scaleOut(tween(150, easing = Motion.EaseOut), targetScale = 0.97f),
         modifier = Modifier.fillMaxSize(),
     ) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxSize().dismissOnTap(onDismiss).background(Color.Black.copy(alpha = 0.35f)), contentAlignment = Alignment.Center) {
             Column(
                 Modifier
                     .width(660.dp)
+                    .consumeTaps()
                     // The canvas is 540 dp tall: past three rows the grid scrolls inside the sheet.
                     .heightIn(max = 480.dp)
                     .clip(RoundedCornerShape(28.dp))

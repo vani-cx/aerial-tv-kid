@@ -60,6 +60,8 @@ import app.orchard.tv.R
 import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.settings.FocusStyle
 import app.orchard.tv.ui.components.Pressable
+import app.orchard.tv.ui.components.consumeTaps
+import app.orchard.tv.ui.components.dismissOnTap
 import app.orchard.tv.ui.theme.Glyph
 import app.orchard.tv.ui.theme.GlyphIcon
 import app.orchard.tv.ui.theme.Motion
@@ -105,7 +107,8 @@ fun WallpaperSheet(visible: Boolean, onDismiss: () -> Unit, onStartScreensaver: 
     }
 
     AnimatedVisibility(visible = visible, enter = fadeIn(tween(220)), exit = fadeOut(tween(180)), modifier = Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.25f)))
+        // A tap above the sheet closes it, back to Control Center as Back does.
+        Box(Modifier.fillMaxSize().dismissOnTap(onDismiss).background(Color.Black.copy(alpha = 0.25f)))
     }
 
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
@@ -118,6 +121,7 @@ fun WallpaperSheet(visible: Boolean, onDismiss: () -> Unit, onStartScreensaver: 
                 Modifier
                     .fillMaxWidth()
                     .height(360.dp)
+                    .consumeTaps()
                     .clip(RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
                     // Nearly opaque: Home is not blurred behind this sheet, so the wallpaper above
                     // it stays sharp while you choose, and the app grid must not show through.

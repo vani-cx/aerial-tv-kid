@@ -16,6 +16,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.WindowManager
 import android.provider.Settings
 import android.widget.Toast
@@ -199,6 +200,7 @@ class MainActivity : ComponentActivity() {
     }
     private val releaseScreen = Runnable { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     private var swallowKeyUp = -1
+    private var swallowTouch = false
 
     /** An app (or the stock launcher) was opened from the grid and Home has not been pressed since. */
     private var openedAppSinceHome = false
@@ -240,6 +242,20 @@ class MainActivity : ComponentActivity() {
             return true
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        restartIdleTimer()
+        // As with keys: the touch that ends the screensaver only ends it, through to the lift.
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            swallowTouch = vm.screensaverVisible
+            if (swallowTouch) hideScreensaver()
+        }
+        if (swallowTouch) {
+            if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) swallowTouch = false
+            return true
+        }
+        return super.dispatchTouchEvent(event)
     }
 
     override fun onNewIntent(intent: Intent) {

@@ -21,6 +21,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -66,6 +69,8 @@ import app.orchard.tv.system.NetKind
 import app.orchard.tv.system.SourceKind
 import app.orchard.tv.system.SystemProbe
 import app.orchard.tv.ui.components.Pressable
+import app.orchard.tv.ui.components.consumeTaps
+import app.orchard.tv.ui.components.dismissOnTap
 import app.orchard.tv.ui.home.MenuRow
 import app.orchard.tv.ui.home.dateText
 import app.orchard.tv.ui.home.timeText
@@ -103,7 +108,8 @@ fun ControlCenter(
         exit = fadeOut(tween(180)),
         modifier = Modifier.fillMaxSize(),
     ) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.28f)))
+        // A tap outside the panel closes Control Center.
+        Box(Modifier.fillMaxSize().dismissOnTap(onClose).background(Color.Black.copy(alpha = 0.28f)))
     }
 
     Box(Modifier.fillMaxSize().padding(top = 24.dp, end = 32.dp), contentAlignment = Alignment.TopEnd) {
@@ -116,6 +122,7 @@ fun ControlCenter(
             Column(
                 Modifier
                     .width(360.dp)
+                    .consumeTaps()
                     .clip(RoundedCornerShape(30.dp))
                     .background(Palette.Glass)
                     .border(1.dp, Palette.Hairline, RoundedCornerShape(30.dp))
@@ -130,10 +137,12 @@ fun ControlCenter(
                     },
                     label = "cc-page",
                 ) { p ->
+                    // Closing sets the page back to Main while the panel fades out; that page must
+                    // not take focus from the tile Home has just put it back on.
                     when (p) {
-                        CcPage.Main -> MainPage(vm, now, onOpen)
-                        CcPage.Inputs -> InputsPage(vm, onOpen)
-                        CcPage.InputSettings -> InputSettingsPage(vm)
+                        CcPage.Main -> MainPage(vm, now, visible, onOpen)
+                        CcPage.Inputs -> InputsPage(vm, visible, onOpen)
+                        CcPage.InputSettings -> InputSettingsPage(vm, visible)
                     }
                 }
             }
@@ -142,10 +151,11 @@ fun ControlCenter(
 }
 
 @Composable
-private fun MainPage(vm: HomeViewModel, now: LocalDateTime, onOpen: (android.content.Intent) -> Unit) {
+private fun MainPage(vm: HomeViewModel, now: LocalDateTime, takeFocus: Boolean, onOpen: (android.content.Intent) -> Unit) {
     val context = LocalContext.current
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) {
+        if (!takeFocus) return@LaunchedEffect
         withFrameNanos { }
         runCatching { first.requestFocus() }
     }
@@ -241,16 +251,20 @@ private fun RoundButton(glyph: Glyph, label: String, focusRequester: FocusReques
 
 /**
  * A Control Center slider: focus it, then Left and Right change the level, OK does [onClick].
- * Shared by volume and brightness so both feel identical.
+ * Shared by volume and brightness so both feel identical. On a touch screen a tap does [onClick]
+ * and a sideways drag steps the level, [steps] steps across the width of the row.
  */
 @Composable
 private fun SliderRow(
     glyph: Glyph,
     level: Float,
     value: String,
+    steps: Int,
     onStep: (Int) -> Unit,
     onClick: () -> Unit,
 ) {
+    val step by rememberUpdatedState(onStep)
+    val stepCount by rememberUpdatedState(steps.coerceAtLeast(1))
     Pressable(
         onClick = onClick,
         focusedScale = 1.03f,
@@ -266,7 +280,21 @@ private fun SliderRow(
         val fg = if (state.focused) Palette.OnFocus else Palette.Label
         val fraction by animateFloatAsState(level, spring(dampingRatio = 1f, stiffness = 700f), label = "slider-level")
         Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(bg).height(48.dp).padding(horizontal = 16.dp),
+            Modifier
+                .fillMaxWidth()
+                .pointerInput(Unit) {
+                    // The level only moves in the steps the system takes, so the drag is counted
+                    // out in steps rather than set to an exact point.
+                    var travelled = 0f
+                    detectHorizontalDragGestures(onDragStart = { travelled = 0f }) { change, dx ->
+                        change.consume()
+                        travelled += dx
+                        val pitch = size.width.toFloat() / stepCount
+                        while (travelled >= pitch) { step(1); travelled -= pitch }
+                        while (travelled <= -pitch) { step(-1); travelled += pitch }
+                    }
+                }
+                .clip(RoundedCornerShape(16.dp)).background(bg).height(48.dp).padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -292,6 +320,7 @@ private fun VolumeRow(vm: HomeViewModel) {
         glyph = if (volume.muted) Glyph.SpeakerMuted else Glyph.Speaker,
         level = if (volume.muted) 0f else volume.fraction,
         value = if (volume.muted) stringResource(R.string.cc_muted) else volume.level.toString(),
+        steps = volume.max,
         onStep = vm::adjustVolume,
         onClick = vm::toggleMute,
     )
@@ -312,6 +341,8 @@ private fun BrightnessRow(vm: HomeViewModel) {
             glyph = Glyph.Sun,
             level = level,
             value = Math.round(level * 100).toString(),
+            // Brightness.adjust moves 5% a step.
+            steps = 20,
             onStep = vm::adjustBrightness,
             onClick = {},
         )
@@ -319,9 +350,10 @@ private fun BrightnessRow(vm: HomeViewModel) {
 }
 
 @Composable
-private fun InputsPage(vm: HomeViewModel, onOpen: (android.content.Intent) -> Unit) {
+private fun InputsPage(vm: HomeViewModel, takeFocus: Boolean, onOpen: (android.content.Intent) -> Unit) {
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) {
+        if (!takeFocus) return@LaunchedEffect
         withFrameNanos { }
         runCatching { first.requestFocus() }
     }
@@ -359,9 +391,10 @@ private fun InputsPage(vm: HomeViewModel, onOpen: (android.content.Intent) -> Un
  * TV starts on (one, or none). Kept apart from the list that switches inputs.
  */
 @Composable
-private fun InputSettingsPage(vm: HomeViewModel) {
+private fun InputSettingsPage(vm: HomeViewModel, takeFocus: Boolean) {
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) {
+        if (!takeFocus) return@LaunchedEffect
         withFrameNanos { }
         runCatching { first.requestFocus() }
     }
