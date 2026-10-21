@@ -191,7 +191,9 @@ fun HomeScreen(
         // screensaver. A grid scrolled by touch counts as being inside it.
         val scrolled = dragged && scroll.value > 1f
         dragged = false
-        if (focusedRow > 0 || scrolled) focusApp(focusedIndex.coerceAtLeast(0) % COLUMNS) else onStartScreensaver()
+        // Handled even when that is turned off: unhandled, Back would close Home itself.
+        if (focusedRow > 0 || scrolled) focusApp(focusedIndex.coerceAtLeast(0) % COLUMNS)
+        else if (AerialSettings.backStartsScreensaver) onStartScreensaver()
     }
 
     BoxWithConstraints(

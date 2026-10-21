@@ -75,6 +75,10 @@
     <string name="ss_delay">开始时间</string>
     <string name="ss_minutes">%d 分钟</string>
     <string name="ss_back_hint">提示：在主页第一行按返回键，也可以立即开始屏保。</string>
+    <string name="ss_back">返回键</string>
+    <string name="ss_back_on">开始屏保</string>
+    <string name="ss_back_off">不响应</string>
+    <string name="ss_back_choice_hint">在主页第一行按返回键时做什么。容易误按的话可以关掉，屏保仍会按时自动开始。</string>
     <string name="st_focus_style">焦点样式</string>
     <string name="st_home_layout">主屏幕</string>
     <string name="st_layout">布局</string>

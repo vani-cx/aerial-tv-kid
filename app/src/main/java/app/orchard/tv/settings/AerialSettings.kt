@@ -56,6 +56,9 @@ object AerialSettings {
     /** The clock, with the date and weather, in the top right instead of the top left. */
     var clockRight by mutableStateOf(false); private set
 
+    /** Back on Home's top row starts the screensaver, as on tvOS; off for homes where it gets pressed by accident (issue #94). */
+    var backStartsScreensaver by mutableStateOf(true); private set
+
     /**
      * Parental PIN (issue #10): asked before TV settings open and before hidden apps come back.
      * Kept as a SHA-256 hash. One right entry holds for a while, until Home is pressed.
@@ -83,6 +86,7 @@ object AerialSettings {
         showAllNames = prefs.getBoolean("show_all_names", false)
         oneRowHome = prefs.getBoolean("one_row_home", false)
         clockRight = prefs.getBoolean("clock_right", false)
+        backStartsScreensaver = prefs.getBoolean("back_starts_screensaver", true)
         screensaverMinutes = prefs.getInt("screensaver_minutes", DEFAULT_SCREENSAVER_MINUTES)
     }
 
@@ -125,6 +129,11 @@ object AerialSettings {
     fun chooseClockRight(on: Boolean) {
         clockRight = on
         app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean("clock_right", on) }
+    }
+
+    fun chooseBackStartsScreensaver(on: Boolean) {
+        backStartsScreensaver = on
+        app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean("back_starts_screensaver", on) }
     }
 
     fun chooseScreensaverMinutes(minutes: Int) {

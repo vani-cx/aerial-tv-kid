@@ -172,11 +172,20 @@ fun WallpaperSheet(visible: Boolean, onDismiss: () -> Unit, onStartScreensaver: 
                     Spacer(Modifier.height(22.dp))
                     SectionTitle(R.string.wp_screensaver)
                     Group { note ->
-                        SettingRow(R.string.ss_kind, stringResource(R.string.ss_back_hint), note, first = true) { ScreensaverChoice(onStartScreensaver) }
+                        SettingRow(
+                            R.string.ss_kind,
+                            if (AerialSettings.backStartsScreensaver) stringResource(R.string.ss_back_hint) else null,
+                            note, first = true,
+                        ) { ScreensaverChoice(onStartScreensaver) }
                         Choices(
                             R.string.ss_delay, null, note,
                             AerialSettings.screensaverChoices.map { it to stringResource(R.string.ss_minutes, it) },
                             AerialSettings.screensaverMinutes, AerialSettings::chooseScreensaverMinutes,
+                        )
+                        Choices(
+                            R.string.ss_back, stringResource(R.string.ss_back_choice_hint), note,
+                            listOf(true to R.string.ss_back_on, false to R.string.ss_back_off),
+                            AerialSettings.backStartsScreensaver, AerialSettings::chooseBackStartsScreensaver,
                         )
                     }
 

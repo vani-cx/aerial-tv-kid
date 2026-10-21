@@ -76,6 +76,10 @@
     <string name="ss_delay">Start after</string>
     <string name="ss_minutes">%d min</string>
     <string name="ss_back_hint">Tip: press Back on the top row of Home to start the screensaver.</string>
+    <string name="ss_back">Back Button</string>
+    <string name="ss_back_on">Starts It</string>
+    <string name="ss_back_off">Does Nothing</string>
+    <string name="ss_back_choice_hint">What Back does on the top row of Home. Turn it off if it gets pressed by accident; the screensaver still starts on its own.</string>
     <string name="st_focus_style">Focus Style</string>
     <string name="st_home_layout">Home Screen</string>
     <string name="st_layout">Layout</string>
