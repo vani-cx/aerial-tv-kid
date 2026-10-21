@@ -70,7 +70,7 @@ tools/install.sh / restore.sh       部署与还原
 - **画布**：`MainActivity` 用 `LocalDensity` 把内容缩放到 960×540dp 的设计画布（`density = 屏幕宽 / 960`）。不同厂商的 1080p 屏幕 dpi 不同（小米 320，TCL 240），这样排版完全一致。Compose 里所有 dp/sp 都按这个画布理解。
 - **分辨率**：系统给 App 的界面多大，就按多大画（`ui/theme/Theme.kt` 的 `canvasDensity`：1080p 界面是 2，4K 界面是 4）。预先画好的位图也按它算：磁贴图是「聚焦放大后的磁贴」的实际像素（1080p 时 352×198，4K 时 704×396），壁纸按屏幕像素解码，界面超过 1080p 时每日精选下载必应的 UHD 图。大部分 4K 电视的界面其实是 1080p，由硬件放大（Android TV 的 `config_maxUiWidth` = 1920，Google TV 模拟器和家里三台电视都是这样）；只有厂商放开这个限制的电视才会拿到 4K 界面。4K 路径在 Android 15 的 4K 模拟器（`Aerial4KUI`，非 TV 镜像，没有这个限制）上验证过。
 - **刷新率**：Android 12 起，如果面板能无黑屏地切到更高的刷新率（`Display.Mode.getAlternativeRefreshRates`），首页会选最高的那个（最高 120Hz），见 `MainActivity.preferSmoothestRefreshRate`。会黑屏的切换一律不做：桌面每次回来都黑一下是不可接受的。
-- **网格**（`HomeScreen.GridMetrics`）：5 列，16:9 磁贴，边距 56dp、间距 28dp，第一行在屏幕高 55.5% 处。磁贴用绝对 `offset` 定位，没有用 Row，所以移动 App 时组件不会重建、焦点不会丢，位置变化由 `animateIntOffsetAsState` 做重排动画。
+- **网格**（`HomeScreen.GridMetrics`）：5 列，16:9 磁贴，边距 56dp、间距 28dp，第一行在屏幕高 55.5% 处。个性化里选「主屏幕：只显示一排」（`AerialSettings.oneRowHome`，默认关）时，第一行下移到底部（屏幕高减一个行距再减 12dp，第二行只露一条边），好让壁纸里的合照露出来，像 tvOS 全屏 Top Shelf 时那样；这时不显示大时钟和日期，把屏幕让给壁纸：时钟选「左上」时左上角只留一行小字的时间和天气（`HomeChrome.CornerClock`），选「右上」时时间和天气并进右上角的状态按钮。进网格后的位置和模糊背景不变。标准布局下大时钟也可以放右边（`AerialSettings.clockRight`）。磁贴用绝对 `offset` 定位，没有用 Row，所以移动 App 时组件不会重建、焦点不会丢，位置变化由 `animateIntOffsetAsState` 做重排动画。
 - **滚动**：不用 `verticalScroll`（它会自动 bringIntoView），而是一个 `Animatable` 加内容 `offset`，目标由聚焦行决定（`scrollFor`），用弹簧动画以便连按时平滑改变目标。
 - **焦点**：每个磁贴一个 `FocusRequester`（按包名存在 map 里）。方向键由磁贴自己处理：`moveFocus` 失败时触发边缘回弹。浮层打开时磁贴 `focusable(enabled=false)`，焦点不会逃出浮层；浮层关闭后恢复到原磁贴。HOME 键重置通过 `homeResetPending` 加「窗口重新获得焦点」两个条件触发（在别的 App 在前台时请求焦点会丢）。
 - **返回键**：网格里 → 回第一行；第一行 → 启动屏保（tvOS 行为）。
@@ -111,7 +111,7 @@ Logo 的大小统一：先在 256×256 的采样里找出 Logo 的范围，再�
 
 ## 个性化：壁纸、屏保、焦点样式、天气
 
-控制中心的「个性化」打开 `WallpaperSheet`，按「看得到的效果」从上到下分四段：壁纸、屏幕保护程序、焦点样式、天气（城市在手机页设置）。右边是手机扫码卡片。焦点移到最后一段可聚焦的「焦点样式」时，面板滚到底，让下面的天气也露出来。
+控制中心的「个性化」打开 `WallpaperSheet`，按「看得到的效果」从上到下分组：壁纸（缩略图行）、主屏幕（布局、时钟、App 名称、焦点样式）、屏幕保护程序（类型和立即开始、开始时间）、天气（只读）、家长密码。除壁纸外都是 tvOS 设置那样的分组卡片，一行一个设置，左边名称、右边选项；每组下面一条说明，跟着组里聚焦的那一行变（`Group` / `SettingRow`），说明区固定两行高，焦点移动时面板不跳。天气的城市在手机页设置。右边是手机扫码卡片。焦点移到最后一行「家长密码」时，面板滚到底，让它下面的说明也露出来。
 
 - `Wallpapers` 是 Compose 状态单例，只在主线程写。来源：
   - `daily:<date>`：必应 HPImageArchive，`cn.bing.com`，最近 8 张，存在 `files/daily/`；

@@ -48,6 +48,15 @@ object AerialSettings {
     var showAllNames by mutableStateOf(false); private set
 
     /**
+     * Only the top row on Home, low on the screen, so the wallpaper (a family photo) shows above it,
+     * as tvOS does under a full-screen top shelf. The rest of the grid is one press down.
+     */
+    var oneRowHome by mutableStateOf(false); private set
+
+    /** The clock, with the date and weather, in the top right instead of the top left. */
+    var clockRight by mutableStateOf(false); private set
+
+    /**
      * Parental PIN (issue #10): asked before TV settings open and before hidden apps come back.
      * Kept as a SHA-256 hash. One right entry holds for a while, until Home is pressed.
      */
@@ -72,6 +81,8 @@ object AerialSettings {
         pinHash = prefs.getString("pin_hash", null)
         pinSet = pinHash != null
         showAllNames = prefs.getBoolean("show_all_names", false)
+        oneRowHome = prefs.getBoolean("one_row_home", false)
+        clockRight = prefs.getBoolean("clock_right", false)
         screensaverMinutes = prefs.getInt("screensaver_minutes", DEFAULT_SCREENSAVER_MINUTES)
     }
 
@@ -104,6 +115,16 @@ object AerialSettings {
     fun chooseShowAllNames(on: Boolean) {
         showAllNames = on
         app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean("show_all_names", on) }
+    }
+
+    fun chooseOneRowHome(on: Boolean) {
+        oneRowHome = on
+        app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean("one_row_home", on) }
+    }
+
+    fun chooseClockRight(on: Boolean) {
+        clockRight = on
+        app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean("clock_right", on) }
     }
 
     fun chooseScreensaverMinutes(minutes: Int) {

@@ -15,6 +15,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -46,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
@@ -131,46 +133,68 @@ fun WallpaperSheet(visible: Boolean, onDismiss: () -> Unit, onStartScreensaver: 
             ) {
                 val scroll = rememberScrollState()
                 val scope = rememberCoroutineScope()
-                // How Home looks, in the order you see it: the picture behind everything, what
-                // replaces it when idle, how the focused app stands out, and the weather.
+                // How Home looks, in the order you see it: the picture behind everything, how Home
+                // is laid out over it, what replaces it when idle, then the weather and the PIN.
+                // Settings sit in tvOS-style grouped rows; each group's note follows the focused row.
                 Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(scroll)) {
                     BasicText(stringResource(R.string.wp_title), style = Type.LargeTitle)
                     Spacer(Modifier.height(16.dp))
                     SectionTitle(R.string.wp_wallpaper)
                     WallpaperRows()
 
-                    Spacer(Modifier.height(10.dp))
-                    SectionTitle(R.string.wp_screensaver)
-                    ScreensaverChoice(onStartScreensaver)
                     Spacer(Modifier.height(12.dp))
-                    ScreensaverDelay()
-                    Spacer(Modifier.height(8.dp))
-                    BasicText(stringResource(R.string.ss_back_hint), style = Type.Caption.copy(color = Palette.TertiaryLabel))
+                    SectionTitle(R.string.st_home_layout)
+                    Group { note ->
+                        Choices(
+                            R.string.st_layout, stringResource(R.string.st_home_layout_hint), note,
+                            listOf(false to R.string.st_home_standard, true to R.string.st_home_one_row),
+                            AerialSettings.oneRowHome, AerialSettings::chooseOneRowHome, first = true,
+                        )
+                        Choices(
+                            R.string.st_clock, stringResource(R.string.st_clock_hint), note,
+                            listOf(false to R.string.st_clock_left, true to R.string.st_clock_right),
+                            AerialSettings.clockRight, AerialSettings::chooseClockRight,
+                        )
+                        Choices(
+                            R.string.st_names, stringResource(R.string.st_names_hint), note,
+                            listOf(false to R.string.st_names_focused, true to R.string.st_names_all),
+                            AerialSettings.showAllNames, AerialSettings::chooseShowAllNames,
+                        )
+                        Choices(
+                            R.string.st_focus_style,
+                            stringResource(if (AerialSettings.focusStyle == FocusStyle.HighContrast) R.string.st_focus_high_hint else R.string.st_focus_standard_hint),
+                            note,
+                            listOf(FocusStyle.HighContrast to R.string.st_focus_high, FocusStyle.Standard to R.string.st_focus_standard),
+                            AerialSettings.focusStyle, AerialSettings::chooseFocusStyle,
+                        )
+                    }
 
-                    Spacer(Modifier.height(24.dp))
-                    SectionTitle(R.string.st_focus_style)
-                    FocusChoice()
-                    Spacer(Modifier.height(8.dp))
-                    BasicText(
-                        stringResource(if (AerialSettings.focusStyle == FocusStyle.HighContrast) R.string.st_focus_high_hint else R.string.st_focus_standard_hint),
-                        style = Type.Caption.copy(color = Palette.TertiaryLabel),
-                    )
+                    Spacer(Modifier.height(22.dp))
+                    SectionTitle(R.string.wp_screensaver)
+                    Group { note ->
+                        SettingRow(R.string.ss_kind, stringResource(R.string.ss_back_hint), note, first = true) { ScreensaverChoice(onStartScreensaver) }
+                        Choices(
+                            R.string.ss_delay, null, note,
+                            AerialSettings.screensaverChoices.map { it to stringResource(R.string.ss_minutes, it) },
+                            AerialSettings.screensaverMinutes, AerialSettings::chooseScreensaverMinutes,
+                        )
+                    }
 
-                    Spacer(Modifier.height(24.dp))
-                    SectionTitle(R.string.st_names)
-                    NamesChoice()
-
-                    Spacer(Modifier.height(24.dp))
-                    SectionTitle(R.string.st_pin)
-                    // The last row that takes focus: bring the weather below it into view too.
-                    PinChoice(onPin, onFocused = { scope.launch { scroll.animateScrollTo(scroll.maxValue) } })
-                    Spacer(Modifier.height(8.dp))
-                    BasicText(stringResource(R.string.st_pin_hint), style = Type.Caption.copy(color = Palette.TertiaryLabel))
-
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(22.dp))
                     SectionTitle(R.string.wp_weather)
-                    WeatherLine()
-                    Spacer(Modifier.height(32.dp))
+                    Group(stringResource(if (Weather.chosen) R.string.wp_weather_chosen else R.string.wp_weather_guessed)) { note ->
+                        SettingRow(R.string.wp_weather_city, null, note, first = true) { WeatherValue() }
+                    }
+
+                    // One row says what it is; a title over it would only repeat it.
+                    Spacer(Modifier.height(10.dp))
+                    Group(stringResource(R.string.st_pin_hint)) { note ->
+                        SettingRow(R.string.st_pin, null, note, first = true) {
+                            // The last row that takes focus: bring the note under it into view too.
+                            PinChoice(onPin, onFocused = { scope.launch { scroll.animateScrollTo(scroll.maxValue) } })
+                        }
+                    }
+                    Spacer(Modifier.height(24.dp))
                 }
                 Spacer(Modifier.width(28.dp))
                 PhoneCard(phoneUrl, qr)
@@ -263,28 +287,66 @@ private fun WallpaperCard(wp: Wallpaper, focusRequester: FocusRequester?) {
 
 @Composable
 private fun SectionTitle(title: Int) {
-    BasicText(stringResource(title), style = Type.Headline)
+    BasicText(stringResource(title), style = Type.Headline, modifier = Modifier.padding(start = 4.dp))
     Spacer(Modifier.height(10.dp))
 }
 
+/**
+ * A card of setting rows, as in tvOS Settings, with one note under it: the focused row's, or
+ * [note] when the row has none or focus is elsewhere. The note keeps two lines of room so the
+ * sheet does not shift as focus moves.
+ */
 @Composable
-private fun FocusChoice() {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        listOf(
-            FocusStyle.HighContrast to R.string.st_focus_high,
-            FocusStyle.Standard to R.string.st_focus_standard,
-        ).forEach { (style, label) ->
-            Chip(stringResource(label), on = AerialSettings.focusStyle == style) { AerialSettings.chooseFocusStyle(style) }
+private fun Group(note: String? = null, rows: @Composable ColumnScope.(note: (String?) -> Unit) -> Unit) {
+    var focusedNote by remember { mutableStateOf<String?>(null) }
+    var inside by remember { mutableStateOf(false) }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.05f))
+            .onFocusChanged { inside = it.hasFocus },
+    ) { rows { focusedNote = it } }
+    Box(Modifier.height(38.dp).padding(start = 16.dp, top = 7.dp)) {
+        (if (inside) focusedNote ?: note else note)?.let {
+            BasicText(it, style = Type.Caption.copy(color = Palette.TertiaryLabel), maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
     }
 }
 
-/** App names: only under the focused app, as on tvOS, or under every app (issue #28). */
+/** One row: the setting's name on the left, its control on the right, a hairline above all but the first. */
 @Composable
-private fun NamesChoice() {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        listOf(false to R.string.st_names_focused, true to R.string.st_names_all).forEach { (all, label) ->
-            Chip(stringResource(label), on = AerialSettings.showAllNames == all) { AerialSettings.chooseShowAllNames(all) }
+private fun SettingRow(label: Int, hint: String?, note: (String?) -> Unit, first: Boolean = false, control: @Composable () -> Unit) {
+    if (!first) Box(Modifier.padding(start = 18.dp).fillMaxWidth().height(1.dp).background(Palette.Hairline))
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(58.dp)
+            .padding(start = 18.dp, end = 10.dp)
+            .onFocusChanged { if (it.hasFocus) note(hint) },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        BasicText(stringResource(label), style = Type.Body, modifier = Modifier.weight(1f), maxLines = 1)
+        control()
+    }
+}
+
+/** A row of chips for one of a few values. */
+@Composable
+private fun <T> Choices(
+    label: Int,
+    hint: String?,
+    note: (String?) -> Unit,
+    options: List<Pair<T, Any>>,
+    current: T,
+    choose: (T) -> Unit,
+    first: Boolean = false,
+) {
+    SettingRow(label, hint, note, first) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            options.forEach { (value, text) ->
+                Chip(if (text is Int) stringResource(text) else text.toString(), on = current == value) { choose(value) }
+            }
         }
     }
 }
@@ -292,7 +354,7 @@ private fun NamesChoice() {
 /** Parental PIN on or off; either way goes through the PIN pad (issue #10). */
 @Composable
 private fun PinChoice(onPin: (on: Boolean) -> Unit, onFocused: () -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         listOf(false to R.string.st_pin_off, true to R.string.st_pin_on).forEach { (on, label) ->
             Chip(stringResource(label), on = AerialSettings.pinSet == on, onFocused = onFocused) {
                 if (AerialSettings.pinSet != on) onPin(on)
@@ -303,7 +365,7 @@ private fun PinChoice(onPin: (on: Boolean) -> Unit, onFocused: () -> Unit) {
 
 /** Where the weather is for and what it is now. The city is set on the phone page. */
 @Composable
-private fun WeatherLine() {
+private fun WeatherValue() {
     val w = Weather.now
     val place = Weather.place
     val kind = w?.let {
@@ -321,12 +383,8 @@ private fun WeatherLine() {
     }
     BasicText(
         if (w != null) listOfNotNull(place, "${w.celsius}° $kind").joinToString(" · ") else stringResource(R.string.wp_weather_none),
-        style = Type.Body,
-    )
-    Spacer(Modifier.height(4.dp))
-    BasicText(
-        stringResource(if (Weather.chosen) R.string.wp_weather_chosen else R.string.wp_weather_guessed),
-        style = Type.Caption.copy(color = Palette.TertiaryLabel),
+        style = Type.Body.copy(color = Palette.SecondaryLabel),
+        modifier = Modifier.padding(end = 8.dp),
     )
 }
 
@@ -355,23 +413,10 @@ private fun Chip(label: String, on: Boolean, onFocused: (() -> Unit)? = null, on
     }
 }
 
-/** How long Home sits idle before the screensaver starts (issue #66). */
-@Composable
-private fun ScreensaverDelay() {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        BasicText(stringResource(R.string.ss_delay), style = Type.Body.copy(color = Palette.SecondaryLabel))
-        AerialSettings.screensaverChoices.forEach { minutes ->
-            Chip(stringResource(R.string.ss_minutes, minutes), on = AerialSettings.screensaverMinutes == minutes) {
-                AerialSettings.chooseScreensaverMinutes(minutes)
-            }
-        }
-    }
-}
-
 @Composable
 private fun ScreensaverChoice(onStart: () -> Unit) {
     // The choice first, then the action that tries it.
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         listOf(
             ScreensaverMode.Aerial to R.string.ss_aerial,
             ScreensaverMode.Photos to R.string.ss_photos,
@@ -379,7 +424,7 @@ private fun ScreensaverChoice(onStart: () -> Unit) {
         ).forEach { (mode, label) ->
             Chip(stringResource(label), on = Wallpapers.screensaver == mode) { Wallpapers.chooseScreensaver(mode) }
         }
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(6.dp))
         Pressable(onClick = onStart, focusedScale = 1.06f) { state ->
             val bg by animateColorAsState(if (state.focused) Palette.Focus else Palette.FillStrong, tween(140, easing = Motion.EaseOut), label = "ss-start")
             val fg = if (state.focused) Palette.OnFocus else Palette.Label

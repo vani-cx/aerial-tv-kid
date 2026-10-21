@@ -84,7 +84,7 @@ import kotlin.math.roundToInt
 private const val COLUMNS = 5
 
 /** Grid geometry for the screen at hand. On a 1080p TV this is a 960×540 dp canvas. */
-private class GridMetrics(screenW: Dp, screenH: Dp) {
+private class GridMetrics(screenW: Dp, screenH: Dp, oneRow: Boolean) {
     val margin = 56.dp
     val gap = 28.dp
     val tileW = (screenW - margin * 2 - gap * (COLUMNS - 1)) / COLUMNS
@@ -92,8 +92,14 @@ private class GridMetrics(screenW: Dp, screenH: Dp) {
     val pitchX = tileW + gap
     val pitchY = tileH + 50.dp
 
-    /** The top row sits a little past the middle, under the shelf, as on tvOS. */
-    val topRowY = screenH * 0.555f
+    /**
+     * The top row sits a little past the middle, under the shelf, as on tvOS. In one-row mode it
+     * sits low, with only the top of the second row showing under the focused app's name.
+     */
+    val topRowY = if (oneRow) screenH - pitchY - 12.dp else screenH * 0.555f
+
+    /** Top of the shelf clock, in the standard layout. */
+    val clockY = screenH * 0.555f - 196.dp
 
     /** Where a row rests once you go down into the grid: the row above stays in view. */
     val restY = screenH * 0.37f
@@ -231,7 +237,9 @@ fun HomeScreen(
                 }
             },
     ) {
-        val metrics = remember(maxWidth, maxHeight) { GridMetrics(maxWidth, maxHeight) }
+        val metrics = remember(maxWidth, maxHeight, AerialSettings.oneRowHome) {
+            GridMetrics(maxWidth, maxHeight, AerialSettings.oneRowHome)
+        }
         val rows = (apps.size + COLUMNS - 1) / COLUMNS
         val collapsePx = with(density) { (metrics.topRowY - metrics.restY).toPx() }
 
@@ -285,12 +293,27 @@ fun HomeScreen(
             )
 
             Box(Modifier.fillMaxSize().offset { IntOffset(0, -scroll.value.roundToInt()) }) {
-                ShelfClock(
-                    now = now,
-                    modifier = Modifier
-                        .padding(start = metrics.margin, top = metrics.topRowY - 196.dp)
-                        .graphicsLayer { alpha = 1f - (scroll.value / collapsePx * 1.6f).coerceIn(0f, 1f) },
-                )
+                val clockRight = AerialSettings.clockRight
+                // With one row the wallpaper keeps the screen, as under tvOS's full-screen shelf: no
+                // big clock, only the time and weather in one line, or inside the pill on the right.
+                if (!AerialSettings.oneRowHome) {
+                    ShelfClock(
+                        now = now,
+                        alignEnd = clockRight,
+                        modifier = Modifier
+                            .align(if (clockRight) Alignment.TopEnd else Alignment.TopStart)
+                            .padding(horizontal = metrics.margin)
+                            .padding(top = metrics.clockY)
+                            .graphicsLayer { alpha = 1f - (scroll.value / collapsePx * 1.6f).coerceIn(0f, 1f) },
+                    )
+                } else if (!clockRight) {
+                    CornerClock(
+                        now = now,
+                        modifier = Modifier
+                            .padding(start = metrics.margin, top = 28.dp)
+                            .graphicsLayer { alpha = 1f - (scroll.value / collapsePx * 1.6f).coerceIn(0f, 1f) },
+                    )
+                }
 
                 apps.forEachIndexed { index, app ->
                     key(app.key) {
@@ -345,10 +368,13 @@ fun HomeScreen(
             drawRect(Brush.verticalGradient(0f to Color.Black, 0.5f to Color.Black.copy(alpha = 0.82f), 1f to Color.Transparent))
         }
 
+        // One-row Home with the clock on the right: the pill carries the time and weather.
+        val inPill = AerialSettings.oneRowHome && AerialSettings.clockRight
         StatusPill(
             now = now,
             network = vm.network,
-            showTime = if (dragged) pastShelf else focusedRow > 0,
+            showTime = inPill || (if (dragged) pastShelf else focusedRow > 0),
+            showWeather = inPill,
             enabled = gridEnabled && moving == null,
             focusRequester = pillRequester,
             onFocused = { gained ->

@@ -29,6 +29,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -132,9 +133,9 @@ private fun darkened(src: ImageBitmap, alpha: Float): ImageBitmap {
  * the city it is for (issue #59). The clock screensaver shows the same.
  */
 @Composable
-fun ShelfClock(now: LocalDateTime, modifier: Modifier = Modifier) {
+fun ShelfClock(now: LocalDateTime, modifier: Modifier = Modifier, alignEnd: Boolean = false) {
     val dim = Color.White.copy(alpha = 0.86f)
-    Column(modifier) {
+    Column(modifier, horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             BasicText(dateText(now), style = Type.Title.copy(color = dim))
             Weather.now?.let { w ->
@@ -144,6 +145,24 @@ fun ShelfClock(now: LocalDateTime, modifier: Modifier = Modifier) {
             }
         }
         BasicText(timeText(now), style = Type.Clock, modifier = Modifier.padding(top = 2.dp))
+    }
+}
+
+/**
+ * One-row Home: the time and the weather in one quiet line in the top left, level with the status
+ * pill, so the wallpaper keeps the rest of the screen. A soft shadow keeps it readable on photos.
+ */
+@Composable
+fun CornerClock(now: LocalDateTime, modifier: Modifier = Modifier) {
+    val dim = Color.White.copy(alpha = 0.92f)
+    val shadow = Shadow(Color.Black.copy(alpha = 0.5f), blurRadius = 8f)
+    Row(modifier.height(34.dp), verticalAlignment = Alignment.CenterVertically) {
+        BasicText(timeText(now), style = Type.Title.copy(color = dim, shadow = shadow))
+        Weather.now?.let { w ->
+            GlyphIcon(glyphFor(w), dim, 18.dp, Modifier.padding(start = 16.dp, end = 6.dp))
+            val place = Weather.place?.takeIf { it.length <= 12 }
+            BasicText(listOfNotNull(place, "${w.celsius}°").joinToString(" "), style = Type.Headline.copy(color = dim, shadow = shadow))
+        }
     }
 }
 
@@ -166,6 +185,7 @@ fun StatusPill(
     now: LocalDateTime,
     network: NetworkStatus,
     showTime: Boolean,
+    showWeather: Boolean = false,
     enabled: Boolean,
     focusRequester: FocusRequester,
     onFocused: (Boolean) -> Unit,
@@ -200,6 +220,12 @@ fun StatusPill(
                 NetKind.Offline -> Glyph.Offline
             }
             GlyphIcon(glyph, fg, 17.dp, level = network.level)
+            if (showWeather) Weather.now?.let { w ->
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    GlyphIcon(glyphFor(w), fg, 17.dp)
+                    BasicText("${w.celsius}°", style = Type.Headline.copy(color = fg))
+                }
+            }
             if (showTime || state.focused) {
                 BasicText(timeText(now), style = Type.Headline.copy(color = fg))
             }
