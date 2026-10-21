@@ -225,7 +225,7 @@ class PhoneServer private constructor(private val context: Context, private val 
             return (1..8).map { alphabet[rnd.nextInt(alphabet.length)] }.joinToString("")
         }
 
-        private fun lanAddress(context: Context): String? {
+        fun lanAddress(context: Context): String? {
             val cm = context.getSystemService<ConnectivityManager>() ?: return null
             val props = cm.getLinkProperties(cm.currentNetwork() ?: return null) ?: return null
             return props.linkAddresses.map { it.address }.firstOrNull { it is Inet4Address && !it.isLoopbackAddress }?.hostAddress

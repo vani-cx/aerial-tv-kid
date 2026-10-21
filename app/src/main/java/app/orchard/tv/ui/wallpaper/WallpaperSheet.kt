@@ -142,6 +142,8 @@ fun WallpaperSheet(visible: Boolean, onDismiss: () -> Unit, onStartScreensaver: 
                     Spacer(Modifier.height(10.dp))
                     SectionTitle(R.string.wp_screensaver)
                     ScreensaverChoice(onStartScreensaver)
+                    Spacer(Modifier.height(12.dp))
+                    ScreensaverDelay()
                     Spacer(Modifier.height(8.dp))
                     BasicText(stringResource(R.string.ss_back_hint), style = Type.Caption.copy(color = Palette.TertiaryLabel))
 
@@ -313,6 +315,19 @@ private fun Chip(label: String, on: Boolean, onFocused: (() -> Unit)? = null, on
         ) {
             if (on) GlyphIcon(Glyph.Check, fg, 14.dp)
             BasicText(label, style = Type.Body.copy(color = fg))
+        }
+    }
+}
+
+/** How long Home sits idle before the screensaver starts (issue #66). */
+@Composable
+private fun ScreensaverDelay() {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        BasicText(stringResource(R.string.ss_delay), style = Type.Body.copy(color = Palette.SecondaryLabel))
+        AerialSettings.screensaverChoices.forEach { minutes ->
+            Chip(stringResource(R.string.ss_minutes, minutes), on = AerialSettings.screensaverMinutes == minutes) {
+                AerialSettings.chooseScreensaverMinutes(minutes)
+            }
         }
     }
 }

@@ -45,6 +45,7 @@ import app.orchard.tv.ui.theme.LocalReducedMotion
 import app.orchard.tv.ui.theme.canvasDensity
 import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.wallpaper.Wallpapers
+import app.orchard.tv.update.Updates
 import app.orchard.tv.weather.Weather
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -79,6 +80,7 @@ class MainActivity : ComponentActivity() {
         TileArtFactory.useCanvasDensity(canvasDensity(resources.displayMetrics))
         Wallpapers.init(this)
         Weather.init(this)
+        Updates.init(this)
         CustomIcons.init(this)
         AerialSettings.init(this)
         val reducedMotion = Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
@@ -213,12 +215,13 @@ class MainActivity : ComponentActivity() {
     /**
      * Aerial's screensaver has to start before the firmware's (ad-carrying) one. Xiaomi keeps its
      * delay in system/screen_saver_timeout: 120000 on some MiTV-MFTR0 units, 480000 on others, -1
-     * when off. Start 15 s ahead of it when it is shorter than our default.
+     * when off. Start 15 s ahead of it when it is shorter than the delay chosen in Personalize.
      */
     private fun idleBeforeScreensaver(): Long {
+        val chosen = AerialSettings.screensaverMinutes * 60_000L
         val firmware = runCatching { Settings.System.getLong(contentResolver, "screen_saver_timeout") }.getOrNull()
-        return if (firmware != null && firmware > 0) minOf(IDLE_BEFORE_SCREENSAVER_MS, maxOf(30_000L, firmware - 15_000L))
-        else IDLE_BEFORE_SCREENSAVER_MS
+        return if (firmware != null && firmware > 0) minOf(chosen, maxOf(30_000L, firmware - 15_000L))
+        else chosen
     }
 
     private fun hideScreensaver() {
@@ -302,6 +305,7 @@ class MainActivity : ComponentActivity() {
         vm.reload()
         Wallpapers.refreshDailyIfStale()
         Weather.refreshIfStale()
+        Updates.checkIfStale()
     }
 
     override fun onResume() {
@@ -362,7 +366,6 @@ class MainActivity : ComponentActivity() {
                 .setAction(Intent.ACTION_MAIN)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
 
-        const val IDLE_BEFORE_SCREENSAVER_MS = 5 * 60 * 1000L
         const val SCREENSAVER_HOLD_MS = 4 * 60 * 60 * 1000L
 
         /** `adb shell am start -a app.orchard.tv.PREVIEW_SCREENSAVER -n app.orchard.tv/.MainActivity` */

@@ -36,7 +36,7 @@ sealed interface Overlay {
     data object Wallpaper : Overlay
 }
 
-enum class CcPage { Main, Inputs, InputSettings }
+enum class CcPage { Main, Inputs, InputSettings, Update }
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val context get() = getApplication<Application>()
