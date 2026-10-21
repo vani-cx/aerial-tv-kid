@@ -4,7 +4,8 @@
 
 ## 现状（2026-10-21）
 
-- 版本 **1.21（versionCode 23）**，2026-10-21 发布（[v1.21](https://github.com/pengchujin/aerial-tv/releases/tag/v1.21)）：系统不许通知监听的电视（低内存 Android 9，小米 MFTP0）上，待机强停后改由同步适配器（`guard/RevivalSync.kt`）约 30–60 秒后拉回 Aerial 并重开守护和 ADB，详见 [devices/xiaomi-mitv-mftp0.md](devices/xiaomi-mitv-mftp0.md)；在 Android 9 低内存模拟器和关掉通知监听的 MFTR0 上验证过，**MFTP0 本机还没用 1.21 实测**。小米 MFTR0 装的是 1.21 的测试包（设置 → 账号里多了「Aerial 桌面守护」账号，卸载时自动删除）。
+- 版本 **1.22（versionCode 24）**，2026-10-21 发布（[v1.22](https://github.com/pengchujin/aerial-tv/releases/tag/v1.22)）：个性化 → 屏幕保护程序里加「返回键：开始屏保 / 不响应」（#94）；待机唤醒时如果 Aerial 已经在前台（守护先把它拉回来了，或进程是唤醒后才复活的），守护补发一次唤醒标记，「开机时打开」的信号源照样打开（#111，小米 MiTV-MTEQ0 上报告人验证过同样的改法）；海信 VIDAA（有 `com.hisense.vidaaassistant` 或 `com.jamdeo.tv.vod`）上守护不再过滤按键，音量键交回海信固件（#7，没有海信真机）；Android TV 原生设置侧栏（CM311-1）不再另开任务（PR #90）。小米 MiTV-MFTR0（`standard`）和 TCL MT5879 国行（`guard`，多屏互动推送，ADB 点「同意」）装的都是 1.22，两台回归都过，返回键开关在小米上逐项验证过，测完已改回默认（开始屏保）。
+- 1.21（versionCode 23）：系统不许通知监听的电视（低内存 Android 9，小米 MFTP0）上，待机强停后改由同步适配器（`guard/RevivalSync.kt`）约 30–60 秒后拉回 Aerial 并重开守护和 ADB，详见 [devices/xiaomi-mitv-mftp0.md](devices/xiaomi-mitv-mftp0.md)；**MFTP0 本机还没用 1.21 实测**（#77 有用户在 1.20 上抓到小米唤醒时 `restartHomeStandby` 强停 Aerial 的日志）。
 - 1.20（versionCode 22）：个性化里加「主屏幕：标准 / 只显示一排」（只显示一排时第一排放到屏幕下方，不显示大时钟，把屏幕让给壁纸）和「时钟：左上 / 右上」；个性化面板改成 tvOS 设置那样的分组卡片。小米 MiTV-MFTR0（`standard`）和 TCL MT5879 国行（`guard`，多屏互动推送，用 ADB 点的「同意」）装的都是 1.20；新功能只在小米上逐项验证过（两种布局、两个时钟位置、面板各组），两台电视上的这两项都保持默认（标准、左上）。1.19 的修复（#82、#95、#87）见 v1.19 的 Release 说明，1.18 的内容见 v1.18。酷开、乐视、OPPO K9、小米 ANTL0 / Android 9 相关的改动没有真机，只按用户日志改。海信 VIDAA 的主页键见 [devices/hisense-vidaa.md](devices/hisense-vidaa.md)。主要改动见 Release 说明和 ARCHITECTURE.md。
 - 具体 IP、每台电视上改过的设置、户主自己的数据：见 **`local/TVS.md`**（不在版本库，需要单独私下拿到）。
 - 开源在 https://github.com/pengchujin/aerial-tv（MIT）。官网在 `site/`，已部署到 https://aerial.qust.me（Cloudflare Worker 静态资源）。还没有自动化测试，以下结论都来自真机操作和日志。
