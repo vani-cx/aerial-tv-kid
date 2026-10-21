@@ -202,7 +202,9 @@ adb shell cmd role remove-role-holder --user 0 android.app.role.HOME app.orchard
 - **雷鸟 55S595C Ultra（MT9655）等只有「无线调试」的机型**：拿不到授权，能装但接管不了主页键。
 - **海信 VIDAA**：第 7 步改了 `persist.vt.use_home_pkg` 以后，主页键直接进 Aerial；但开机仍会先进聚好看（固件在开机完成前拦截第三方 App），按一次主页键即可。
 - **Vidda 其他系统、OPPO K9、雷鸟鹤 6**：能装，但开机进不了 Aerial（固件只认自家桌面，除非删掉原桌面，这里不做）。可以把 Aerial 当普通 App 用。
-- **验收第 3 条是 0**：有的固件拦截侧载的无障碍服务。请用户在电视的安全中心或权限管理里允许 Aerial 自启动、无障碍，然后重新运行 `adb shell am start -n app.orchard.tv/.MainActivity` 再验收。
+- **验收第 3 条是 0，但第 2 条里有 Aerial**：常见于升级之后，系统还在找旧的安装目录（小米 Android 9，#72）。运行 `adb shell am force-stop app.orchard.tv`，等 3 秒，再 `adb shell am start -W -n app.orchard.tv/.MainActivity`，然后重新验收。macOS / Linux 也可以直接运行 `curl -fsSL https://aerial.qust.me/install.sh | TV=<IP> bash -s repair`。
+- **用了一段时间后按主页键又回到原桌面**：同上，先试一次上面的强停再打开。
+- **验收第 3 条是 0，第 2 条里也没有 Aerial**：有的固件拦截侧载的无障碍服务。请用户在电视的安全中心或权限管理里允许 Aerial 自启动、无障碍，然后重新运行 `adb shell am start -n app.orchard.tv/.MainActivity` 再验收。
 - **不支持**：LG webOS、三星 Tizen、华为智慧屏（鸿蒙）、Android 4.4 及更老的电视。
 
 ## 用户常问

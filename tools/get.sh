@@ -7,6 +7,7 @@
 #   curl -fsSL https://aerial.qust.me/install.sh | TV=<tv-ip> bash
 #   curl -fsSL .../install.sh | KEEP_ADB=1 TV=<tv-ip> bash      # TVs that switch ADB off (Xiaomi)
 #   curl -fsSL .../install.sh | TV=<tv-ip> bash -s guard        # firmwares that refuse launchers
+#   curl -fsSL .../install.sh | TV=<tv-ip> bash -s repair       # Home opens the TV's launcher again
 #   curl -fsSL .../install.sh | TV=<tv-ip> bash -s restore      # give Home back to the TV's launcher
 #
 # Needs curl, unzip and python3 (TCL only). If adb is not installed, Google's platform-tools are

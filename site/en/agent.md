@@ -201,7 +201,9 @@ Then:
 - **TVs with only Wireless debugging** (FFALCON 55S595C Ultra, MT9655): adb can't be authorized there, so Aerial installs but can't take over Home.
 - **Hisense VIDAA**: once item 7 has changed `persist.vt.use_home_pkg`, Home goes straight to Aerial; the TV still starts into its own launcher after a reboot (the firmware holds third-party apps back until boot completes), so press Home once.
 - **Other Vidda systems, OPPO K9, FFALCON Crane 6**: Aerial installs but the TV doesn't start into it (the firmware only accepts its own launcher unless that is removed, which this install doesn't do). Aerial still works as an app.
-- **Check line 3 is 0**: some firmwares block sideloaded accessibility services. Ask the user to allow Aerial's autostart and accessibility in the TV's security or permissions app, then run `adb shell am start -n app.orchard.tv/.MainActivity` and check again.
+- **Check line 3 is 0 but line 2 lists Aerial**: common right after an update, when the system still looks in the old install directory (Xiaomi, Android 9, #72). Run `adb shell am force-stop app.orchard.tv`, wait 3 seconds, run `adb shell am start -W -n app.orchard.tv/.MainActivity`, and check again. On macOS / Linux, `curl -fsSL https://aerial.qust.me/install.sh | TV=<IP> bash -s repair` does the same.
+- **Home opens the TV's own launcher again after a while**: try the same stop-and-open first.
+- **Check line 3 is 0 and line 2 does not list Aerial**: some firmwares block sideloaded accessibility services. Ask the user to allow Aerial's autostart and accessibility in the TV's security or permissions app, then run `adb shell am start -n app.orchard.tv/.MainActivity` and check again.
 - **Not supported**: LG webOS, Samsung Tizen, Huawei Vision (HarmonyOS), and Android 4.4 or older.
 
 ## What users ask

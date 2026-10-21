@@ -4,6 +4,7 @@
 #   TV=<tv-ip> tools/install.sh               # standard build (declares HOME)
 #   TV=<tv-ip> tools/install.sh guard         # for firmwares that refuse to install a launcher
 #   KEEP_ADB=1 TV=<tv-ip> tools/install.sh    # also switch ADB back on whenever the TV turns it off
+#   TV=<tv-ip> tools/install.sh repair        # Home went back to the TV's launcher: restart Home Guard
 #
 # The APK comes from the latest release (aerial.qust.me's copy, else GitHub), so only adb is needed
 # (and python3 on TCL TVs).
@@ -30,7 +31,7 @@ cd "$(dirname "$0")/.."
 REPO=pengchujin/aerial-tv
 command -v adb >/dev/null || { echo "adb not found. macOS: brew install android-platform-tools; Linux: install android-tools / adb." >&2; exit 1; }
 FLAVOR="${1:-standard}"
-case "$FLAVOR" in standard|guard) ;; *) echo "flavor must be standard or guard" >&2; exit 1 ;; esac
+case "$FLAVOR" in standard|guard|repair) ;; *) echo "flavor must be standard or guard (or repair)" >&2; exit 1 ;; esac
 PKG=app.orchard.tv
 GUARD="$PKG/$PKG.guard.HomeGuardService"
 
@@ -45,6 +46,32 @@ export ANDROID_SERIAL="$SERIAL"
 adb connect "$SERIAL" >/dev/null
 if [ "$(adb get-state 2>/dev/null)" != device ]; then
   echo "The TV did not accept the connection. Accept \"Allow USB debugging?\" on the TV, then run again." >&2
+  exit 1
+fi
+
+# What counts is the service Android actually runs, not the settings entry: after an update, Xiaomi
+# MiTV-MFTP0 (Android 9) kept the entry while system_server still pointed at the old APK directory
+# and never bound it (issue #72).
+guard_bound() { adb shell dumpsys accessibility 2>/dev/null | grep -q "label=Aerial"; }
+
+wait_guard() {
+  for _ in $(seq 1 "$1"); do sleep 1; guard_bound && return 0; done
+  return 1
+}
+
+# Stopping Aerial makes system_server load it afresh, from the APK that is really installed; the
+# guard is bound again when it starts (verified on MiTV-MFTP0, issue #72).
+restart_aerial() {
+  adb shell am force-stop "$PKG"
+  sleep 3
+  adb shell am start -W -n "$PKG/.MainActivity" >/dev/null 2>&1 || true
+}
+
+if [ "$FLAVOR" = repair ]; then
+  adb shell pm path "$PKG" >/dev/null 2>&1 || { echo "Aerial is not installed on this TV." >&2; exit 1; }
+  restart_aerial
+  if wait_guard 8; then echo "Home Guard is running again. Press Home on the remote."; exit 0; fi
+  echo "Aerial is open, but Home Guard is not running. Run the install command again." >&2
   exit 1
 fi
 
@@ -157,6 +184,11 @@ adb shell pm grant "$PKG" android.permission.WRITE_SECURE_SETTINGS 2>/dev/null |
 adb shell appops set "$PKG" SYSTEM_ALERT_WINDOW allow 2>/dev/null || true             # open Aerial after boot
 adb shell appops set "$PKG" WRITE_SETTINGS allow 2>/dev/null || true                  # brightness
 adb shell cmd notification allow_listener "$PKG/$PKG.guard.RevivalListener" 2>/dev/null || true  # come back after a kill
+# Android 9 on Xiaomi MiTV-MFTP0 reports success but never binds it (issue #72).
+if ! adb shell dumpsys notification 2>/dev/null | grep -q "$PKG/$PKG.guard.RevivalListener"; then
+  echo "Note: this TV did not allow Aerial's notification listener, so Aerial cannot bring itself back" >&2
+  echo "after the TV stops it. If Home ever opens the TV's launcher again: TV=$TV $0 repair" >&2
+fi
 # Compose runs much smoother ahead-of-time compiled on TV chips.
 adb shell cmd package compile -m speed -f "$PKG" >/dev/null 2>&1 || true
 # TVs on Android's standard screensaver (TCL's carries a membership upsell) get Aerial's instead,
@@ -218,13 +250,16 @@ case "$CURRENT" in
 esac
 adb shell settings put secure accessibility_enabled 1
 
-for _ in 1 2 3 4 5 6; do
-  sleep 1
-  if adb shell dumpsys accessibility | grep -q "label=Aerial"; then
-    echo "Home Guard is running. Press Home on the remote."
-    exit 0
-  fi
-done
+if wait_guard 6; then
+  echo "Home Guard is running. Press Home on the remote."
+  exit 0
+fi
+echo "Home Guard is enabled but Android has not started it; restarting Aerial."
+restart_aerial
+if wait_guard 8; then
+  echo "Home Guard is running. Press Home on the remote."
+  exit 0
+fi
 echo "Home Guard is enabled but Android has not started it." >&2
 echo "Some TCL / Hisense firmwares block sideloaded accessibility services: allow Aerial under the" >&2
 echo "TV's security app (自启动 / 无障碍 / 权限管理), then run this script again." >&2
