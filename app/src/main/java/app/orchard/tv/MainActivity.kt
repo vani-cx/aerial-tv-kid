@@ -45,6 +45,7 @@ import app.orchard.tv.ui.theme.LocalReducedMotion
 import app.orchard.tv.ui.theme.canvasDensity
 import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.wallpaper.Wallpapers
+import app.orchard.tv.system.MissingClipboard
 import app.orchard.tv.system.SystemProbe
 import app.orchard.tv.update.Updates
 import app.orchard.tv.weather.Weather
@@ -70,6 +71,10 @@ class MainActivity : ComponentActivity() {
         override fun onLost(network: Network) = runOnUiThread { vm.refreshNetwork() }
         override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) = runOnUiThread { vm.refreshNetwork() }
     }
+
+    // See MissingClipboard.
+    override fun getSystemService(name: String): Any? =
+        super.getSystemService(name) ?: if (name == CLIPBOARD_SERVICE) MissingClipboard.standIn else null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -345,7 +350,12 @@ class MainActivity : ComponentActivity() {
         openedAppSinceHome = true
         // The stock launcher (Xiaomi's PatchWall, with the maker's own iQIYI / Mango content) can
         // only be opened through the system Home action; see HomeGuardService.openStockLauncher.
-        if (HomeGuardService.isStockHome(app.packageName) && HomeGuardService.openStockLauncher()) return
+        // Hisense VIDAA hands the Home action to Aerial once persist.vt.use_home_pkg points at it,
+        // so there it went nowhere; its launcher opens like any app (issue #87). Xiaomi's throws.
+        if (HomeGuardService.isStockHome(app.packageName)) {
+            HomeGuardService.allowStockLauncher()
+            if (runCatching { startActivity(app.launchIntent()) }.isSuccess || HomeGuardService.openStockLauncher()) return
+        }
         val options = bounds?.let {
             ActivityOptions.makeScaleUpAnimation(
                 window.decorView, it.left.toInt(), it.top.toInt(), it.width.toInt(), it.height.toInt(),

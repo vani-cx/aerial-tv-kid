@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import app.orchard.tv.system.MissingClipboard
 import app.orchard.tv.ui.theme.canvasDensity
 import app.orchard.tv.weather.Weather
 import androidx.lifecycle.Lifecycle
@@ -35,6 +36,10 @@ class AerialDream : DreamService(), LifecycleOwner, SavedStateRegistryOwner {
 
     override val lifecycle: Lifecycle get() = registry
     override val savedStateRegistry: SavedStateRegistry get() = savedState.savedStateRegistry
+
+    // See MissingClipboard.
+    override fun getSystemService(name: String): Any? =
+        super.getSystemService(name) ?: if (name == CLIPBOARD_SERVICE) MissingClipboard.standIn else null
 
     override fun onCreate() {
         super.onCreate()

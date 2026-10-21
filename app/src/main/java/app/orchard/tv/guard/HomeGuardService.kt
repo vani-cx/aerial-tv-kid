@@ -322,8 +322,13 @@ class HomeGuardService : AccessibilityService() {
          */
         fun openStockLauncher(): Boolean {
             val s = instance ?: return false
-            s.allowStockUntil = SystemClock.uptimeMillis() + 60 * 60 * 1000L
+            allowStockLauncher()
             return s.performGlobalAction(GLOBAL_ACTION_HOME)
+        }
+
+        /** Lets the stock launcher stay in front until Aerial is back: the viewer opened it on purpose. */
+        fun allowStockLauncher() {
+            instance?.allowStockUntil = SystemClock.uptimeMillis() + 60 * 60 * 1000L
         }
 
         /** Called when Aerial comes back to the front: the stock launcher is fair game again. */
