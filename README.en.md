@@ -91,7 +91,7 @@ Chinese firmware shows its menu names in Chinese; they're in brackets.
 |---|---|
 | **Xiaomi / Redmi** | Settings (设置) → About (关于) → press OK on **Model** (产品型号) until developer mode is on. Then Settings → Account & Security (账号与安全): turn on **ADB debugging** (ADB 调试) and **Install unknown apps** (安装未知来源的应用) |
 | **TCL / FFALCON** | Settings (设置) → About (关于) → **Device info** (本机信息), then quickly press **Up, Down, Left, Right**. Turn on **ADB** in the **More** (更多) group that appears |
-| **Other Android TVs** | Settings → Device Preferences → About → press **Build** 7 times, then turn on **USB debugging** in Developer options |
+| **Other Android TVs** | Settings → Device Preferences → About → press **Build** (not Android version) 7 times, then turn on **USB debugging** in Developer options |
 
 The TV's IP address is under Settings → Network. The first time your computer connects, the TV asks to allow debugging: choose **Always allow**.
 

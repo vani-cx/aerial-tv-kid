@@ -46,7 +46,7 @@ The TV is connected once `adb devices` lists it as `device`.
 |---|---|
 | Xiaomi / Redmi | Settings (设置) → About (关于) → press OK on **Model** (产品型号) until it says developer mode is on. Then Settings → Account & Security (账号与安全): turn on **ADB debugging** (ADB 调试) and **Install unknown apps** (安装未知来源的应用) |
 | TCL / FFALCON | Settings (设置) → About (关于) → **Device info** (本机信息), then press **Up, Down, Left, Right**, less than a second apart. A **More** (更多) group appears at the bottom; turn on **ADB** there |
-| Android TV / Google TV, Sony, Hisense and others | Settings → Device Preferences → About → press **Build** 7 times, then turn on **USB debugging** in Developer options (sometimes called Network debugging) |
+| Android TV / Google TV, Sony, Hisense and others | Settings → Device Preferences → About → press **Build** 7 times (not Android version, which shows an Easter egg; press Back to leave it), then turn on **USB debugging** in Developer options (sometimes called Network debugging) |
 
 The TV's IP address is usually under Settings → Network or About.
 
