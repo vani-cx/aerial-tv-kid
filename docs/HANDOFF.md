@@ -4,7 +4,7 @@
 
 ## 现状（2026-10-21）
 
-- 版本 **1.18（versionCode 20）**，2026-10-21 发布（[v1.18](https://github.com/pengchujin/aerial-tv/releases/tag/v1.18)）：触屏、家长密码、检查更新提示、屏保开始时间、照片每天换一张、显示全部 App 名称、天气带城市名，以及酷开 HOME.CC、install.sh 校验守护并加 `repair` 等适配。小米 MiTV-MFTR0（`standard`）和 TCL MT5879 国行（`guard`，多屏互动推送，用 ADB 点的「同意」）装的都是 1.18。酷开、乐视、OPPO K9、小米 ANTL0 / Android 9 相关的改动没有真机，只按用户日志改。海信 VIDAA 的主页键见 [devices/hisense-vidaa.md](devices/hisense-vidaa.md)。主要改动见 Release 说明和 ARCHITECTURE.md。
+- 版本 **1.19（versionCode 21）**，2026-10-21 发布（[v1.19](https://github.com/pengchujin/aerial-tv/releases/tag/v1.19)）：通知监听在用户解锁前读取存储导致开机崩溃（#82）、没有剪贴板服务的固件启动即崩溃（#95）、海信 VIDAA 点「原来的桌面」没反应（#87）。小米 MiTV-MFTR0（`standard`）和 TCL MT5879 国行（`guard`，多屏互动推送，用 ADB 点的「同意」）装的都是 1.19。三个修复都没有在报告的机型上验证：小米上验证了替身剪贴板能正常启动（临时强制使用）、「桌面」磁贴仍走系统 Home 动作打开 PatchWall、通知监听复活正常。1.18 的内容（触屏、家长密码、检查更新提示、屏保开始时间、照片每天换一张等）见 v1.18 的 Release 说明。酷开、乐视、OPPO K9、小米 ANTL0 / Android 9 相关的改动没有真机，只按用户日志改。海信 VIDAA 的主页键见 [devices/hisense-vidaa.md](devices/hisense-vidaa.md)。主要改动见 Release 说明和 ARCHITECTURE.md。
 - 具体 IP、每台电视上改过的设置、户主自己的数据：见 **`local/TVS.md`**（不在版本库，需要单独私下拿到）。
 - 开源在 https://github.com/pengchujin/aerial-tv（MIT）。官网在 `site/`，已部署到 https://aerial.qust.me（Cloudflare Worker 静态资源）。还没有自动化测试，以下结论都来自真机操作和日志。
 
