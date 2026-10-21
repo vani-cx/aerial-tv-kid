@@ -148,6 +148,13 @@ a.chip-link:hover { text-decoration: none; border-color: rgba(41,151,255,.5); co
   appearance: none; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 15px; font-weight: 500;
   padding: 8px 18px; border-radius: 9px; cursor: pointer; transition: background .2s ease, color .2s ease;
 }
+.tabs button { display: inline-flex; align-items: center; gap: 7px; }
+.tabs .logo { display: block; flex: none; height: 14px; aspect-ratio: 1; background: currentColor; -webkit-mask: var(--logo) center / contain no-repeat; mask: var(--logo) center / contain no-repeat; }
+.tabs .logo.xiaomi { --logo: url(img/brands/xiaomi.svg); height: 16px; }
+.tabs .logo.android { --logo: url(img/brands/android.svg); height: 18px; }
+.tabs .logo.tcl { --logo: url(img/brands/tcl.svg); height: 17px; aspect-ratio: 1.678; }
+.tabs .logo.haier { --logo: url(img/brands/haier.svg); height: 13px; aspect-ratio: 3.247; }
+.tabs .logo.oppo { --logo: url(img/brands/oppo.svg); height: 11px; aspect-ratio: 4.207; }
 .tabs button[aria-selected="true"] { background: var(--card-2); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.4); }
 .panel { display: none; }
 .panel.on { display: block; }
@@ -204,6 +211,11 @@ footer a { color: var(--muted); }
   .grid3, .gallery { grid-template-columns: 1fr; }
   .field { flex-wrap: wrap; padding: 10px 14px; }
   .field .opt { padding: 4px 0 6px; }
+  .tabs[data-tabs="brand"] { display: flex; }
+  .tabs[data-tabs="brand"] button { flex: 1 1 auto; justify-content: center; padding: 8px; }
   .compare-legend { margin-top: 18px; }
   .compare .knob { width: 34px; height: 34px; margin: -17px 0 0 -17px; }
+}
+@media (max-width: 480px) {
+  .tabs .logo.xiaomi, .tabs .logo.android { display: none; }
 }

@@ -89,9 +89,11 @@ Chinese firmware shows its menu names in Chinese; they're in brackets.
 
 | TV | How |
 |---|---|
-| **Xiaomi / Redmi** | Settings (设置) → About (关于) → press OK on **Model** (产品型号) until developer mode is on. Then Settings → Account & Security (账号与安全): turn on **ADB debugging** (ADB 调试) and **Install unknown apps** (安装未知来源的应用) |
-| **TCL / FFALCON** | Settings (设置) → About (关于) → **Device info** (本机信息), then quickly press **Up, Down, Left, Right**. Turn on **ADB** in the **More** (更多) group that appears |
-| **Other Android TVs** | Settings → Device Preferences → About → press **Build** (not Android version) 7 times, then turn on **USB debugging** in Developer options |
+| <img src="site/img/brands/xiaomi.svg" height="16" alt=""> **Xiaomi / Redmi** | Settings (设置) → About (关于) → press OK on **Model** (产品型号) until developer mode is on. Then Settings → Account & Security (账号与安全): turn on **ADB debugging** (ADB 调试) and **Install unknown apps** (安装未知来源的应用) |
+| <img src="site/img/brands/tcl.svg" height="14" alt=""> **TCL / FFALCON** | Settings (设置) → About (关于) → **Device info** (本机信息), then quickly press **Up, Down, Left, Right**. Turn on **ADB** in the **More** (更多) group that appears |
+| <img src="site/img/brands/haier.svg" height="12" alt=""> **Haier / MOOKA** | Press the Source button **on the TV itself**, then **Left, Left, Up, Right** on the remote to open the factory menu (海尔工厂菜单). Set **ADB 调试开关** (ADB debugging) to on and change nothing else (user reports) |
+| <img src="site/img/brands/oppo.svg" height="10" alt=""> **OPPO** | Settings (设置) → System (系统) → About (关于本机) → **Model** (设备型号), press **Up, Up, Right, Right**, then OK (user reports) |
+| <img src="site/img/brands/android.svg" height="16" alt=""> **Other Android TVs** | Settings → Device Preferences → About → press **Build** (not Android version) 7 times, then turn on **USB debugging** in Developer options |
 
 The TV's IP address is under Settings → Network. The first time your computer connects, the TV asks to allow debugging: choose **Always allow**.
 
@@ -236,4 +238,4 @@ The aerial catalog, `app/src/main/assets/aerials.json`, is generated from Apple'
 
 [MIT](LICENSE). The Inter typeface is under the [SIL Open Font License](FONT-LICENSE-OFL.txt).
 
-Aerial is an independent open-source project, not affiliated with Apple, Xiaomi, TCL or Sony. The aerial films are © Apple and stream from Apple's servers. Daily photos come from Bing and belong to their respective owners.
+Aerial is an independent open-source project, not affiliated with Apple, Xiaomi, TCL, Haier, OPPO or Sony; brand logos belong to their owners. The aerial films are © Apple and stream from Apple's servers. Daily photos come from Bing and belong to their respective owners.

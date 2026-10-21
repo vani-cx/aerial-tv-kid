@@ -22,7 +22,7 @@
 <link rel="alternate" hreflang="en" href="https://aerial.qust.me/en/">
 <link rel="alternate" hreflang="x-default" href="https://aerial.qust.me/en/">
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="../style.css?v=3">
+<link rel="stylesheet" href="../style.css?v=4">
 </head>
 <body>
 
@@ -185,12 +185,16 @@
     <div class="install reveal">
       <h3 class="step"><span>1</span>Turn on ADB debugging on the TV</h3>
       <div class="tabs" role="tablist" data-tabs="brand">
-        <button role="tab" aria-selected="true" data-tab="xiaomi">Xiaomi</button>
-        <button role="tab" aria-selected="false" data-tab="tcl">TCL</button>
-        <button role="tab" aria-selected="false" data-tab="other">Others</button>
+        <button role="tab" aria-selected="true" data-tab="xiaomi"><i class="logo xiaomi" aria-hidden="true"></i>Xiaomi</button>
+        <button role="tab" aria-selected="false" data-tab="tcl" aria-label="TCL"><i class="logo tcl" aria-hidden="true"></i></button>
+        <button role="tab" aria-selected="false" data-tab="haier" aria-label="Haier"><i class="logo haier" aria-hidden="true"></i></button>
+        <button role="tab" aria-selected="false" data-tab="oppo" aria-label="OPPO"><i class="logo oppo" aria-hidden="true"></i></button>
+        <button role="tab" aria-selected="false" data-tab="other"><i class="logo android" aria-hidden="true"></i>Others</button>
       </div>
       <div class="panel on" data-panel="xiaomi"><p>Settings (设置) → About (关于) → press OK on <b>Model</b> (产品型号) until developer mode is on. Then Settings → Account &amp; Security (账号与安全): turn on <b>ADB debugging</b> (ADB 调试) and <b>Install unknown apps</b> (安装未知来源的应用).</p></div>
       <div class="panel" data-panel="tcl"><p>Settings (设置) → About (关于) → <b>Device info</b> (本机信息), then quickly press <b>Up, Down, Left, Right</b>. Turn on <b>ADB</b> in the <b>More</b> (更多) group that appears.</p></div>
+      <div class="panel" data-panel="haier"><p>Press the Source button <b>on the TV itself</b>. While the source menu is open, press <b>Left, Left, Up, Right</b> on the remote to open the factory menu (海尔工厂菜单), then set <b>ADB 调试开关</b> (ADB debugging) to on. Change nothing else.</p></div>
+      <div class="panel" data-panel="oppo"><p>Settings (设置) → System (系统) → About (关于本机) → <b>Model</b> (设备型号), press <b>Up, Up, Right, Right</b>, then OK.</p></div>
       <div class="panel" data-panel="other"><p>Settings → Device Preferences → About → press <b>Build</b> (not Android version) 7 times, then turn on <b>USB debugging</b> in Developer options.</p></div>
 
       <h3 class="step"><span>2</span>Enter the TV's IP address</h3>
@@ -280,7 +284,7 @@
 <footer>
   <div class="wrap">
     <div>
-      Aerial is an independent open-source project (MIT), not affiliated with Apple, Xiaomi, TCL or Sony.<br>
+      Aerial is an independent open-source project (MIT), not affiliated with Apple, Xiaomi, TCL, Haier, OPPO or Sony; brand logos belong to their owners.<br>
       Aerial films © Apple. Daily photos from Bing, © their respective owners.
     </div>
     <div><a href="https://github.com/pengchujin/aerial-tv">GitHub</a> · <a href="../download/aerial-standard.apk">Download</a> · <a href="https://github.com/pengchujin/aerial-tv/issues">Feedback</a> · <a href="../" data-lang="zh" lang="zh-CN">中文</a></div>

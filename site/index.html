@@ -22,7 +22,7 @@
 <link rel="alternate" hreflang="en" href="https://aerial.qust.me/en/">
 <link rel="alternate" hreflang="x-default" href="https://aerial.qust.me/en/">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 
@@ -185,13 +185,15 @@
     <div class="install reveal">
       <h3 class="step"><span>1</span>在电视上打开 ADB 调试</h3>
       <div class="tabs" role="tablist" data-tabs="brand">
-        <button role="tab" aria-selected="true" data-tab="xiaomi">小米</button>
-        <button role="tab" aria-selected="false" data-tab="tcl">TCL</button>
-        <button role="tab" aria-selected="false" data-tab="oppo">OPPO</button>
-        <button role="tab" aria-selected="false" data-tab="other">其他</button>
+        <button role="tab" aria-selected="true" data-tab="xiaomi"><i class="logo xiaomi" aria-hidden="true"></i>小米</button>
+        <button role="tab" aria-selected="false" data-tab="tcl" aria-label="TCL"><i class="logo tcl" aria-hidden="true"></i></button>
+        <button role="tab" aria-selected="false" data-tab="haier" aria-label="海尔"><i class="logo haier" aria-hidden="true"></i></button>
+        <button role="tab" aria-selected="false" data-tab="oppo" aria-label="OPPO"><i class="logo oppo" aria-hidden="true"></i></button>
+        <button role="tab" aria-selected="false" data-tab="other"><i class="logo android" aria-hidden="true"></i>其他</button>
       </div>
       <div class="panel on" data-panel="xiaomi"><p>设置 → 关于 → 连续按 <b>产品型号</b>，进入开发者模式；再到 设置 → 账号与安全，打开 <b>ADB 调试</b> 和 <b>安装未知来源的应用</b>。</p></div>
       <div class="panel" data-panel="tcl"><p>设置 → 关于 → <b>本机信息</b>，快速按遥控器 <b>上下左右</b>，在底部出现的「更多」里打开 <b>ADB</b>。</p></div>
+      <div class="panel" data-panel="haier"><p>按<b>电视机身上</b>的信号源键，弹出信号源菜单后，用遥控器按 <b>左左上右</b>，进入「海尔工厂菜单」，把 <b>ADB 调试开关</b> 设为开。只改这一项，别动其他选项。</p></div>
       <div class="panel" data-panel="oppo"><p>设置 → 系统 → 关于本机 → <b>设备型号</b>，按 <b>上上右右</b> 再按确认。</p></div>
       <div class="panel" data-panel="other"><p>设置 → 设备偏好设置 → 关于 → 连按 <b>内部版本号</b>（Build，不是「Android 版本」）7 次，再在开发者选项里打开 <b>USB 调试</b>。</p></div>
 
@@ -287,7 +289,7 @@
 <footer>
   <div class="wrap">
     <div>
-      Aerial 是独立的开源项目（MIT 许可），与 Apple、小米、TCL、索尼均无关联。<br>
+      Aerial 是独立的开源项目（MIT 许可），与 Apple、小米、TCL、海尔、OPPO、索尼均无关联，品牌标志归各自所有者。<br>
       航拍影片版权归 Apple 所有；每日精选图片来自必应，版权归原作者所有。
     </div>
     <div><a href="https://github.com/pengchujin/aerial-tv">GitHub</a> · <a href="download/aerial-standard.apk">下载</a> · <a href="https://github.com/pengchujin/aerial-tv/issues">反馈</a> · <a href="en/" data-lang="en" lang="en">English</a></div>

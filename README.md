@@ -87,10 +87,11 @@
 
 | 电视 | 怎么打开 |
 |---|---|
-| **小米 / Redmi** | 设置 → 关于 → 连续按 **产品型号**，进入开发者模式；再到 设置 → 账号与安全，打开 **ADB 调试** 和 **安装未知来源的应用** |
-| **TCL / 雷鸟** | 设置 → 关于 → **本机信息**，快速按遥控器 **上下左右**，在底部出现的「更多」里打开 **ADB** |
-| **OPPO** | 设置 → 系统 → 关于本机 → **设备型号**，按 **上上右右** 再按确认（用户反馈） |
-| **其他 Android TV** | 设置 → 设备偏好设置 → 关于 → 连按 **内部版本号**（Build，不是「Android 版本」）7 次，再在开发者选项里打开 **USB 调试** |
+| <img src="site/img/brands/xiaomi.svg" height="16" alt=""> **小米 / Redmi** | 设置 → 关于 → 连续按 **产品型号**，进入开发者模式；再到 设置 → 账号与安全，打开 **ADB 调试** 和 **安装未知来源的应用** |
+| <img src="site/img/brands/tcl.svg" height="14" alt=""> **TCL / 雷鸟** | 设置 → 关于 → **本机信息**，快速按遥控器 **上下左右**，在底部出现的「更多」里打开 **ADB** |
+| <img src="site/img/brands/haier.svg" height="12" alt=""> **海尔 / 模卡** | 按**电视机身上**的信号源键，再用遥控器按 **左左上右**，进入「海尔工厂菜单」，把 **ADB 调试开关** 设为开。只改这一项，别动其他选项（用户反馈） |
+| <img src="site/img/brands/oppo.svg" height="10" alt=""> **OPPO** | 设置 → 系统 → 关于本机 → **设备型号**，按 **上上右右** 再按确认（用户反馈） |
+| <img src="site/img/brands/android.svg" height="16" alt=""> **其他 Android TV** | 设置 → 设备偏好设置 → 关于 → 连按 **内部版本号**（Build，不是「Android 版本」）7 次，再在开发者选项里打开 **USB 调试** |
 
 电视的 IP 在「设置 → 网络」里。电脑第一次连接时，电视会问是否允许调试，选 **始终允许**。
 
@@ -236,4 +237,4 @@ BUILD=1 KEEP_ADB=1 TV=<电视IP> tools/install.sh      # 用本地编译的 APK 
 
 [MIT](LICENSE)。Inter 字体使用 [SIL Open Font License](FONT-LICENSE-OFL.txt)。
 
-Aerial 是独立的开源项目，与 Apple、小米、TCL、索尼均无关联。航拍影片版权归 Apple 所有，由 Apple 的服务器直接播放；每日精选图片来自必应，版权归原作者所有。
+Aerial 是独立的开源项目，与 Apple、小米、TCL、海尔、OPPO、索尼均无关联，文中的品牌标志归各自所有者。航拍影片版权归 Apple 所有，由 Apple 的服务器直接播放；每日精选图片来自必应，版权归原作者所有。
