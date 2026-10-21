@@ -191,6 +191,7 @@ Most TVs sold in China only accept the maker's launcher and kill other apps in s
 | PPTV K55U27 | Android 6 | User-verified: works ([#39](https://github.com/pengchujin/aerial-tv/issues/39)) | — |
 | Tencent Aurora Box 7S | — | User-verified: installs; two Settings tiles (hide one with a long press); back to the stock launcher after standby, open ([#51](https://github.com/pengchujin/aerial-tv/issues/51)) | — |
 | Xiaomi MiTV-ASTP0 | Android 9 | User-verified: install, boot, wake from standby; Home flashes the stock launcher first ([#48](https://github.com/pengchujin/aerial-tv/issues/48)) | — |
+| Xiaomi MiTV-NSOP0 | Android 9 | User-verified: one-line install, boot ([#65](https://github.com/pengchujin/aerial-tv/issues/65)) | — |
 | XGIMI projector (m7642) | Android 9 | User-verified: boot; Home after a video sometimes hangs, open ([#44](https://github.com/pengchujin/aerial-tv/issues/44)) | — |
 | TCL 55S595C Ultra (MT9655) | Android 11 | Installs, but ADB is wireless debugging only with no way to authorize, so Home cannot be taken over ([#52](https://github.com/pengchujin/aerial-tv/issues/52)) | [Notes](docs/devices/tcl-mt9655-cn.md) (Chinese) |
 
