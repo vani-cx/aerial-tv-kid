@@ -191,6 +191,7 @@ curl -fsSL https://aerial.qust.me/install.sh | TV=192.168.1.20 bash -s restore
 | PPTV K55U27 | Android 6 | 用户验证：能用（[#39](https://github.com/pengchujin/aerial-tv/issues/39)） | — |
 | 腾讯极光盒子 7S | — | 用户验证：安装成功；有两个「设置」，可以长按隐藏一个；待机后回到原桌面，待查（[#51](https://github.com/pengchujin/aerial-tv/issues/51)） | — |
 | 小米 MiTV-ASTP0 | Android 9 | 用户验证：安装、开机自启、待机唤醒；按 HOME 会先闪一下原桌面（[#48](https://github.com/pengchujin/aerial-tv/issues/48)） | — |
+| 小米 MiTV-MFTP0（alita） | Android 9 | 安装、覆盖升级、开机自启已验证；升级后守护会掉，见 [#72](https://github.com/pengchujin/aerial-tv/issues/72) | [笔记](docs/devices/xiaomi-mitv-mftp0.md) |
 | 极米投影（m7642） | Android 9 | 用户验证：开机自启；看完视频按 HOME 偶尔卡住，待查（[#44](https://github.com/pengchujin/aerial-tv/issues/44)） | — |
 | 雷鸟 55S595C Ultra（MT9655） | Android 11 | 能装，但 ADB 只有无线调试且拿不到授权，接管不了 HOME（[#52](https://github.com/pengchujin/aerial-tv/issues/52)） | [笔记](docs/devices/tcl-mt9655-cn.md) |
 | OPPO K9 65 寸（ColorOS TV 2.4） | Android 9 / 32 位 | 用户验证：要先改包名、补桌面标记才能装，装好后开机自启、待机唤醒、屏保、天气都正常 | [笔记](docs/devices/oppo-coloros-tv.md) |
