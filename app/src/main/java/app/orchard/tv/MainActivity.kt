@@ -47,6 +47,7 @@ import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.wallpaper.Wallpapers
 import app.orchard.tv.system.MissingClipboard
 import app.orchard.tv.system.SystemProbe
+import app.orchard.tv.system.settingsLaunchIntent
 import app.orchard.tv.update.Updates
 import app.orchard.tv.weather.Weather
 import kotlinx.coroutines.flow.filterNotNull
@@ -366,7 +367,7 @@ class MainActivity : ComponentActivity() {
             ).toBundle()
         }
         try {
-            startActivity(app.launchIntent(), options)
+            startActivity(settingsLaunchIntent(this, app.launchIntent()), options)
         } catch (e: Exception) {
             Toast.makeText(this, getString(R.string.launch_failed, app.label), Toast.LENGTH_SHORT).show()
         }
@@ -374,7 +375,7 @@ class MainActivity : ComponentActivity() {
 
     private fun open(intent: Intent) {
         try {
-            startActivity(intent)
+            startActivity(settingsLaunchIntent(this, intent))
         } catch (e: Exception) {
             Toast.makeText(this, R.string.unavailable, Toast.LENGTH_SHORT).show()
         }

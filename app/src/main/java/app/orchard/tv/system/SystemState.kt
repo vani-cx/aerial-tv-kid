@@ -192,6 +192,7 @@ object SystemProbe {
         // component was picked on TCL too, where it does not exist.
         return (intents.firstOrNull { pm.resolveActivity(it, 0) != null } ?: intents.last())
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .let { settingsLaunchIntent(context, it) }
     }
 
     // ---- Inputs ----
