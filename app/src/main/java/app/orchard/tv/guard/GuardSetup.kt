@@ -31,6 +31,10 @@ object GuardSetup {
         private set
 
     private const val PREFS = "system"
+
+    private const val KEY_REVIVALS = "revivals"
+
+    private const val REVIVAL_WINDOW_MS = 10 * 60 * 1000L
     private const val KEY_KEEP_ADB = "keep_adb"
     private const val KEY_OWN_SCREENSAVER = "own_screensaver"
     private const val KEY_HOME_IN_FRONT = "home_in_front"
@@ -50,6 +54,25 @@ object GuardSetup {
      * Some firmwares (Xiaomi) switch ADB debugging off on their own, usually around standby.
      * When the owner opts in (tools/install.sh does, with KEEP_ADB=1), Aerial switches it back on.
      */
+    /**
+     * Notes that the notification listener brought Aerial back after it was stopped. LeTV's eUI
+     * (X43, issue #63) stops Aerial every few seconds to minutes; each time Aerial came back, saw
+     * nothing in front it knew, took Home, and pulled the viewer out of the app they were in.
+     */
+    fun noteRevival(context: Context) {
+        val now = System.currentTimeMillis()
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val recent = recentRevivals(context, now) + now
+        prefs.edit().putString(KEY_REVIVALS, recent.joinToString(",")).apply()
+    }
+
+    /** Whether the firmware has stopped Aerial three times or more in the last ten minutes. */
+    fun revivedOften(context: Context): Boolean = recentRevivals(context, System.currentTimeMillis()).size >= 3
+
+    private fun recentRevivals(context: Context, now: Long): List<Long> =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_REVIVALS, null).orEmpty()
+            .split(',').mapNotNull { it.toLongOrNull() }.filter { now - it in 0..REVIVAL_WINDOW_MS }
+
     fun keepAdb(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_KEEP_ADB, false)
 

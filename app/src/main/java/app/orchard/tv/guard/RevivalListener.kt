@@ -17,6 +17,7 @@ import android.util.Log
 class RevivalListener : NotificationListenerService() {
     override fun onListenerConnected() {
         Log.i("AerialGuard", "revived by the notification listener binding")
+        GuardSetup.noteRevival(this)
         GuardSetup.ensureEnabled(this)
         // After a crash Android keeps the guard enabled but does not bind it again (TCL MT5879),
         // and nothing else would notice until Aerial is opened: Home went to the TCL launcher.

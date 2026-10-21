@@ -166,6 +166,12 @@ class HomeGuardService : AccessibilityService() {
         // Unknown means we were only just bound, which happens after a standby kill. Any screen of
         // the stock launcher counts: when Aerial is killed, whatever was on top of the launcher's
         // task is uncovered, not always its home activity (PatchWall's StrategicLayerActivity).
+        // Unless the firmware keeps stopping Aerial: then an unknown front is most likely the app
+        // the viewer is in, and Home stays with the Home key (LeTV eUI, issue #63).
+        if (last == null && GuardSetup.revivedOften(this)) {
+            Log.i(TAG, "$reason, but Aerial keeps being stopped and the front is unknown; leaving it")
+            return
+        }
         val stockInFront = last == null || last.first in stockHomes
         if (!stockInFront && last != null) Log.i(TAG, "$reason with ${last.first} in front; leaving it there")
         if (!stockInFront || SystemClock.uptimeMillis() < allowStockUntil) return
