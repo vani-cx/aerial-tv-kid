@@ -2,9 +2,9 @@
 
 写给接手 Aerial 的人或 AI。先读这份，再读 [ARCHITECTURE.md](ARCHITECTURE.md) 和 [devices/](devices/)。
 
-## 现状（2026-10-20）
+## 现状（2026-10-21）
 
-- 版本 **1.17（versionCode 19）**，2026-10-21 发布（[v1.17](https://github.com/pengchujin/aerial-tv/releases/tag/v1.17)），主要是磁贴重绘（见 ARCHITECTURE「磁贴图」）。小米 MiTV-MFTR0（`standard`）装的是 1.17；TCL MT5879 国行（`guard`）还是 1.15（2026-10-21 通过多屏互动推送，用 ADB 点的「同意」），1.16、1.17 都没推。TCL 上的 32 个 App 的新磁贴只在小米上用 `TileSheet` 渲染看过，没在 TCL 真机上看过。海信 VIDAA 的主页键见 [devices/hisense-vidaa.md](devices/hisense-vidaa.md)。主要改动见 Release 说明和 ARCHITECTURE.md。
+- 版本 **1.18（versionCode 20）**，2026-10-21 发布（[v1.18](https://github.com/pengchujin/aerial-tv/releases/tag/v1.18)）：触屏、家长密码、检查更新提示、屏保开始时间、照片每天换一张、显示全部 App 名称、天气带城市名，以及酷开 HOME.CC、install.sh 校验守护并加 `repair` 等适配。小米 MiTV-MFTR0（`standard`）和 TCL MT5879 国行（`guard`，多屏互动推送，用 ADB 点的「同意」）装的都是 1.18。酷开、乐视、OPPO K9、小米 ANTL0 / Android 9 相关的改动没有真机，只按用户日志改。海信 VIDAA 的主页键见 [devices/hisense-vidaa.md](devices/hisense-vidaa.md)。主要改动见 Release 说明和 ARCHITECTURE.md。
 - 具体 IP、每台电视上改过的设置、户主自己的数据：见 **`local/TVS.md`**（不在版本库，需要单独私下拿到）。
 - 开源在 https://github.com/pengchujin/aerial-tv（MIT）。官网在 `site/`，已部署到 https://aerial.qust.me（Cloudflare Worker 静态资源）。还没有自动化测试，以下结论都来自真机操作和日志。
 
