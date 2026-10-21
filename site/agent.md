@@ -163,6 +163,8 @@ adb shell "sleep 3; dumpsys window | grep mCurrentFocus"
 
 第 5 条不是 `app.orchard.tv` 时，等 5 秒再运行一次第 4、5 条（有的电视守护启动得慢）。还不是，看「常见情况」。
 
+`input keyevent` 模拟的主页键不经过守护的按键过滤，在少数电视上（索尼 Android 9）结果和实体遥控器不同：这时请用户用实体遥控器按一次主页键，再只运行第 5 条，以这次为准。
+
 都通过后，征得用户同意再 `adb reboot`，等一两分钟电视开机后重新 `adb connect <IP>:5555`，再跑一次第 5 条，确认开机直接进入 Aerial。
 
 ## 还原

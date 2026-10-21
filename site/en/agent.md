@@ -162,6 +162,8 @@ adb shell "sleep 3; dumpsys window | grep mCurrentFocus"
 
 If line 5 shows something else, wait 5 seconds and run lines 4 and 5 again (Home Guard starts slowly on some TVs). If it still does, see "Common cases".
 
+A Home press sent with `input keyevent` skips Home Guard's key filter, so on a few TVs (Sony, Android 9) it lands somewhere else than the remote's Home button does. Then ask the user to press Home on the remote once and run only line 5; that result counts.
+
 Once all of it passes, ask the user before running `adb reboot`. After the TV has started again (a minute or two), `adb connect <IP>:5555` and run line 5 again to confirm the TV starts into Aerial.
 
 ## Undo
