@@ -378,7 +378,10 @@ private fun VolumeRow(vm: HomeViewModel) {
     )
 }
 
-/** Brightness where Aerial may change it; otherwise a row that opens the TV's picture settings. */
+/**
+ * Brightness where Aerial may change it; otherwise a row that opens the TV's picture settings, and
+ * says so: a bare "Brightness" with no slider read as broken (Vidda 85V1F-S, FFalcon, issue #130).
+ */
 @Composable
 private fun BrightnessRow(vm: HomeViewModel) {
     val context = LocalContext.current
@@ -387,13 +390,13 @@ private fun BrightnessRow(vm: HomeViewModel) {
         MenuRow(Glyph.Sun, stringResource(R.string.cc_brightness), onClick = {
             vm.overlay = Overlay.None
             SystemProbe.openPictureSettings(context)
-        })
+        }, trailing = stringResource(R.string.cc_brightness_in_settings) + " ›")
     } else {
         SliderRow(
             glyph = Glyph.Sun,
             level = level,
             value = Math.round(level * 100).toString(),
-            // Brightness.adjust moves 5% a step.
+            // Brightness.adjust moves 5% a step, and stops at 1%.
             steps = 20,
             onStep = vm::adjustBrightness,
             onClick = {},

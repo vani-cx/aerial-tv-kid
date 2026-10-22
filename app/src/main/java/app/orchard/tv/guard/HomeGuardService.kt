@@ -365,6 +365,18 @@ class HomeGuardService : AccessibilityService() {
 
         val isRunning: Boolean get() = instance != null
 
+        /** Looks once more at boot completion; false if the guard is not running. */
+        fun onBootCompleted(): Boolean {
+            val s = instance ?: return false
+            s.handler.post {
+                // Aerial already in front: the take-over at bind time worked, and has opened the
+                // input the TV starts on if there is one.
+                if (s.lastWindow?.first == s.packageName) return@post
+                if (s.getSystemService<PowerManager>()?.isInteractive == true) s.takeOverOnceSettled("boot completed", woke = true)
+            }
+            return true
+        }
+
         /** True if [packageName] is a stock launcher the guard keeps away from the front. */
         fun isStockHome(packageName: String): Boolean = instance?.stockHomes?.containsKey(packageName) == true
 

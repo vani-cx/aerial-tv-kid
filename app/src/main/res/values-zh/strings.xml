@@ -60,6 +60,7 @@
     <string name="launch_failed">无法打开%1$s</string>
     <string name="unavailable">此电视不支持</string>
     <string name="cc_brightness">亮度</string>
+    <string name="cc_brightness_in_settings">在图像设置里调</string>
     <string name="cc_personalize">个性化</string>
     <string name="wp_title">个性化</string>
     <string name="wp_wallpaper">壁纸</string>

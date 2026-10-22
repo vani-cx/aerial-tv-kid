@@ -18,9 +18,11 @@ class BootReceiver : BroadcastReceiver() {
         if (intent.action == Intent.ACTION_LOCKED_BOOT_COMPLETED) return
         // Also when Aerial is the default Home: some firmwares start their own launcher at boot
         // regardless (Skyworth/Coolita 8R145, issue #43).
-        // The guard takes Home over itself once it can see what is in front: by the time this
-        // arrives, an HDMI-CEC source may already have switched the TV to its input.
-        if (HomeGuardService.isRunning) return
+        // A guard that is already running looks at what is in front before taking Home: by the time
+        // this arrives, an HDMI-CEC source may already have switched the TV to its input. It still
+        // has to look: on Xiaomi MiTV-MTEQ0 (Android 10) it is bound ~20 s before BOOT_COMPLETED,
+        // never sees PatchWall's windows, and the take-over at bind time did not stick (issue #154).
+        if (HomeGuardService.onBootCompleted()) return
         runCatching {
             context.startActivity(MainActivity.bringBackIntent(context))
         }
