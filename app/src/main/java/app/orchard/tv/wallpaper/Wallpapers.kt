@@ -107,6 +107,21 @@ object Wallpapers {
         rebuildList()
         rebuildBackdrop()
         scope.launch { refreshDaily() }
+        scope.launch(Dispatchers.IO) { clearStaleUploads() }
+    }
+
+    /**
+     * Uploads pass through temp files in the cache folder (ours, CustomIcons', and NanoHTTPD's for
+     * each part), deleted when the upload ends. One cut off midway, or the process dying, leaves
+     * its file behind, and those piled up (#193). Only those, and only an hour old: the aerial
+     * cache beside them keeps itself under 48 MB.
+     */
+    private fun clearStaleUploads() {
+        val before = System.currentTimeMillis() - 60 * 60 * 1000L
+        app.cacheDir.listFiles { f ->
+            f.isFile && f.lastModified() < before &&
+                (f.name.startsWith("upload") || f.name.startsWith("icon") || f.name.startsWith("NanoHTTPD-"))
+        }?.forEach { val kb = it.length() / 1024; if (it.delete()) Log.i(TAG, "removed a stale upload, $kb KB") }
     }
 
     fun select(id: String) {
