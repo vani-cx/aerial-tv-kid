@@ -17,6 +17,7 @@ import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
 import android.view.KeyEvent
+import android.view.ViewConfiguration
 import android.view.accessibility.AccessibilityEvent
 import androidx.core.content.getSystemService
 import app.orchard.tv.MainActivity
@@ -246,11 +247,29 @@ class HomeGuardService : AccessibilityService() {
         if (!GuardSetup.isUserUnlocked(this)) return false
         if (event.keyCode != KeyEvent.KEYCODE_HOME) return false
         if (isDefaultHome()) return false
-        if (event.action == KeyEvent.ACTION_UP && !event.isCanceled) {
-            Log.i(TAG, "Home key taken before the system saw it")
-            goHome()
+        // Held, Home is the firmware's task center, which taking the key hid (Xiaomi, issue #185):
+        // open the recent apps instead, and leave Home alone when the key comes up. Timed here:
+        // the filter sees keys before Android makes the repeats that would say the key is held.
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+            homeHeld = false
+            handler.removeCallbacks(homeHold)
+            handler.postDelayed(homeHold, ViewConfiguration.getLongPressTimeout().toLong())
+        }
+        if (event.action == KeyEvent.ACTION_UP) {
+            handler.removeCallbacks(homeHold)
+            if (!event.isCanceled && !homeHeld) {
+                Log.i(TAG, "Home key taken before the system saw it")
+                goHome()
+            }
         }
         return true
+    }
+
+    private var homeHeld = false
+    private val homeHold = Runnable {
+        homeHeld = true
+        Log.i(TAG, "Home held; opening recent apps")
+        performGlobalAction(GLOBAL_ACTION_RECENTS)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
