@@ -73,6 +73,7 @@ class MainActivity : ComponentActivity() {
             vm.refreshNetwork()
             Wallpapers.refreshDailyIfStale(networkCameUp = true)
             Weather.refreshIfStale(networkCameUp = true)
+            Updates.checkIfStale()
         }
         override fun onLost(network: Network) = runOnUiThread { vm.refreshNetwork() }
         override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) = runOnUiThread { vm.refreshNetwork() }

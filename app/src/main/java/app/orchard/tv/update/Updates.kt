@@ -21,12 +21,16 @@ import java.net.URL
  * and report bugs fixed long ago. At most once a day Aerial reads the latest release's tag from the
  * website (reachable in China, unlike GitHub); Control Center then names the new version and says
  * how to update. Nothing is downloaded or installed in the background.
+ *
+ * Every three hours, not once a day: several releases can come out in one day, and a TV that had
+ * checked in the morning kept offering nothing until the next day (1.22 to 1.25 on 2026-10-22).
  */
 object Updates {
     private const val TAG = "AerialUpdates"
     private const val PREFS = "updates"
     private const val VERSION_URL = "https://aerial.qust.me/download/version.txt"
-    private const val CHECK_EVERY_MS = 24 * 60 * 60 * 1000L
+    private const val CHECK_EVERY_MS = 3 * 60 * 60 * 1000L
+    private const val RETRY_MS = 10 * 60 * 1000L
 
     /** This build's version, e.g. "1.17" (the guard build's "-guard" left off). */
     val current: String = BuildConfig.VERSION_NAME.substringBefore('-')
@@ -49,7 +53,7 @@ object Updates {
     fun checkIfStale() {
         if (!started) return
         val now = System.currentTimeMillis()
-        if (now - lastAttempt < CHECK_EVERY_MS / 24 || now - prefs.getLong("checked_at", 0) < CHECK_EVERY_MS) return
+        if (now - lastAttempt < RETRY_MS || now - prefs.getLong("checked_at", 0) < CHECK_EVERY_MS) return
         lastAttempt = now
         scope.launch {
             val latest = withContext(Dispatchers.IO) {
