@@ -2,9 +2,10 @@
 
 写给接手 Aerial 的人或 AI。先读这份，再读 [ARCHITECTURE.md](ARCHITECTURE.md) 和 [devices/](devices/)。
 
-## 现状（2026-10-21）
+## 现状（2026-10-22）
 
-- 版本 **1.22（versionCode 24）**，2026-10-21 发布（[v1.22](https://github.com/pengchujin/aerial-tv/releases/tag/v1.22)）：个性化 → 屏幕保护程序里加「返回键：开始屏保 / 不响应」（#94）；待机唤醒时如果 Aerial 已经在前台（守护先把它拉回来了，或进程是唤醒后才复活的），守护补发一次唤醒标记，「开机时打开」的信号源照样打开（#111，小米 MiTV-MTEQ0 上报告人验证过同样的改法）；海信 VIDAA（有 `com.hisense.vidaaassistant` 或 `com.jamdeo.tv.vod`）上守护不再过滤按键，音量键交回海信固件（#7，没有海信真机）；Android TV 原生设置侧栏（CM311-1）不再另开任务（PR #90）。小米 MiTV-MFTR0（`standard`）和 TCL MT5879 国行（`guard`，多屏互动推送，ADB 点「同意」）装的都是 1.22，两台回归都过，返回键开关在小米上逐项验证过，测完已改回默认（开始屏保）。
+- 版本 **1.23（versionCode 25）**，2026-10-22 发布（[v1.23](https://github.com/pengchujin/aerial-tv/releases/tag/v1.23)）：照 tvOS 26 改外观。第一排下面垫 Liquid Glass 底板（用预先模糊好的壁纸做材质，不做实时模糊），进网格时淡出、回第一排时淡入；控制中心、个性化、长按菜单、隐藏的 App、家长密码都改成玻璃面板；焦点放大不再回弹，高对比度白框不会同时出现两个；第一排不显示名称，网格里只显示选中的（「App 名称」设置去掉）；新增按键声音（自己合成，个性化里可关）；图标换成 Material Symbols Rounded；主屏幕默认单排（选过双排的不变）；「隐藏的 App」从控制中心挪进个性化；右上角按钮只放网络和控制中心，时间不再在两处同时出现。都在小米 MiTV-MFTR0（`standard`）上逐项验证过，GPU 90 分位约 15–16ms（之前 12–13ms）；**TCL 没装 1.23**（发版时 TCL 待机断网，连不上）。
+- 1.22（versionCode 24），2026-10-21 发布（[v1.22](https://github.com/pengchujin/aerial-tv/releases/tag/v1.22)）：个性化 → 屏幕保护程序里加「返回键：开始屏保 / 不响应」（#94）；待机唤醒时如果 Aerial 已经在前台（守护先把它拉回来了，或进程是唤醒后才复活的），守护补发一次唤醒标记，「开机时打开」的信号源照样打开（#111，小米 MiTV-MTEQ0 上报告人验证过同样的改法）；海信 VIDAA（有 `com.hisense.vidaaassistant` 或 `com.jamdeo.tv.vod`）上守护不再过滤按键，音量键交回海信固件（#7，没有海信真机）；Android TV 原生设置侧栏（CM311-1）不再另开任务（PR #90）。小米 MiTV-MFTR0（`standard`）和 TCL MT5879 国行（`guard`，多屏互动推送，ADB 点「同意」）装的都是 1.22，两台回归都过，返回键开关在小米上逐项验证过，测完已改回默认（开始屏保）。
 - 1.21（versionCode 23）：系统不许通知监听的电视（低内存 Android 9，小米 MFTP0）上，待机强停后改由同步适配器（`guard/RevivalSync.kt`）约 30–60 秒后拉回 Aerial 并重开守护和 ADB，详见 [devices/xiaomi-mitv-mftp0.md](devices/xiaomi-mitv-mftp0.md)；**MFTP0 本机还没用 1.21 实测**（#77 有用户在 1.20 上抓到小米唤醒时 `restartHomeStandby` 强停 Aerial 的日志）。
 - 1.20（versionCode 22）：个性化里加「主屏幕：标准 / 只显示一排」（只显示一排时第一排放到屏幕下方，不显示大时钟，把屏幕让给壁纸）和「时钟：左上 / 右上」；个性化面板改成 tvOS 设置那样的分组卡片。小米 MiTV-MFTR0（`standard`）和 TCL MT5879 国行（`guard`，多屏互动推送，用 ADB 点的「同意」）装的都是 1.20；新功能只在小米上逐项验证过（两种布局、两个时钟位置、面板各组），两台电视上的这两项都保持默认（标准、左上）。1.19 的修复（#82、#95、#87）见 v1.19 的 Release 说明，1.18 的内容见 v1.18。酷开、乐视、OPPO K9、小米 ANTL0 / Android 9 相关的改动没有真机，只按用户日志改。海信 VIDAA 的主页键见 [devices/hisense-vidaa.md](devices/hisense-vidaa.md)。主要改动见 Release 说明和 ARCHITECTURE.md。
 - 具体 IP、每台电视上改过的设置、户主自己的数据：见 **`local/TVS.md`**（不在版本库，需要单独私下拿到）。
