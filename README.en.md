@@ -19,6 +19,8 @@ Made for the Xiaomi, TCL and other TVs sold in China. It starts at boot and surv
 <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-555555?style=flat-square"></a>
 <img alt="Android TV 5.0+" src="https://img.shields.io/badge/Android%20TV-5.0%2B-3ddc84?style=flat-square&logo=android&logoColor=white">
 
+![Aerial's home screen](site/img/home.jpg)
+
 | The TV's stock home screen | With Aerial |
 |:---:|:---:|
 | <img src="site/img/stock-xiaomi.jpg" alt="The stock home screen, covered in show recommendations and membership badges"> | <img src="site/img/home.jpg" alt="Aerial's home screen"> |
