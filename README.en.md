@@ -119,6 +119,7 @@ Add `--uninstall` (`bash -s restore --uninstall`) to remove Aerial as well. With
 ### Troubleshooting
 
 - **TCL shows a 多屏互动 prompt**: press Right, then OK, to choose 同意 (Agree).
+- **Skyworth: `adb install` fails with `INSTALL_FAILED_USER_RESTRICTED`**: run `adb shell settings put global verifier_verify_adb_installs 0`, then install again (from a user's report; see the [agent guide](site/en/agent.md#common-cases)).
 - **The firmware won't install home-screen apps**: add `-s guard` to the end of the command, or use [aerial-guard.apk](https://aerial.qust.me/download/aerial-guard.apk).
 - **What `KEEP_ADB=1` does**: Xiaomi turns ADB off after standby; with it, Aerial turns it back on so you can update later.
 - **Do my apps, subscriptions and old home screen stay?** Yes. The old home screen is in the app list. A boot ad comes from the firmware and stays.

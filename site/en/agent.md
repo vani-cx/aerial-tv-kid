@@ -78,6 +78,7 @@ Run these in PowerShell, with the adb from step 1. Everything inside `adb shell 
 
 2. Install it: `adb install -r aerial-standard.apk`. Go on when it prints `Success`. If it fails:
    - With **`INSTALL_FAILED_VERIFICATION_FAILURE`**: this is a TCL, which refuses every adb install. Follow "TCL" below, then continue from item 3.
+   - With **`INSTALL_FAILED_USER_RESTRICTED`** (Skyworth and others): see the Skyworth entry under "Common cases", then install again.
    - Otherwise (for example, the firmware refuses home-screen apps): install `aerial-guard.apk` instead (same address with `guard` in place of `standard`).
 
 3. Grant the permissions only adb can grant. If one fails, go on with the next:
@@ -202,6 +203,7 @@ Then:
 - **Xiaomi**: `resolve-activity` still names PatchWall (`com.mitv.tvhome`); that's expected, Home Guard takes over. Never disable `com.mitv.tvhome`. `KEEP_ADB` is recommended.
 - **Xiaomi on Android 9 with low RAM (`adb shell getprop ro.config.low_ram` prints `true`, e.g. MFTP0)**: Android allows no third-party notification listener there, so `allow_listener` prints nothing and does nothing. That is expected; don't keep retrying. Xiaomi force-stops Aerial at standby; from 1.21 Android's sync service brings Aerial back about 30-60 seconds after the stop, and Home Guard then turns ADB back on. Woken after more than a minute, the TV shows Aerial straight away; woken after a few seconds, it shows the stock launcher first and switches to Aerial within about a minute. To test standby, stay in standby for over a minute and look 30 seconds after waking, without pressing Home or opening an app meanwhile. 1.20 and earlier do not come back after standby on these TVs.
 - **TCL**: `adb install` always fails (`INSTALL_FAILED_VERIFICATION_FAILURE`); use 多屏互动 as in "TCL". If the user didn't see the prompt on the TV, run it again.
+- **Skyworth (e.g. 7T631_T60, Android 13)**: when `adb install` fails with `INSTALL_FAILED_USER_RESTRICTED`, the firmware is verifying adb installs. Note the current value with `adb shell settings get global verifier_verify_adb_installs`, run `adb shell settings put global verifier_verify_adb_installs 0`, then install again (on macOS / Linux, run the one-liner again). Afterwards put the old value back (if it was `null`, `adb shell settings delete global verifier_verify_adb_installs`), and turn it off again for each update. This comes from a user's report; it has not been checked on a Skyworth here.
 - **TVs with only Wireless debugging** (FFALCON 55S595C Ultra, MT9655): adb can't be authorized there, so Aerial installs but can't take over Home.
 - **Hisense VIDAA**: once item 7 has changed `persist.vt.use_home_pkg`, Home goes straight to Aerial; the TV still starts into its own launcher after a reboot (the firmware holds third-party apps back until boot completes), so press Home once.
 - **Other Vidda systems, OPPO K9, FFALCON Crane 6**: Aerial installs but the TV doesn't start into it (the firmware only accepts its own launcher unless that is removed, which this install doesn't do). Aerial still works as an app.
