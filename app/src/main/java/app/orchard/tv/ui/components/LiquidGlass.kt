@@ -1,5 +1,6 @@
 package app.orchard.tv.ui.components
 
+import android.os.Build
 import android.graphics.BitmapShader
 import android.graphics.ComposeShader
 import android.graphics.LinearGradient
@@ -72,7 +73,9 @@ fun Modifier.liquidGlass(corner: Dp, bottomCorners: Boolean = true): Modifier = 
             val mask = smoothMask(w, h, radius, if (bottomCorners) radius else 0f)
             val shape = BitmapShader(mask, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
                 .apply { setLocalMatrix(Matrix().apply { setScale(size.width / w, size.height / h) }) }
-            val brush = shader?.let { ShaderBrush(ComposeShader(it, shape, PorterDuff.Mode.DST_IN)) }
+            // Before Android 9 a hardware-drawn ComposeShader cannot hold two bitmap shaders; there
+            // the glass is drawn as is and the clip's plain rounded corners hold it.
+            val brush = shader?.let { ShaderBrush(if (Build.VERSION.SDK_INT >= 28) ComposeShader(it, shape, PorterDuff.Mode.DST_IN) else it) }
             val flat = mask.asImageBitmap()
             onDrawBehind {
                 if (shader == null || brush == null || root == IntSize.Zero) {

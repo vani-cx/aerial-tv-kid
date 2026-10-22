@@ -1,15 +1,11 @@
 package app.orchard.tv.ui.home
 
 import android.text.format.DateFormat
-import android.graphics.BitmapShader
-import android.graphics.ComposeShader
 import android.graphics.PorterDuff
 import android.graphics.Matrix
-import android.graphics.Shader
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
@@ -41,6 +37,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import app.orchard.tv.system.NetKind
@@ -115,10 +112,9 @@ fun HomeBackground(backdrop: ImageBitmap?, frosted: ImageBitmap?, plate: Rect?, 
         val glassSrc = frost ?: bmp
         val dark = remember(glassSrc) { glassSrc?.let { darkened(it, GRID_SHADE) } }
         val plateSrc = remember(glassSrc) { glassSrc?.let { plateTinted(it) } }
-        // The shader stretching the glass over the screen; made once per size, outside state,
-        // since it is made while drawing.
-        val shaderFor = remember(glassSrc) { arrayOfNulls<Pair<Size, Shader>>(1) }
-        val outlineFor = remember { arrayOfNulls<Pair<IntSize, Pair<Shader, Shader>>>(1) }
+        // The plate, baked for one screen size and resting place; outside state, since it is made
+        // while drawing.
+        val plateFor = remember(plateSrc) { arrayOfNulls<Pair<Pair<Size, Rect>, ImageBitmap>>(1) }
         Canvas(Modifier.fillMaxSize()) {
             if (bmp == null || glassSrc == null || dark == null || plateSrc == null) {
                 drawRect(Color.Black)
@@ -141,28 +137,19 @@ fun HomeBackground(backdrop: ImageBitmap?, frosted: ImageBitmap?, plate: Rect?, 
             val radius = PlateCorner.toPx()
             val grow = PlateSwell.toPx() * (1f - fade)
             val r = plate.translate(0f, -scroll()).inflate(grow)
-            val shader = shaderFor[0]?.takeIf { it.first == size }?.second ?: BitmapShader(
-                plateSrc.asAndroidBitmap(), android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP,
-            ).apply {
-                setLocalMatrix(Matrix().apply { setScale(size.width / plateSrc.width, size.height / plateSrc.height) })
-            }.also { shaderFor[0] = size to it }
-            // The continuous outline is a mask, and the lit edge a picture, both made at the
-            // plate's resting size and stretched as it swells. Glass, mask and edge go in one
-            // rect: drawn apart they cost the GPU 3ms more a frame than the plain rounded plate.
-            val w = plate.width.roundToInt()
-            val h = plate.height.roundToInt()
-            val (outline, edge) = outlineFor[0]?.takeIf { it.first == IntSize(w, h) }?.second ?: Pair<Shader, Shader>(
-                BitmapShader(smoothMask(w, h, radius), Shader.TileMode.CLAMP, Shader.TileMode.CLAMP),
-                BitmapShader(glassEdge(w, h, radius, 1.2.dp.toPx()).asAndroidBitmap(), Shader.TileMode.CLAMP, Shader.TileMode.CLAMP),
-            ).also { outlineFor[0] = IntSize(w, h) to it }
-            val toPlate = Matrix().apply { setScale(r.width / w, r.height / h); postTranslate(r.left, r.top) }
-            outline.setLocalMatrix(toPlate)
-            edge.setLocalMatrix(toPlate)
-            drawRect(
-                ShaderBrush(ComposeShader(ComposeShader(shader, outline, PorterDuff.Mode.DST_IN), edge, PorterDuff.Mode.SRC_OVER)),
-                topLeft = r.topLeft,
-                size = r.size,
+            // Glass, continuous outline and lit edge baked into one picture at the plate's resting
+            // place and size, stretched as it swells and riding up with its row as it fades. The GPU
+            // draws one image. Composing them in shaders while drawing (1.27) came out solid white
+            // on older GPUs (Xiaomi MiTV-ASTP0, Android 9, Mali-G31, issue #183; a HuiQu projector,
+            // #181) and drawn apart they cost 3 ms more a frame than the plain rounded plate.
+            val baked = plateFor[0]?.takeIf { it.first == size to plate }?.second
+                ?: bakePlate(plateSrc, size, plate, radius, 1.2.dp.toPx()).also { plateFor[0] = (size to plate) to it }
+            drawImage(
+                baked,
+                dstOffset = IntOffset(r.left.roundToInt(), r.top.roundToInt()),
+                dstSize = IntSize(r.width.roundToInt(), r.height.roundToInt()),
                 alpha = fade,
+                filterQuality = FilterQuality.Low,
             )
         }
     }
@@ -194,6 +181,22 @@ private fun plateTinted(src: ImageBitmap): ImageBitmap {
     val out = src.asAndroidBitmap().copy(android.graphics.Bitmap.Config.ARGB_8888, true)
     val paint = android.graphics.Paint().apply { colorFilter = android.graphics.ColorMatrixColorFilter(PlateTint) }
     android.graphics.Canvas(out).drawBitmap(src.asAndroidBitmap(), 0f, 0f, paint)
+    return out.frozen().asImageBitmap()
+}
+
+/** The part of [glass] (stretched over [screen]) under [plate], cut to the plate's outline, with its lit edge. */
+private fun bakePlate(glass: ImageBitmap, screen: Size, plate: Rect, radius: Float, rim: Float): ImageBitmap {
+    val w = plate.width.roundToInt().coerceAtLeast(1)
+    val h = plate.height.roundToInt().coerceAtLeast(1)
+    val out = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(out)
+    canvas.drawBitmap(
+        glass.asAndroidBitmap(),
+        Matrix().apply { setScale(screen.width / glass.width, screen.height / glass.height); postTranslate(-plate.left, -plate.top) },
+        android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG),
+    )
+    canvas.drawBitmap(smoothMask(w, h, radius), 0f, 0f, android.graphics.Paint().apply { xfermode = android.graphics.PorterDuffXfermode(PorterDuff.Mode.DST_IN) })
+    canvas.drawBitmap(glassEdge(w, h, radius, rim).asAndroidBitmap(), 0f, 0f, null)
     return out.frozen().asImageBitmap()
 }
 
