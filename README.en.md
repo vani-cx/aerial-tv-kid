@@ -33,13 +33,14 @@ Built for the Xiaomi, TCL and other TVs sold in China. It takes over at boot and
 ### Home
 
 <p align="center">
-  <img src="site/img/focus.jpg" width="49%" alt="Netflix in focus">
+  <img src="site/img/focus.jpg" width="49%" alt="The glass shelf under the top row">
   <img src="site/img/grid.jpg" width="49%" alt="The app grid, scrolled down">
 </p>
 
-- **Clock**: a large, thin clock over your wallpaper, which darkens toward the bottom and left so everything stays readable. Scroll down and it tucks into the status bar.
-- **App grid**: five apps per row. The focused app lifts and shows its name, with a white ring so you can spot it from the couch. Prefer the plain tvOS look? Set Focus Style to Standard in Control Center → Personalize.
-- **Icons**: apps with a TV banner show it. Square icons fill the tile with their own color, and adaptive icons split into layers for a parallax effect.
+- **Glass shelf**: as on tvOS 26, your top row sits low on a Liquid Glass shelf and leaves the screen to your wallpaper. Go down into the grid and the shelf melts into a frosted wallpaper. Want the big clock? Choose Two Rows in Control Center → Personalize → Home Screen.
+- **App grid**: five apps per row. The focused app lifts smoothly. As on Apple TV, the top row shows no names and the grid shows only the focused app's. A glossy white ring marks focus so you can spot it from the couch. Prefer the plain tvOS look? Set Focus Style to Standard in Control Center → Personalize.
+- **Icons**: apps with a TV banner show it. Square icons fill the tile with their own color, and adaptive icons split into layers for a parallax effect. System apps like Settings, Weather and Photos get matching icons.
+- **Sounds**: a soft click as focus moves, and on select, long press, Back and volume, as on Apple TV. You can turn them off in Personalize.
 - **Every app**: including system apps with no launcher entry, like Xiaomi's App Store, Media Player and Mi Home.
 - **Input tiles**: pin HDMI, AV or the antenna to Home and switch to it in one press (Control Center → Inputs → Show on Home).
 - **Back button**: works like tvOS. In the grid it jumps to the top row; on the top row it starts the screensaver.
@@ -76,7 +77,7 @@ On TVs that use Android's standard screensaver (TCL, for one), Aerial becomes th
   <img src="site/img/phone.jpg" width="20%" alt="The setup page on a phone">
 </p>
 
-- **Wallpaper**: Bing's photo of the day, eight built-in gradients, or your own photos.
+- **Wallpaper**: Bing's photo of the day (reachable from China), fourteen Mac-style built-ins (hills, dunes, sea, waves and soft light), or your own photos.
 - **Phone setup**: scan the QR code in the wallpaper panel to upload photos, pick a wallpaper or change the screensaver from your phone. The page is only open while the panel is, behind a random token.
 
 ## Install
