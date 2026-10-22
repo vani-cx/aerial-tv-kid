@@ -15,8 +15,10 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.view.Choreographer
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.View
 import android.view.WindowManager
 import android.provider.Settings
 import android.widget.Toast
@@ -45,6 +47,7 @@ import app.orchard.tv.ui.theme.LocalReducedMotion
 import app.orchard.tv.ui.theme.canvasDensity
 import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.wallpaper.Wallpapers
+import app.orchard.tv.system.DiagLog
 import app.orchard.tv.system.MissingClipboard
 import app.orchard.tv.system.Sounds
 import app.orchard.tv.system.SystemProbe
@@ -84,6 +87,9 @@ class MainActivity : ComponentActivity() {
         super.getSystemService(name) ?: if (name == CLIPBOARD_SERVICE) MissingClipboard.standIn else null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        DiagLog.catchCrashes()
+        DiagLog.init(this)
+        DiagLog.i("onCreate ${intent.action} restored=${savedInstanceState != null}; ${DiagLog.device()}")
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, window.decorView).apply {
@@ -102,7 +108,9 @@ class MainActivity : ComponentActivity() {
         // The home screen paints every pixel itself; a window background would be one more
         // full-screen fill per frame for the TV's GPU.
         window.setBackgroundDrawable(null)
-        preferSmoothestRefreshRate()
+        if (DiagLog.modeSwitch(this)) preferSmoothestRefreshRate() else DiagLog.i("refresh rate left as it is (mode_switch off)")
+        if (DiagLog.softLayer(this)) window.decorView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+        logWindow()
 
         setContent {
             // TVs ship at different densities for the same 1080p panel (Xiaomi 320dpi, TCL 240dpi),
@@ -204,14 +212,66 @@ class MainActivity : ComponentActivity() {
             }
             .maxByOrNull { it.refreshRate }
             ?.takeIf { it.refreshRate > current.refreshRate + 0.5f } ?: return
-        android.util.Log.i("Aerial", "refresh rate ${current.refreshRate} -> ${best.refreshRate} Hz (mode ${best.modeId})")
+        DiagLog.i("refresh rate ${current.refreshRate} -> ${best.refreshRate} Hz (mode ${best.modeId})")
         window.attributes = window.attributes.apply { preferredDisplayModeId = best.modeId }
+    }
+
+    // ---- What Home's window does, for a TV whose logcat shows nothing (see DiagLog) ----
+
+    private var draws = 0
+    private var keysLogged = 0
+
+    private fun logWindow() {
+        val m = resources.displayMetrics
+        val modes = if (Build.VERSION.SDK_INT >= 23) display()?.let { d ->
+            val alt = if (Build.VERSION.SDK_INT >= 31) d.mode.alternativeRefreshRates.joinToString() else "?"
+            "mode ${d.mode.modeId} ${d.mode.physicalWidth}x${d.mode.physicalHeight}@${d.mode.refreshRate} (seamless: $alt) of " +
+                d.supportedModes.joinToString { "${it.modeId}:${it.physicalWidth}x${it.physicalHeight}@${it.refreshRate}" }
+        } else null
+        DiagLog.i(
+            "display ${m.widthPixels}x${m.heightPixels} ${m.densityDpi}dpi, canvas density ${canvasDensity(m)}; $modes; " +
+                "hwui ${systemProperty("debug.hwui.renderer")}, soft_layer=${DiagLog.softLayer(this)}",
+        )
+        window.decorView.viewTreeObserver.addOnDrawListener {
+            draws++
+            if (draws <= 3) DiagLog.i("draw $draws: ${window.decorView.width}x${window.decorView.height}, hw=${window.decorView.isHardwareAccelerated}")
+        }
+        // A heartbeat for the first two minutes: whether frames come at all, keys arrive and Home is in.
+        for (s in 2..120 step 6) idleHandler.postDelayed({
+            val asked = SystemClock.uptimeMillis()
+            Choreographer.getInstance().postFrameCallback {
+                DiagLog.i(
+                    "${s}s: frame after ${SystemClock.uptimeMillis() - asked} ms, draws $draws, " +
+                        "focus ${window.decorView.hasWindowFocus()}, shown ${window.decorView.isShown}, " +
+                        "state ${lifecycle.currentState}, apps ${vm.apps.size} loaded ${vm.loaded}, " +
+                        "screensaver ${vm.screensaverVisible}, overlay ${vm.overlay}",
+                )
+            }
+        }, s * 1000L)
+    }
+
+    private fun display(): android.view.Display? =
+        if (Build.VERSION.SDK_INT >= 30) display else @Suppress("DEPRECATION") windowManager.defaultDisplay
+
+    private fun systemProperty(key: String): String? = runCatching {
+        Class.forName("android.os.SystemProperties").getMethod("get", String::class.java).invoke(null, key) as String
+    }.getOrNull()
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        DiagLog.i("window focus $hasFocus")
+    }
+
+    override fun dump(prefix: String, fd: java.io.FileDescriptor?, writer: java.io.PrintWriter, args: Array<out String>?) {
+        super.dump(prefix, fd, writer, args)
+        DiagLog.dump(writer)
     }
 
     // ---- Screensaver: Aerial's own, before the firmware's ad-carrying one can start ----
 
     private val idleHandler = Handler(Looper.getMainLooper())
     private val showScreensaver = Runnable {
+        DiagLog.i("screensaver starts (${Wallpapers.screensaver})")
         vm.screensaverVisible = true
         // Holding the screen on keeps the firmware's screensaver from starting over ours. After a
         // long stretch, let go so the TV's own power policy can still turn the panel off.
@@ -243,12 +303,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun hideScreensaver() {
+        if (vm.screensaverVisible) DiagLog.i("screensaver ends")
         vm.screensaverVisible = false
         idleHandler.removeCallbacks(releaseScreen)
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (keysLogged++ < 200) DiagLog.i("key ${KeyEvent.keyCodeToString(event.keyCode)} ${if (event.action == KeyEvent.ACTION_DOWN) "down" else "up"}, view focused ${currentFocus != null}")
         restartIdleTimer()
         // The key that wakes the screensaver only wakes it, silently.
         if (!vm.screensaverVisible && event.keyCode != swallowKeyUp) Sounds.onKey(event)
@@ -283,6 +345,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        DiagLog.i("onNewIntent ${intent.action}")
         if (intent.getBooleanExtra(EXTRA_WOKE, false)) openBootSource("brought back on wake")
         if (intent.action == ACTION_PREVIEW_SCREENSAVER) {
             idleHandler.post { showScreensaver.run() }
@@ -298,6 +361,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        DiagLog.i("onStart")
         GuardSetup.ensureEnabled(this)
         idleHandler.postDelayed({ GuardSetup.rebindIfStalled(this) }, 5_000)
         vm.reloadIfPackagesChanged()
@@ -331,6 +395,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        DiagLog.i("onResume; screensaver after ${idleBeforeScreensaver() / 1000} s")
         restartIdleTimer()
         GuardSetup.setHomeInFront(this, true)
         HomeGuardService.onAerialResumed()
@@ -342,6 +407,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
+        DiagLog.i("onPause")
         GuardSetup.setHomeInFront(this, false)
         idleHandler.removeCallbacks(showScreensaver)
         hideScreensaver()
@@ -349,6 +415,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
+        DiagLog.i("onStop")
         unregisterReceiver(packageReceiver)
         unregisterReceiver(volumeReceiver)
         runCatching { getSystemService<ConnectivityManager>()?.unregisterNetworkCallback(networkCallback) }

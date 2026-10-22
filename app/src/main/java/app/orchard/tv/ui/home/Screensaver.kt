@@ -2,8 +2,8 @@ package app.orchard.tv.ui.home
 
 import android.os.Build
 import android.os.SystemClock
-import android.util.Log
 import android.view.KeyEvent
+import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import app.orchard.tv.apps.AppEntry
+import app.orchard.tv.system.DiagLog
 import app.orchard.tv.ui.theme.LocalReducedMotion
 import app.orchard.tv.ui.theme.Motion
 import app.orchard.tv.ui.theme.Type
@@ -149,8 +150,6 @@ private fun Labels(caption: String?, now: LocalDateTime) {
     }
 }
 
-private const val TAG = "AerialScreensaver"
-
 /**
  * Before Android 7.0 network_security_config is ignored, so Apple Root CA is never trusted and
  * HTTPS to Apple's video host always fails, but only after the player has retried for about half a
@@ -192,7 +191,7 @@ private fun AerialSaver(now: LocalDateTime, steps: SharedFlow<Int>, onUnavailabl
         val opened = SystemClock.elapsedRealtime()
         val listener = object : Player.Listener {
             override fun onRenderedFirstFrame() {
-                if (!playing) Log.i(TAG, "first frame of ${player.currentMediaItem?.mediaId} after ${SystemClock.elapsedRealtime() - opened} ms")
+                if (!playing) DiagLog.i("first frame of ${player.currentMediaItem?.mediaId} after ${SystemClock.elapsedRealtime() - opened} ms")
                 playing = true
                 shownAny = true
                 failures = 0
@@ -206,7 +205,7 @@ private fun AerialSaver(now: LocalDateTime, steps: SharedFlow<Int>, onUnavailabl
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                Log.w(TAG, "aerial film failed (${error.errorCodeName}): ${player.currentMediaItem?.localConfiguration?.uri}")
+                DiagLog.i("aerial film failed (${error.errorCodeName}): ${player.currentMediaItem?.localConfiguration?.uri}")
                 playing = false
                 // Apple's video host chains to Apple Root CA, which Android does not ship. From 7.0 on
                 // network_security_config trusts it for this host; 5.0 and 6.0 ignore that file and
@@ -246,7 +245,7 @@ private fun AerialSaver(now: LocalDateTime, steps: SharedFlow<Int>, onUnavailabl
     LaunchedEffect(attempt, playing) {
         if (playing) return@LaunchedEffect
         delay(STALL_MS)
-        Log.w(TAG, "no picture from ${player.currentMediaItem?.mediaId} after $STALL_MS ms; next film")
+        DiagLog.i("no picture from ${player.currentMediaItem?.mediaId} after $STALL_MS ms; next film")
         failures++
         // Nothing has played at all this time: Apple's CDN is out of reach. Hand over to the photo
         // screensaver after two films rather than three, so the screen is not black for long
@@ -263,7 +262,16 @@ private fun AerialSaver(now: LocalDateTime, steps: SharedFlow<Int>, onUnavailabl
 
     AndroidView(
         modifier = Modifier.fillMaxSize(),
-        factory = { ctx -> SurfaceView(ctx).also { player.setVideoSurfaceView(it) } },
+        factory = { ctx ->
+            SurfaceView(ctx).also {
+                it.holder.addCallback(object : SurfaceHolder.Callback {
+                    override fun surfaceCreated(holder: SurfaceHolder) = DiagLog.i("film surface created")
+                    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) = Unit
+                    override fun surfaceDestroyed(holder: SurfaceHolder) = DiagLog.i("film surface destroyed")
+                })
+                player.setVideoSurfaceView(it)
+            }
+        },
         onRelease = { player.clearVideoSurfaceView(it) },
     )
     Box(Modifier.fillMaxSize().graphicsLayer { alpha = veil }.background(Color.Black))

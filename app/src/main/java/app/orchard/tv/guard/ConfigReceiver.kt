@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import app.orchard.tv.apps.TileSheet
 import app.orchard.tv.settings.AerialSettings
+import app.orchard.tv.system.DiagLog
 import kotlinx.coroutines.launch
 
 /**
@@ -39,6 +40,12 @@ class ConfigReceiver : BroadcastReceiver() {
             if (intent.hasExtra("large_clock")) AerialSettings.chooseLargeClock(intent.getBooleanExtra("large_clock", false))
             if (intent.hasExtra("clock_right")) AerialSettings.chooseClockRight(intent.getBooleanExtra("clock_right", false))
             if (intent.hasExtra("one_row_home")) AerialSettings.chooseOneRowHome(intent.getBooleanExtra("one_row_home", false))
+        }
+        // ... --ez diag true / --ez mode_switch false / --ez soft_layer true   (see DiagLog;
+        //                                 the last two apply the next time Home starts)
+        if (intent.hasExtra("diag")) DiagLog.setEnabled(context, intent.getBooleanExtra("diag", false))
+        for (key in listOf("mode_switch", "soft_layer")) {
+            if (intent.hasExtra(key)) DiagLog.setOption(context, key, intent.getBooleanExtra(key, false))
         }
         if (intent.hasExtra("keep_adb")) GuardSetup.setKeepAdb(context, intent.getBooleanExtra("keep_adb", false))
         if (intent.hasExtra("own_screensaver")) GuardSetup.setOwnScreensaver(context, intent.getBooleanExtra("own_screensaver", false))

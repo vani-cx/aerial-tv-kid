@@ -18,6 +18,11 @@ android {
         targetSdk = 34
         versionCode = 33
         versionName = "1.31"
+        // `./gradlew -Pdiag ...`: a build for one reporter's TV whose logcat shows no app lines;
+        // see system/DiagLog.kt.
+        val diag = project.hasProperty("diag")
+        buildConfigField("boolean", "DIAG", diag.toString())
+        if (diag) versionNameSuffix = "-diag"
     }
 
     // standard: a normal HOME app. guard: no HOME intent filter at all, for China-market firmwares

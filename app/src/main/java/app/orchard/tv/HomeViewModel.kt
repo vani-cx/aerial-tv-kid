@@ -2,6 +2,7 @@ package app.orchard.tv
 
 import android.app.Application
 import android.os.Build
+import android.os.SystemClock
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -20,6 +21,7 @@ import app.orchard.tv.apps.folderEntry
 import app.orchard.tv.apps.sourceEntry
 import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.system.Brightness
+import app.orchard.tv.system.DiagLog
 import app.orchard.tv.system.HomeStatus
 import app.orchard.tv.system.NetworkStatus
 import app.orchard.tv.system.SystemProbe
@@ -111,9 +113,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             val ctx = context
+            val started = SystemClock.uptimeMillis()
             all = AppCatalog.load(ctx)
+            DiagLog.i("${all.size} apps in ${SystemClock.uptimeMillis() - started} ms")
             sources = withContext(Dispatchers.Default) { SystemProbe.sources(ctx) }
             arrange()
+            if (!loaded) DiagLog.i("Home loaded: ${apps.size} tiles, ${sources.size} inputs, ${SystemClock.uptimeMillis() - started} ms")
             loaded = true
         }
     }

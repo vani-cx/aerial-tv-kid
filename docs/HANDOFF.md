@@ -99,6 +99,7 @@ adb -s $XIAOMI_TV:5555 shell cmd package compile -m speed -f app.orchard.tv
 - **帧率**：`adb shell dumpsys gfxinfo app.orchard.tv reset`，操作几下，再执行 `... framestats`，看 `SwapBuffers→GpuCompleted` 这一段的耗时。
 - **守护状态**：`dumpsys accessibility | grep -E "label=(Aerial|app.orchard.tv)"`（有输出就是已绑定；小米 ASTP0 上标签显示成类名）；日志 tag 是 `AerialGuard`。
 - **壁纸**：日志 tag 是 `AerialWallpaper`。
+- **logcat 看不到 App 日志的电视**（创维 7T631_T60）：`adb shell dumpsys activity app.orchard.tv/.MainActivity` 末尾打印 `DiagLog` 最近的记录（启动、显示模式、绘制、按键、焦点、屏保、加载耗时）；诊断版（`./gradlew -Pdiag ...`，版本名带 `-diag`）或 `ConfigReceiver --ez diag true` 之后还写进 `/sdcard/Android/data/app.orchard.tv/files/aerial-diag.log`，可以 `adb pull`。试验开关（下次启动生效）：`--ez mode_switch false` 不切刷新率（诊断版默认就不切），`--ez soft_layer true` 用软件绘制首页。
 - **手机配置页**：令牌不写日志，从电视截图里识别二维码即可：`swift tools/qr-from-screenshot.swift shot.png`。
 - **立即预览屏保**：`adb shell am start -a app.orchard.tv.PREVIEW_SCREENSAVER -n app.orchard.tv/.MainActivity`；TCL 上测系统屏保：`am start -n com.android.systemui/.Somnambulator`。
 - **模拟小米的待机清理**：`adb shell am force-stop app.orchard.tv`，然后看日志里出现 `revived by the notification listener binding`。
