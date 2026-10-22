@@ -13,6 +13,7 @@ import androidx.lifecycle.viewModelScope
 import app.orchard.tv.apps.AppCatalog
 import app.orchard.tv.apps.AppEntry
 import app.orchard.tv.apps.CustomIcons
+import app.orchard.tv.apps.SourceLooks
 import app.orchard.tv.apps.FOLDER_KEY_PREFIX
 import app.orchard.tv.apps.LayoutStore
 import app.orchard.tv.apps.TileArt
@@ -30,6 +31,7 @@ import app.orchard.tv.system.VolumeStatus
 import app.orchard.tv.ui.home.PinMode
 import app.orchard.tv.ui.home.ScreensaverSkips
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
@@ -46,7 +48,7 @@ sealed interface Overlay {
     data class Pin(val mode: PinMode, val onDone: () -> Unit) : Overlay
 }
 
-enum class CcPage { Main, Inputs, InputSettings, Update }
+enum class CcPage { Main, Inputs, InputSettings, Update, Setup }
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val context get() = getApplication<Application>()
@@ -90,6 +92,28 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         reload()
         // A tile picture set or removed from the phone page.
         viewModelScope.launch { snapshotFlow { CustomIcons.version }.drop(1).collect { reload() } }
+        offerSetupOnce()
+        // An input's device or name, chosen from its tile's menu or the phone page.
+        viewModelScope.launch { snapshotFlow { SourceLooks.all }.drop(1).collect { if (loaded) arrange() } }
+    }
+
+    /**
+     * Installed from the APK alone (issue #213): nothing granted Aerial what install.sh does, and
+     * Home is still the stock launcher. Control Center's setup page says how to finish, once, a
+     * few seconds in, when Home Guard would have bound if it were on.
+     */
+    private fun offerSetupOnce() {
+        val prefs = context.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
+        if (prefs.getBoolean("setup_offered", false)) return
+        viewModelScope.launch {
+            delay(4_000)
+            val granted = context.checkCallingOrSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+            val status = SystemProbe.homeStatus(context)
+            if (status == HomeStatus.NotDefault && !granted && (overlay != Overlay.None || screensaverVisible)) return@launch
+            prefs.edit().putBoolean("setup_offered", true).apply()
+            if (status == HomeStatus.NotDefault && !granted) overlay = Overlay.ControlCenter(CcPage.Setup)
+        }
     }
 
     /** PackageManager's change counter when the list was last loaded (Android 8+). */
@@ -125,7 +149,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun arrange() {
         // Pinned TV inputs share the grid, order and hiding with the apps.
-        val pinned = sources.filter { it.id in AerialSettings.pinnedSources }.map(::sourceEntry)
+        val pinned = sources.filter { it.id in AerialSettings.pinnedSources }.map { sourceEntry(context, it) }
+        AppCatalog.pinnedSources = pinned
         val arrangement = store.arrange(all + pinned) { folder, inside ->
             val shown = inside.take(9).map { it.art }
             val art = folderArt[folder.id]?.takeIf { (made, _) -> made.size == shown.size && made.indices.all { made[it] === shown[it] } }?.second

@@ -35,9 +35,9 @@
 </p>
 
 - **首页**：常用的一排 App 放在屏幕下方的玻璃底板上，往下是全部 App。小米「应用中心」「米家」这类藏起来的系统 App 也在。
-- **整理**：长按 OK 键（或按菜单键）可以移动、放进文件夹、隐藏、卸载。
+- **整理**：长按 OK 键（或按菜单键）可以移动、放进文件夹、隐藏、卸载。固定到主屏幕的 HDMI 可以选接的是 Apple TV、PlayStation、Switch、Xbox、电脑等，换成对应的图标，也能在手机上起名字。
 - **控制中心**：在第一排按上键到右上角打开，有信号源、网络、设置、音量、亮度和个性化。
-- **屏保**：Apple TV 的 114 段航拍影片，也可以换成照片或时钟。
+- **屏保**：Apple TV 的 114 段航拍影片，电视支持时播 4K 或 4K 杜比视界，也可以换成照片或时钟。
 - **壁纸**：必应每日精选、14 张内置壁纸，或者用手机扫码传自己的照片。
 - **个性化**：单排或双排、时钟大小和位置、App 名称、焦点样式、按键声音，都能改。
 
@@ -116,6 +116,7 @@ curl -fsSL https://aerial.qust.me/install.sh | TV=192.168.1.20 bash -s restore
 
 ### 常见问题
 
+- **只用 U 盘装了 APK**：1.32 起「我的应用」里有 Aerial 的图标，打开后会提示怎么设为主屏幕。只装 APK 时按主页键、开机和待机后还是原桌面，要用上面的命令或 Agent 再设置一次（会覆盖安装，不丢设置）。
 - **TCL 弹出「多屏互动」**：按遥控器「右」再按确认，选「同意」。
 - **创维 `adb install` 报 `INSTALL_FAILED_USER_RESTRICTED`**：先运行 `adb shell settings put global verifier_verify_adb_installs 0` 再装（用户反馈，详见[安装说明](site/agent.md#常见情况)）。
 - **提示不允许安装桌面类 App**：命令最后加 `-s guard`，或下载 [aerial-guard.apk](https://aerial.qust.me/download/aerial-guard.apk)。

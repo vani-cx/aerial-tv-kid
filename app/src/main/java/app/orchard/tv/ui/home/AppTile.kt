@@ -44,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -122,11 +123,12 @@ fun AppTile(
     enabled: Boolean,
     moving: Boolean,
     appearDelayMs: Int,
-    onGlass: (() -> Float)?,
     onFocused: () -> Unit,
     onClick: (Rect?) -> Unit,
     onLongPress: (Rect?) -> Unit,
     modifier: Modifier = Modifier,
+    /** Last tile of its row: Right stops here instead of finding the status pill above (#211). */
+    rowEnd: Boolean = false,
 ) {
     val reduced = LocalReducedMotion.current
     // The tile's face at its drawn size, made on first draw and kept while the artwork lasts.
@@ -364,6 +366,7 @@ fun AppTile(
                         },
                     )
                 }
+                .focusProperties { if (rowEnd) right = FocusRequester.Cancel }
                 .focusable(enabled),
         ) {
             Spacer(Modifier.fillMaxSize().drawWithCache {
@@ -455,10 +458,10 @@ fun AppTile(
                 .offset(y = height + 10.dp)
                 .requiredSize(width + 36.dp, 24.dp)
                 .graphicsLayer {
-                    // As on tvOS 26: no names on the glass of the top row; in the grid only the
-                    // focused app shows its name. With every name shown, the others stay a little
-                    // dimmer than the focused one.
-                    alpha = if (AerialSettings.showAllNames) 0.7f + 0.3f * lift else lift * (1f - (onGlass?.invoke() ?: 0f))
+                    // Only the focused app shows its name, top row included (tvOS 26 hides it on the
+                    // glass, but people read that as a bug: #196 #199 #219). With every name shown,
+                    // the others stay a little dimmer than the focused one.
+                    alpha = if (AerialSettings.showAllNames) 0.7f + 0.3f * lift else lift
                     // Sits just under the lifted tile, and rises into place as it appears.
                     translationY = height.toPx() * (scale - 1f) / 2f - (1f - lift) * 6.dp.toPx() +
                         ring * ringIn * (RingGap + RingWidth).toPx() * scale

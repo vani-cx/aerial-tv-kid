@@ -52,6 +52,9 @@ import app.orchard.tv.ui.theme.LocalReducedMotion
 import app.orchard.tv.ui.theme.Motion
 import app.orchard.tv.ui.theme.Type
 import app.orchard.tv.wallpaper.AerialStream
+import app.orchard.tv.settings.AerialSettings
+import app.orchard.tv.wallpaper.AerialFormats
+import app.orchard.tv.wallpaper.AerialQuality
 import app.orchard.tv.wallpaper.Aerials
 import app.orchard.tv.wallpaper.ScreensaverMode
 import app.orchard.tv.wallpaper.WallpaperKind
@@ -158,11 +161,21 @@ private fun Labels(caption: String?, now: LocalDateTime) {
  */
 private var aerialsOverHttp by mutableStateOf(Build.VERSION.SDK_INT < Build.VERSION_CODES.N)
 
+/**
+ * The quality a decoder gave up on, for the rest of the process: the screensaver then starts one
+ * step lower. A TV can list a decoder it cannot drive at that size or profile.
+ */
+private var aerialQualityCap: AerialQuality? = null
+
 @Composable
 private fun AerialSaver(now: LocalDateTime, steps: SharedFlow<Int>, onUnavailable: () -> Unit) {
     val context = LocalContext.current
-    val films = remember { AerialStream.withOpenerFirst(context, Aerials.all(context).shuffled()) }
-    val player = remember { AerialStream.player(context) }
+    var quality by remember {
+        val wanted = AerialFormats.resolve(context, AerialSettings.aerialQuality)
+        mutableStateOf(aerialQualityCap?.takeIf { it.ordinal < wanted.ordinal } ?: wanted)
+    }
+    val films = remember { AerialStream.withOpenerFirst(context, Aerials.all(context).shuffled(), quality) }
+    val player = remember { AerialStream.player(context, quality) }
     var index by remember { mutableIntStateOf(0) }
     var failures by remember { mutableIntStateOf(0) }
     var playing by remember { mutableStateOf(false) }
@@ -176,7 +189,7 @@ private fun AerialSaver(now: LocalDateTime, steps: SharedFlow<Int>, onUnavailabl
     val veil by animateFloatAsState(if (playing) 0f else 1f, tween(if (playing) 1500 else 400), label = "veil")
 
     fun load(at: Int) {
-        player.setMediaItems(films.map { AerialStream.mediaItem(it, aerialsOverHttp) }, at, 0)
+        player.setMediaItems(films.map { AerialStream.mediaItem(it, quality, aerialsOverHttp) }, at, 0)
         player.prepare()
         player.playWhenReady = true
     }
@@ -207,6 +220,14 @@ private fun AerialSaver(now: LocalDateTime, steps: SharedFlow<Int>, onUnavailabl
             override fun onPlayerError(error: PlaybackException) {
                 DiagLog.i("aerial film failed (${error.errorCodeName}): ${player.currentMediaItem?.localConfiguration?.uri}")
                 playing = false
+                // The decoder could not play this quality: the same film one step lower.
+                if (quality != AerialQuality.Hd && error.errorCode in DECODER_ERRORS) {
+                    aerialQualityCap = AerialFormats.lower(quality)
+                    quality = AerialFormats.lower(quality)
+                    load(player.currentMediaItemIndex)
+                    attempt++
+                    return
+                }
                 // Apple's video host chains to Apple Root CA, which Android does not ship. From 7.0 on
                 // network_security_config trusts it for this host; 5.0 and 6.0 ignore that file and
                 // start on HTTP. The same files are served over plain HTTP; try that before giving up.
@@ -257,7 +278,7 @@ private fun AerialSaver(now: LocalDateTime, steps: SharedFlow<Int>, onUnavailabl
     }
     // While a film plays, get the next screensaver's first film ready on disk.
     LaunchedEffect(playing) {
-        if (playing) AerialStream.prepareOpener(context, films, film, aerialsOverHttp)
+        if (playing) AerialStream.prepareOpener(context, films, film, quality, aerialsOverHttp)
     }
 
     AndroidView(
@@ -280,6 +301,8 @@ private fun AerialSaver(now: LocalDateTime, steps: SharedFlow<Int>, onUnavailabl
 
 /** How long a film may take to show its first frame before the next one is tried. */
 private const val STALL_MS = 8_000L
+
+private val DECODER_ERRORS = PlaybackException.ERROR_CODE_DECODER_INIT_FAILED..PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED
 
 @Composable
 private fun PhotoSaver(now: LocalDateTime, steps: SharedFlow<Int>) {

@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import app.orchard.tv.CcPage
+import app.orchard.tv.apps.SourceLooks
 import app.orchard.tv.HomeViewModel
 import app.orchard.tv.Overlay
 import app.orchard.tv.R
@@ -373,10 +374,6 @@ fun HomeScreen(
                             enabled = gridEnabled,
                             moving = moving == app.key,
                             appearDelayMs = (index * 28).coerceAtMost(320),
-                            // The top row sits on the glass until the grid comes in.
-                            onGlass = if (index < COLUMNS) {
-                                { (1f - scroll.value / collapsePx * 2f).coerceIn(0f, 1f) }
-                            } else null,
                             onFocused = {
                                 focusedKey = app.key
                                 lastFocusedIndex = index
@@ -410,6 +407,7 @@ fun HomeScreen(
                                 }
                             },
                             modifier = Modifier.offset { slot.value },
+                            rowEnd = index % COLUMNS == COLUMNS - 1 || index == apps.lastIndex,
                         )
                     }
                 }
@@ -531,6 +529,10 @@ fun HomeScreen(
             onResetIcon = { key ->
                 closeMenu()
                 vm.resetIcon(key)
+            },
+            onSourceDevice = { id, device ->
+                closeMenu()
+                SourceLooks.chooseDevice(id, device)
             },
             onToFolder = { key, id ->
                 val folderKey = vm.putInFolder(key, id)

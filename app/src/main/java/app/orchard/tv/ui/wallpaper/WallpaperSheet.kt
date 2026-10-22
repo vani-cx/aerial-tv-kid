@@ -73,6 +73,8 @@ import app.orchard.tv.ui.theme.Motion
 import app.orchard.tv.ui.theme.Palette
 import app.orchard.tv.ui.theme.Type
 import app.orchard.tv.wallpaper.PhoneServer
+import app.orchard.tv.wallpaper.AerialFormats
+import app.orchard.tv.wallpaper.AerialQuality
 import app.orchard.tv.wallpaper.ScreensaverMode
 import app.orchard.tv.wallpaper.Wallpaper
 import app.orchard.tv.wallpaper.WallpaperKind
@@ -211,6 +213,17 @@ fun WallpaperSheet(
                             if (AerialSettings.backStartsScreensaver) stringResource(R.string.ss_back_hint) else null,
                             note, first = true,
                         ) { ScreensaverChoice(onStartScreensaver) }
+                        // Only the qualities this TV can play; a 1080p-only TV has nothing to choose.
+                        val qualities = remember { AerialFormats.supported(context) }
+                        if (qualities.size > 1) {
+                            Choices(
+                                R.string.ss_quality, stringResource(R.string.ss_quality_hint), note,
+                                listOf(AerialQuality.Auto to R.string.ss_quality_auto, AerialQuality.Hd to R.string.ss_quality_hd) +
+                                    listOf(AerialQuality.Uhd to R.string.ss_quality_uhd, AerialQuality.DolbyVision to R.string.ss_quality_dv)
+                                        .filter { it.first in qualities },
+                                AerialSettings.aerialQuality, AerialSettings::chooseAerialQuality,
+                            )
+                        }
                         Choices(
                             R.string.ss_delay, null, note,
                             AerialSettings.screensaverChoices.map { it to stringResource(R.string.ss_minutes, it) },

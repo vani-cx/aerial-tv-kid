@@ -94,6 +94,23 @@ const T = {
 最后按说明里的「验收」，把那几条命令的原始输出贴给我。`,
     keeps: 'App、排列顺序、壁纸和设置都会保留。', notes: '这次更新了什么 ›',
     copy: '复制', copied: '已复制',
+    // From the TV's setup page (#setup=1): Aerial is on the TV but nothing has made it Home yet.
+    setup: {
+      title: '让 Aerial 接管主屏幕',
+      sub: () => '只装了 APK 时，Aerial 能打开，但按主页键、开机和待机后还是原来的桌面。下面任选一种，把剩下的设置做完。',
+      tvHead: '在电视上', tvBody: '电视的设置里有「无障碍」时，打开其中的「Aerial 桌面守护」，主页键就会回到 Aerial。小米电视待机后会把它关掉，所以还是建议用电脑做一次。',
+      ai: tv =>
+`请帮我把电视上已经装好的开源桌面 Aerial 设为开机进入的桌面。
+电视 IP：${tv}
+保持 ADB 常开：要
+
+安装说明在这里：https://aerial.qust.me/agent.md
+（打不开时用 https://raw.githubusercontent.com/pengchujin/aerial-tv/main/site/agent.md ）
+
+请先完整读完安装说明再动手，然后在我的电脑上亲自运行命令，不要只把步骤告诉我。需要我在电视上操作时提醒我。
+最后按说明里的「验收」，把那几条命令的原始输出贴给我。`,
+      keeps: '已经装好的 Aerial 会被同一版本覆盖，App、排列顺序、壁纸和设置都会保留。', notes: '',
+    },
   },
   en: {
     title: 'Update Aerial', lang: '中文',
@@ -114,16 +131,33 @@ Updating is installing again. Read the whole guide before you start, then run th
 Finally, follow the guide's Check step and paste me the raw output of those commands.`,
     keeps: 'Your apps, layout, wallpaper and settings stay as they are.', notes: 'What is new ›',
     copy: 'Copy', copied: 'Copied',
+    setup: {
+      title: 'Make Aerial your Home screen',
+      sub: () => 'Installed from the APK alone, Aerial opens, but Home, power-on and wake still land on the old launcher. Either way below finishes the setup.',
+      tvHead: 'On the TV', tvBody: 'If the TV\'s settings have Accessibility, turn on Aerial Home Guard there and Home comes back to Aerial. Xiaomi TVs turn it off in standby, so a computer is still the better way.',
+      ai: tv =>
+`Please make Aerial, the open-source home screen already installed on my TV, the screen the TV starts on.
+TV IP: ${tv}
+Keep ADB on: yes
+
+The install guide is here: https://aerial.qust.me/en/agent.md
+(If it does not open: https://raw.githubusercontent.com/pengchujin/aerial-tv/main/site/en/agent.md )
+
+Read the whole guide before you start, then run the commands on my computer yourself rather than telling me the steps. Tell me when I need to do something on the TV.
+Finally, follow the guide's Check step and paste me the raw output of those commands.`,
+      keeps: 'The Aerial already on the TV is installed over; your apps, layout, wallpaper and settings stay.', notes: '',
+    },
   },
 };
 const hash = new URLSearchParams(location.hash.slice(1));
 const ip = /^[0-9.]{7,15}$/.test(hash.get('tv') || '') ? hash.get('tv') : '<TV-IP>';
 const guard = hash.get('f') === 'guard' ? ' -s guard' : '';
 const version = /^[0-9.]+$/.test(hash.get('v') || '') ? hash.get('v') : '';
+const setup = hash.get('setup') === '1';
 let lang = /^zh/i.test(navigator.language || '') ? 'zh' : 'en';
 
 function render() {
-  const t = T[lang];
+  const t = setup ? { ...T[lang], ...T[lang].setup } : T[lang];
   document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
   document.title = t.title;
   document.querySelectorAll('[data-t]').forEach(e => { e.textContent = t[e.dataset.t]; });

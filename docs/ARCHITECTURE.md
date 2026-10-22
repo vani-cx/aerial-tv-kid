@@ -33,7 +33,7 @@ app/src/main/java/app/orchard/tv/
 │   ├── Wallpapers.kt        壁纸单例：来源（每日/内置/照片/照片每天换一张/跟随App）、选择、首页背景烘焙、缩略图、上传
 │   ├── Gradients.kt         14 张 Mac 风格内置壁纸（山丘、沙丘、海、波浪、光晕），在电视上按实际分辨率画
 │   ├── Images.kt            解码裁剪、首页压暗烘焙、抖动、box blur
-│   ├── Aerials.kt           读取 assets/aerials.json（Apple 航拍目录）
+│   ├── Aerials.kt           读取 assets/aerials.json（Apple 航拍目录）；AerialFormats：这台电视能播哪档画质
 │   └── PhoneServer.kt       NanoHTTPD 手机配置页 + 二维码生成
 ├── settings/
 │   └── AerialSettings.kt    Aerial 自己的偏好（SharedPreferences "settings"）：焦点样式 FocusStyle（默认高对比度）、固定到主屏幕的信号源、开机信号源、屏保开始时间、家长密码（SHA-256，解锁 10 分钟或按 HOME 重新上锁）
@@ -79,10 +79,10 @@ site/update/                        电视升级页二维码打开的页面：�
 - **刷新率**：Android 12 起，如果面板能无黑屏地切到更高的刷新率（`Display.Mode.getAlternativeRefreshRates`），首页会选最高的那个（最高 120Hz），见 `MainActivity.preferSmoothestRefreshRate`。会黑屏的切换一律不做：桌面每次回来都黑一下是不可接受的。
 - **网格**（`HomeScreen.GridMetrics`）：5 列，16:9 磁贴，边距 56dp、间距 28dp，第一行在屏幕高 55.5% 处。个性化里选「主屏幕：单排」（`AerialSettings.oneRowHome`，1.23 起默认开；选过「双排」的保持不变）时，第一行下移到底部（屏幕高减一个行距再减 12dp，第二行只露一条边），好让壁纸里的合照露出来，像 tvOS 全屏 Top Shelf 时那样；时钟大小选「小」（`AerialSettings.largeClock` 关）时，时间和天气是一行小字：时钟选「左上」在左上角（`HomeChrome.CornerClock`），选「右上」在右上角状态按钮的左边。选「大」时是锁屏那样的一块（`HomeChrome.ShelfClock`）：日期、大时钟、天气（当前温度、城市、天气、今天最高最低）三行，左右都和磁贴的边对齐（`AerialSettings.clockRight`）；不论单排还是双排，都固定在状态按钮下面（`GridMetrics.clockY` = 74dp），不再挂在第一排上方（以前单排时浮在屏幕中间，双排时贴着底板）。时钟数字的行框比字高出很多，用 `trimmed` 收掉，让日期离数字 14dp、天气离数字 18dp（小米上量的）。进网格后的位置和模糊背景不变。磁贴用绝对 `offset` 定位，没有用 Row，所以移动 App 时组件不会重建、焦点不会丢，位置变化由 `animateIntOffsetAsState` 做重排动画。
 - **滚动**：不用 `verticalScroll`（它会自动 bringIntoView），而是一个 `Animatable` 加内容 `offset`，目标由聚焦行决定（`scrollFor`），用弹簧动画以便连按时平滑改变目标。
-- **焦点**：每个磁贴一个 `FocusRequester`（按包名存在 map 里）。方向键由磁贴自己处理：`moveFocus` 失败时触发边缘回弹。浮层打开时磁贴 `focusable(enabled=false)`，焦点不会逃出浮层；浮层关闭后恢复到原磁贴。HOME 键重置通过 `homeResetPending` 加「窗口重新获得焦点」两个条件触发（在别的 App 在前台时请求焦点会丢）。
+- **焦点**：每个磁贴一个 `FocusRequester`（按包名存在 map 里）。方向键由磁贴自己处理：`moveFocus` 失败时触发边缘回弹。每行最后一个磁贴（`rowEnd`）右键是 `FocusRequester.Cancel`，否则 Compose 会找到右上角的状态按钮（#211）。浮层打开时磁贴 `focusable(enabled=false)`，焦点不会逃出浮层；浮层关闭后恢复到原磁贴。HOME 键重置通过 `homeResetPending` 加「窗口重新获得焦点」两个条件触发（在别的 App 在前台时请求焦点会丢）。
 - **返回键**：网格里 → 回第一行；第一行 → 启动屏保（tvOS 行为）。
 - **焦点样式**：`AppTile` 聚焦时放大 1.15 倍，加阴影、顶部高光和加粗的名字。放大用临界阻尼弹簧（`dampingRatio = 1`，和 Android TV 的 Leanback / Compose for TV 一样不回弹）：之前 0.66 的回弹在白框上会显得发抖。`FocusStyle.HighContrast`（默认）时，另在磁贴外 5dp 处画 3dp 白色描边（外加一圈淡黑边，保证在亮壁纸上也看得见），描边带玻璃那样左上和右下更亮的渐变，内侧一圈细光。描边有自己的透明度弹簧：出现时跟着放大从磁贴边缘长出来，消失得更快，所以左右移动时不会同时看到两个框。描边画在一个不裁剪的独立图层上，和磁贴共用放大、倾斜、推移、抖动这些变换。起因：国产电视都是方向键遥控器，没有 Siri 遥控器那种跟着手指的倾斜，只靠放大的话用户找不到焦点。
-- **App 名称**：和 tvOS 26 一样，第一排在玻璃底板上时不显示名称；网格里只显示选中的那个 App 的名称。原来的「App 名称：只显示选中的 / 全部显示」设置已去掉。
+- **App 名称**：个性化里「App 名称：只显示选中的 / 全部显示」（`AerialSettings.showAllNames`）。只显示选中的时，第一排也显示（tvOS 26 在玻璃底板上不显示，用户一直当成 bug 报：#196 #199 #219），名称在底板下沿下面；全部显示时其余名称稍暗。
 - **背景**（`HomeChrome.HomeBackground`）：`Wallpapers.backdrop`（选中壁纸，已烘焙压暗），否则（「跟随 App」模式）用聚焦 App 的 `TileArt.backdrop`。和 tvOS 26 一样分两种状态：焦点在第一排时显示清晰的壁纸，第一排下面垫一块 Liquid Glass 底板（比磁贴左右宽 26dp、上下宽 20dp，圆角 32dp，宽度跟第一排的 App 数走）；往下进入网格后，整屏换成模糊、压暗的壁纸。玻璃不做实时模糊：模糊版壁纸（`Wallpapers.frosted`，320×180）由 `Images.frost` 用压暗之前的原图预先做好，通过 BitmapShader 按屏幕坐标铺开，所以底板里看到的正是它身后那块壁纸。切换跟着滚动的弹簧走，没有单独的动画：底板跟着第一排移动，在滚动的前 55% 里淡出，同时最多放大 14dp，像从壁纸上浮起后化开；回到第一排时反过来，淡入并收回原位。两张全屏图只在滚动的中段（进度 30%–70%）交叉淡化，其余时间每帧只画一张。试过让底板一路长大、越过屏幕边缘变成整屏背景，往下时好看，但从网格回到第一排时整屏缩回一条，太夸张，所以没有保留。底板的边缘（顶部内侧的柔光、左上亮右下再亮一点的描边，`LiquidGlass.drawGlassEdge`）跟着底板一起淡出。小米 MFTR0 实测（整屏扩散的版本，同一组按键各测 2–3 次）：GPU 90 分位从 12–13ms 变成 15–16ms。以前没保留玻璃底板，是因为要给聚焦磁贴下面的名字留位置；现在第一排不显示名称，这个问题没有了。
 - **右上角**（`HomeChrome.StatusPill`）：按钮里只有网络和控制中心图标，进入网格、大时钟滚走后才加上时间，所以屏幕上不会同时出现两个时间。单排加「时钟：右上」时，时间和天气是按钮左边的一行字（`CornerClock`），不放进按钮。
 
@@ -139,7 +139,8 @@ Logo 的大小统一：先在 256×256 的采样里找出 Logo 的范围，再�
 - 屏保有两条路径：
   1. **桌面内**：`MainActivity` 空闲计时 5 分钟，或在第一行按返回、点「立即开始」→ `vm.screensaverVisible`，同时加 `FLAG_KEEP_SCREEN_ON`，用来压住厂商屏保（小米靠这条）。
   2. **系统级**：`AerialDream`，由 `install.sh` 在使用标准屏保（`screensaver_enabled=1`）的电视上写入 `screensaver_components`（TCL 靠这条）。
-- 航拍：`assets/aerials.json` 只含地址和地名，影片实时从 `sylvan.apple.com` 播放（1080p H.264），用 Media3 ExoPlayer（#46，`AerialStream`）：全部影片放进一个播放列表，下一段提前加载；连接 5 秒、读取 8 秒超时，只重试一次。`sylvan.apple.com` 的证书链到 Apple Root CA，Android 自带的根证书里没有，`network_security_config.xml` 只对这个域名信任打包的 `raw/apple_root_ca.pem`；Android 5、6 不读这个配置，一开始就走 HTTP。8 秒没画面就换下一段，失败 3 次换照片屏保；这次屏保一帧都没播出来时，2 次就换。播放时把下一次屏保第一段影片的开头和索引预取到磁盘（缓存上限 48MB），下次几乎秒开。小米 MFTR0 实测冷启动 1.3 秒出第一帧。
+- 航拍：`assets/aerials.json` 只含地址和地名，影片实时从 `sylvan.apple.com` 播放，用 Media3 ExoPlayer（#46，`AerialStream`）：全部影片放进一个播放列表，下一段提前加载；连接 5 秒、读取 8 秒超时，只重试一次。`sylvan.apple.com` 的证书链到 Apple Root CA，Android 自带的根证书里没有，`network_security_config.xml` 只对这个域名信任打包的 `raw/apple_root_ca.pem`；Android 5、6 不读这个配置，一开始就走 HTTP。8 秒没画面就换下一段，失败 3 次换照片屏保；这次屏保一帧都没播出来时，2 次就换。播放时把下一次屏保第一段影片的开头和索引预取到磁盘（缓存上限 48MB），下次几乎秒开。小米 MFTR0 实测冷启动 1.3 秒出第一帧。
+- 航拍画质（个性化 → 屏幕保护程序，`AerialSettings.aerialQuality`，#198 #217）：自动 / 1080p（H.264，约 10 Mbps）/ 4K（HEVC SDR，约 12 Mbps）/ 4K 杜比视界（约 24 Mbps）。`AerialFormats` 只问解码器和屏幕：电视的界面大多是 1080p（MFTR0 只报一个 1920×1080 模式），问不出面板是不是 4K。有能解 3840×2160@30 的 HEVC 解码器就能选 4K；Apple 的 HDR 文件是杜比视界 profile 5（dvcC 里 `dvhe.05.07`，没有 HDR10 基础层，别的解码器解出来是绿紫色），所以要有支持 `DolbyVisionProfileDvheStn` 到 `LevelUhd30` 的解码器、并且屏幕的 HdrCapabilities 里有杜比视界，才算支持。「自动」选能播的最高一档；这台电视只能 1080p 时不显示这一项。解码器报错（4001–4005）时这一段降一档重播，本进程以后都从低一档开始。缓存键带画质（`id@dolby_vision`），4K 的缓冲目标加到 32/48MB。小米 MFTR0 实测：自动选杜比视界，用 `OMX.MS.DOLBY_VISION.DVHE.STN.Decoder`，1.06 秒出第一帧、颜色正常；4K 用 `OMX.MS.HEVC.Decoder`，0.82 秒。
 
 ## 手机配置（PhoneServer）
 
@@ -164,6 +165,10 @@ NanoHTTPD 监听 8790 端口，路径前缀是 8 位随机令牌（每次打开�
 给维护者没有的电视用：机型、固件指纹、屏幕和内存、HOME 解析和所有候选、守护看着的原桌面、守护和通知监听的状态、各项授权、屏保和按键音设置、亮度、`TvInputManager` 的输入和 Aerial 显示的信号源、Aerial 认识的厂商包（只列这些，不列全部 App）、DiagLog 最近 150 行、本进程 Aerial 各 tag 的 logcat（不含 AerialWeather，里面有城市）。日志里的 IP、MAC、手机页令牌打码。不收集账号、序列号、Wi-Fi 名称、天气城市。
 
 三个出口：手机页 `GET api/diagnostics`（页面最下面「反馈问题」，可复制，局域网 HTTP 没有 `navigator.clipboard`，用 `execCommand`）；`adb shell dumpsys activity app.orchard.tv/.MainActivity report`；`tools/report.sh` 在它前面再加只有 shell 能读的：getprop、包信息和 appops、HOME 候选和 role、相关 settings、无障碍绑定、tv_input 硬件、系统服务里关于 Aerial 的 logcat（只按 tag 取：小米应用商店会在日志里打印已装 App 列表）。
+
+## 信号源磁贴
+
+控制中心 → 信号源 → 信号源设置里「显示在主屏幕」的信号源和 App 一起排在网格里（`sourceEntry`）。长按菜单「接入的设备」可以选 Apple TV、PlayStation、Nintendo Switch、Xbox、游戏机、电脑、机顶盒、回音壁（`apps/SourceLooks.kt`，#172 #210）：磁贴换成设备的颜色和标志，大字是设备名，小字是端口（HDMI 1）。Apple TV、PlayStation 的标志是 Simple Icons（CC0）的路径；任天堂和微软让 Simple Icons 撤掉了自己的标志，Switch 和 Xbox 画的是掌机和手柄的轮廓。自己起的名字在手机配置页输入（`POST api/source/name`，最多 24 个字，太长先缩小字号再截断）；手机页也能给信号源磁贴传图片，文件名用键的 SHA-1（键里有 `/`）。名字和设备存在 `settings` 的 `source_looks`（JSON，按 TvInputInfo id）。控制中心的信号源页右边也显示起的名字。
 
 ## 开机信号源
 
@@ -211,6 +216,10 @@ NanoHTTPD 监听 8790 端口，路径前缀是 8 位随机令牌（每次打开�
 
 `allowStockLauncher`：用户从网格里主动打开原桌面时，1 小时内不拦截。
 
+电视的播放器（`com.tcl.tv`、`com.xiaomi.mitv.tvplayer`）即使声明了 HOME，也不算原桌面，除非它就是系统解析出来的 HOME：TCL 85G60E 把 `com.tcl.tv` 列为 HOME，每次切信号源都被守护当成原桌面拉回（#223，用户日志；家里的 TCL MT5879 没有这个 HOME，没有真机验证）。
+
+**只装了 APK 的电视**（U 盘、应用商店，#207 #213）：1.32 起 `MainActivity` 也声明 `CATEGORY_LAUNCHER`，国内电视的「我的应用」大多只列这种，以前装完找不到图标。打开后没有 `WRITE_SECURE_SETTINGS`（只有 install.sh 会授权）、桌面状态又是「尚未设为默认桌面」时，4 秒后自动打开一次控制中心的「设为主屏幕」页（`CcPage.Setup`，`settings` 的 `setup_offered` 记住），以后从控制中心底部进去。页上按电视有没有这些设置页显示：无障碍（手动打开桌面守护，小米 MFTR0 有，TCL MT5879 没有）、默认桌面（只有 standard 版；小米会忽略）、通知使用权（待机被杀后复活），以及二维码：打开 `site/update/#setup=1`，给出这台电视的安装命令和 Agent 提示词。Google TV 模拟器（Android 13）上验证过自动弹出和跳到无障碍设置。
+
 ## 系统能力（system/）
 
 - **信号源**：`TvInputManager` 列出直通输入和调谐器。装了 `com.xiaomi.mitv.tvplayer` 的走小米的 Intent（HDMI 的 `input = HW 编号 + 18`，AV=2，ATV/DTMB 各自的 Activity），否则走 `TvContract` 的通用 URI。CEC 子输入的名字用于显示设备名，`Playback_1` 这类通用名会被过滤。`DeviceProfile` 存放按机型的修正（MFTR0 隐藏不存在的 HW8，并重命名调谐器）。
@@ -223,3 +232,4 @@ NanoHTTPD 监听 8790 端口，路径前缀是 8 位随机令牌（每次打开�
 - 字体：Inter 可变字体（OFL，许可证在 `FONT-LICENSE-OFL.txt`）。
 - 依赖：Compose BOM 2026.02.01、activity-compose、lifecycle-viewmodel-compose、core-ktx、NanoHTTPD 2.3.1、ZXing core 3.5.3。
 - 航拍目录由 Apple 的 `resources-16.tar` 生成（生成方法见 HANDOFF.md）。
+- 信号源磁贴的 Apple TV、PlayStation 标志：Simple Icons 16.35.0（CC0），只用来标明接的是什么设备。

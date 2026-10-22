@@ -110,10 +110,11 @@ object TileArtFactory {
     /**
      * A TV input's tile, in the spirit of an app icon: the connector drawn in white over a gradient
      * that tells the kind apart (HDMI blue, DP violet, tuner teal, AV amber), the input's name under it, and
-     * the HDMI-CEC device name (e.g. "Apple TV") as a second line when there is one.
+     * the HDMI-CEC device name (e.g. "Apple TV") as a second line when there is one. With a
+     * [device] chosen from the tile's menu, that device's colours and mark instead.
      */
-    fun forSource(kind: app.orchard.tv.system.SourceKind, label: String, device: String?): TileArt {
-        val (top, bottom) = when (kind) {
+    fun forSource(kind: app.orchard.tv.system.SourceKind, label: String, sub: String?, device: SourceDevice? = null): TileArt {
+        val (top, bottom) = if (device != null) device.top to device.bottom else when (kind) {
             app.orchard.tv.system.SourceKind.Hdmi -> 0xFF3B6FD8.toInt() to 0xFF1D3A86.toInt()
             app.orchard.tv.system.SourceKind.DisplayPort -> 0xFF6E5BD8.toInt() to 0xFF3A2D86.toInt()
             app.orchard.tv.system.SourceKind.Tuner -> 0xFF1FA88E.toInt() to 0xFF0E5C55.toInt()
@@ -133,11 +134,11 @@ object TileArtFactory {
                 color = 0xFFFFFFFF.toInt(); style = Paint.Style.STROKE; strokeWidth = H * 0.035f
                 strokeJoin = Paint.Join.ROUND; strokeCap = Paint.Cap.ROUND
             }
-            val two = device != null
+            val two = sub != null
             val cx = W / 2f
             val cy = H * (if (two) 0.3f else 0.36f)
             val u = H * 0.1f
-            when (kind) {
+            if (device != null) drawDevice(device, cx, cy, u, white) else when (kind) {
                 app.orchard.tv.system.SourceKind.Hdmi, app.orchard.tv.system.SourceKind.DisplayPort -> {
                     // The HDMI plug face (also for DP, whose plug looks much the same): a wide trapezoid with chamfered lower corners.
                     val p = android.graphics.Path().apply {
@@ -169,13 +170,84 @@ object TileArtFactory {
                 color = 0xFFFFFFFF.toInt(); textSize = H * 0.17f; textAlign = Paint.Align.CENTER
                 typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
             }
-            drawText(label, cx, H * (if (two) 0.66f else 0.74f), title)
-            if (device != null) {
-                val sub = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xCCFFFFFF.toInt(); textSize = H * 0.12f; textAlign = Paint.Align.CENTER }
-                drawText(device, cx, H * 0.84f, sub)
+            // A name typed on the phone can be long: smaller type first, then cut short.
+            var shown = label
+            while (title.measureText(shown) > W * 0.88f && title.textSize > H * 0.11f) title.textSize *= 0.92f
+            while (title.measureText(shown) > W * 0.88f && shown.length > 1) shown = shown.dropLast(2) + "…"
+            drawText(shown, cx, H * (if (two) 0.66f else 0.74f), title)
+            if (sub != null) {
+                val small = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xCCFFFFFF.toInt(); textSize = H * 0.12f; textAlign = Paint.Align.CENTER }
+                drawText(sub, cx, H * 0.84f, small)
             }
         }
         return finish(back, null)
+    }
+
+    /**
+     * [device]'s mark centred on ([cx], [cy]), in units of [u] like the connectors: a brand's logo
+     * filled, otherwise the device's outline in [stroke].
+     */
+    private fun Canvas.drawDevice(device: SourceDevice, cx: Float, cy: Float, u: Float, stroke: Paint) {
+        device.logo?.let { data ->
+            val path = androidx.core.graphics.PathParser.createPathFromPathData(data)
+            // Fitted by the mark's own bounds: Apple TV's is wide and short, PlayStation's square.
+            val bounds = RectF().also { path.computeBounds(it, true) }
+            val k = minOf(4.2f * u / bounds.width(), 2.0f * u / bounds.height())
+            save()
+            translate(cx - bounds.centerX() * k, cy - bounds.centerY() * k)
+            scale(k, k)
+            drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt() })
+            restore()
+            return
+        }
+        val fill = Paint(stroke).apply { style = Paint.Style.FILL }
+        fun round(l: Float, t: Float, r: Float, b: Float, rad: Float, p: Paint = stroke) =
+            drawRoundRect(RectF(cx + l * u, cy + t * u, cx + r * u, cy + b * u), rad * u, rad * u, p)
+        when (device) {
+            SourceDevice.Switch -> {
+                // A handheld: the screen between two controllers.
+                round(-1.25f, -0.85f, 1.25f, 0.85f, 0.12f)
+                round(-2.1f, -0.85f, -1.25f, 0.85f, 0.42f)
+                round(1.25f, -0.85f, 2.1f, 0.85f, 0.42f)
+                drawCircle(cx - 1.68f * u, cy - 0.32f * u, 0.16f * u, fill)
+                drawCircle(cx + 1.68f * u, cy + 0.3f * u, 0.16f * u, fill)
+            }
+            SourceDevice.Xbox, SourceDevice.Console -> {
+                // A gamepad: body with grips, a cross on the left and buttons on the right.
+                val p = android.graphics.Path().apply {
+                    moveTo(cx - 1.3f * u, cy - 0.8f * u)
+                    lineTo(cx + 1.3f * u, cy - 0.8f * u)
+                    cubicTo(cx + 2.1f * u, cy - 0.8f * u, cx + 2.4f * u, cy + 0.9f * u, cx + 1.9f * u, cy + 1.0f * u)
+                    cubicTo(cx + 1.5f * u, cy + 1.1f * u, cx + 1.2f * u, cy + 0.4f * u, cx + 0.8f * u, cy + 0.3f * u)
+                    lineTo(cx - 0.8f * u, cy + 0.3f * u)
+                    cubicTo(cx - 1.2f * u, cy + 0.4f * u, cx - 1.5f * u, cy + 1.1f * u, cx - 1.9f * u, cy + 1.0f * u)
+                    cubicTo(cx - 2.4f * u, cy + 0.9f * u, cx - 2.1f * u, cy - 0.8f * u, cx - 1.3f * u, cy - 0.8f * u)
+                    close()
+                }
+                drawPath(p, stroke)
+                drawLine(cx - 1.35f * u, cy - 0.25f * u, cx - 0.75f * u, cy - 0.25f * u, stroke)
+                drawLine(cx - 1.05f * u, cy - 0.55f * u, cx - 1.05f * u, cy + 0.05f * u, stroke)
+                drawCircle(cx + 0.85f * u, cy - 0.25f * u, 0.13f * u, fill)
+                drawCircle(cx + 1.3f * u, cy - 0.25f * u, 0.13f * u, fill)
+            }
+            SourceDevice.Computer -> {
+                // A monitor on a stand.
+                round(-1.8f, -1.0f, 1.8f, 0.75f, 0.15f)
+                drawLine(cx, cy + 0.75f * u, cx, cy + 1.1f * u, stroke)
+                drawLine(cx - 0.7f * u, cy + 1.1f * u, cx + 0.7f * u, cy + 1.1f * u, stroke)
+            }
+            SourceDevice.SetTopBox -> {
+                // A flat box with a light and a slot.
+                round(-2.0f, -0.45f, 2.0f, 0.55f, 0.2f)
+                drawCircle(cx - 1.4f * u, cy + 0.05f * u, 0.12f * u, fill)
+                drawLine(cx + 0.4f * u, cy + 0.05f * u, cx + 1.4f * u, cy + 0.05f * u, stroke)
+            }
+            else -> {
+                // A soundbar: a long bar with its speaker grilles.
+                round(-2.3f, -0.4f, 2.3f, 0.4f, 0.4f)
+                for (x in listOf(-1.4f, -0.5f, 0.5f, 1.4f)) drawCircle(cx + x * u, cy, 0.15f * u, fill)
+            }
+        }
     }
 
     /**

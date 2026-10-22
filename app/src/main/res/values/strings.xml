@@ -17,6 +17,15 @@
     <string name="cc_home_default">Aerial is your home screen</string>
     <string name="cc_home_guarded">Home Guard is on</string>
     <string name="cc_home_not_default">Not the default home screen</string>
+    <string name="cc_setup_title">Make Aerial Your Home Screen</string>
+    <string name="cc_setup_body">Installed from the APK alone, Aerial opens, but Home, power-on and wake still go to the old launcher.</string>
+    <string name="cc_setup_guard">Turn On Home Guard</string>
+    <string name="cc_setup_guard_where">Accessibility</string>
+    <string name="cc_setup_home">Choose the Default Home App</string>
+    <string name="cc_setup_revival">Return After Standby</string>
+    <string name="cc_setup_revival_where">Notification access</string>
+    <string name="cc_setup_scan">Or set it all up with a computer (recommended)</string>
+    <string name="cc_setup_scan_hint">Scan with your phone for this TV\'s command and a prompt for an AI agent.</string>
     <string name="cc_back">Back</string>
     <string name="cc_no_inputs">No inputs found on this TV</string>
 
@@ -96,6 +105,12 @@
     <string name="ss_back_on">Starts It</string>
     <string name="ss_back_off">Does Nothing</string>
     <string name="ss_back_choice_hint">What Back does on the top row of Home. Turn it off if it gets pressed by accident; the screensaver still starts on its own.</string>
+    <string name="ss_quality">Aerial Quality</string>
+    <string name="ss_quality_hint">Auto plays the best this TV can show: 4K Dolby Vision, 4K or 1080p. 4K Dolby Vision needs about 25 Mbps; choose 1080p if films often skip.</string>
+    <string name="ss_quality_auto">Auto</string>
+    <string name="ss_quality_hd">1080p</string>
+    <string name="ss_quality_uhd">4K</string>
+    <string name="ss_quality_dv">4K Dolby Vision</string>
     <string name="st_focus_style">Focus Style</string>
     <string name="st_home_layout">Home Screen</string>
     <string name="st_layout">Layout</string>
@@ -142,6 +157,16 @@
     <string name="cc_inputs_boot_hint">Switch to this input when the TV is turned on or wakes from standby. Home still comes back to Aerial.</string>
     <string name="cc_inputs_pin_hint">Pinned inputs appear as tiles at the front of Home; select one to switch straight to it. Long-press a tile to move or remove it.</string>
     <string name="menu_unpin_source">Remove from Home</string>
+    <string name="menu_source_device">Connected Device</string>
+    <string name="menu_source_plain">Default</string>
+    <string name="device_apple_tv">Apple TV</string>
+    <string name="device_playstation">PlayStation</string>
+    <string name="device_switch">Nintendo Switch</string>
+    <string name="device_xbox">Xbox</string>
+    <string name="device_console">Game Console</string>
+    <string name="device_computer">Computer</string>
+    <string name="device_set_top_box">Set-top Box</string>
+    <string name="device_speaker">Soundbar</string>
     <string name="cc_update_available">New Version: %s</string>
     <string name="cc_update_title">Aerial %s</string>
     <string name="cc_update_current">This TV has Aerial %s.</string>

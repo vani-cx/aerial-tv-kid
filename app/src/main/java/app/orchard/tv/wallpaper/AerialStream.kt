@@ -68,24 +68,33 @@ object AerialStream {
         .setConnectTimeoutMs(5_000)
         .setReadTimeoutMs(8_000)
 
-    fun url(film: Aerial, overHttp: Boolean): String =
-        if (overHttp) film.url.replaceFirst("https://", "http://") else film.url
+    fun url(film: Aerial, quality: AerialQuality, overHttp: Boolean): String =
+        film.url(quality).let { if (overHttp) it.replaceFirst("https://", "http://") else it }
 
-    /** Keyed by film, not address, so the cached opener serves HTTP and HTTPS alike. */
-    fun mediaItem(film: Aerial, overHttp: Boolean): MediaItem =
-        MediaItem.Builder().setUri(url(film, overHttp)).setMediaId(film.id).setCustomCacheKey(film.id).build()
+    /** Keyed by film and quality, not address, so the cached opener serves HTTP and HTTPS alike. */
+    private fun key(film: Aerial, quality: AerialQuality) = "${film.id}@${quality.key}"
 
-    fun player(context: Context): ExoPlayer {
+    fun mediaItem(film: Aerial, quality: AerialQuality, overHttp: Boolean): MediaItem =
+        MediaItem.Builder().setUri(url(film, quality, overHttp)).setMediaId(film.id).setCustomCacheKey(key(film, quality)).build()
+
+    fun player(context: Context, quality: AerialQuality): ExoPlayer {
         val source = CacheDataSource.Factory()
             .setCache(cache(context))
             .setUpstreamDataSourceFactory(http())
             .setCacheWriteDataSinkFactory(null)
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
         // ExoPlayer's default video buffer is sized for phones (up to 128 MB); TVs here have 1–2 GB.
-        // 24 MB is 10–13 s of film, which is also when the next film starts loading.
+        // 24 MB is 10–13 s of 1080p film, which is also when the next film starts loading; the 4K
+        // files get about as many seconds.
         val load = DefaultLoadControl.Builder()
             .setBufferDurationsMs(10_000, 30_000, 1_000, 2_000)
-            .setTargetBufferBytes(24 * 1024 * 1024)
+            .setTargetBufferBytes(
+                when (quality) {
+                    AerialQuality.DolbyVision -> 48
+                    AerialQuality.Uhd -> 32
+                    else -> 24
+                } * 1024 * 1024,
+            )
             .setPrioritizeTimeOverSizeThresholds(false)
             .build()
         return ExoPlayer.Builder(context)
@@ -101,16 +110,17 @@ object AerialStream {
             }
     }
 
-    private fun isReady(cache: SimpleCache, film: Aerial): Boolean {
-        val length = ContentMetadata.getContentLength(cache.getContentMetadata(film.id))
-        return length > 0 && cache.isCached(film.id, 0, HEAD_BYTES) &&
-            cache.isCached(film.id, length - TAIL_BYTES, TAIL_BYTES)
+    private fun isReady(cache: SimpleCache, film: Aerial, quality: AerialQuality): Boolean {
+        val key = key(film, quality)
+        val length = ContentMetadata.getContentLength(cache.getContentMetadata(key))
+        return length > 0 && cache.isCached(key, 0, HEAD_BYTES) &&
+            cache.isCached(key, length - TAIL_BYTES, TAIL_BYTES)
     }
 
     /** [films] with one of the films fetched ahead, if any, moved to the front. */
-    fun withOpenerFirst(context: Context, films: List<Aerial>): List<Aerial> {
+    fun withOpenerFirst(context: Context, films: List<Aerial>, quality: AerialQuality): List<Aerial> {
         val cache = cache(context)
-        val opener = films.filter { isReady(cache, it) }.randomOrNull() ?: return films
+        val opener = films.filter { isReady(cache, it, quality) }.randomOrNull() ?: return films
         return listOf(opener) + (films - opener)
     }
 
@@ -118,24 +128,25 @@ object AerialStream {
      * Fetches the start and the index of one more film for the next screensaver, unless [OPENERS]
      * are ready already. Runs while a film plays; about 9 MB.
      */
-    suspend fun prepareOpener(context: Context, films: List<Aerial>, playing: Aerial, overHttp: Boolean) =
+    suspend fun prepareOpener(context: Context, films: List<Aerial>, playing: Aerial, quality: AerialQuality, overHttp: Boolean) =
         runInterruptible(Dispatchers.IO) {
             val cache = cache(context)
             val candidates = films.filter { it != playing }
-            if (candidates.count { isReady(cache, it) } >= OPENERS) return@runInterruptible
-            val film = candidates.filterNot { isReady(cache, it) }.randomOrNull() ?: return@runInterruptible
+            if (candidates.count { isReady(cache, it, quality) } >= OPENERS) return@runInterruptible
+            val film = candidates.filterNot { isReady(cache, it, quality) }.randomOrNull() ?: return@runInterruptible
+            val key = key(film, quality)
             val started = SystemClock.elapsedRealtime()
             runCatching {
-                val uri = android.net.Uri.parse(url(film, overHttp))
+                val uri = android.net.Uri.parse(url(film, quality, overHttp))
                 val length = contentLength(uri)
                 ContentMetadataMutations().also { ContentMetadataMutations.setContentLength(it, length) }
-                    .let { cache.applyContentMetadataMutations(film.id, it) }
+                    .let { cache.applyContentMetadataMutations(key, it) }
                 val writer = CacheDataSource.Factory().setCache(cache).setUpstreamDataSourceFactory(http())
                 for ((position, size) in listOf(0L to HEAD_BYTES, length - TAIL_BYTES to TAIL_BYTES)) {
-                    val spec = DataSpec.Builder().setUri(uri).setKey(film.id).setPosition(position).setLength(size).build()
+                    val spec = DataSpec.Builder().setUri(uri).setKey(key).setPosition(position).setLength(size).build()
                     CacheWriter(writer.createDataSource(), spec, null, null).cache()
                 }
-                Log.i(TAG, "next screensaver opens with ${film.id}, fetched in ${SystemClock.elapsedRealtime() - started} ms")
+                Log.i(TAG, "next screensaver opens with $key, fetched in ${SystemClock.elapsedRealtime() - started} ms")
             }.onFailure { Log.w(TAG, "could not fetch ${film.id} ahead", it) }
         }
 

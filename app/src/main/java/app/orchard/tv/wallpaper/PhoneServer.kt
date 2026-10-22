@@ -9,6 +9,7 @@ import android.util.Log
 import androidx.core.content.getSystemService
 import app.orchard.tv.apps.AppCatalog
 import app.orchard.tv.apps.CustomIcons
+import app.orchard.tv.apps.SourceLooks
 import app.orchard.tv.apps.TileArtFactory
 import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.system.Diagnostics
@@ -76,6 +77,13 @@ class PhoneServer private constructor(private val context: Context, private val 
                 session.method == Method.POST && path == "/api/upload" -> upload(session)
                 path.startsWith("/tile/") -> tile(java.net.URLDecoder.decode(path.removePrefix("/tile/"), "UTF-8"))
                 session.method == Method.POST && path == "/api/icon" -> icon(session)
+                session.method == Method.POST && path == "/api/source/name" -> {
+                    val f = form(session)
+                    val source = AppCatalog.pinnedSources.firstOrNull { it.key == f["app"] }?.source
+                    // On the main thread before answering, so the state sent back has the new name.
+                    if (source != null) runBlocking(Dispatchers.Main) { SourceLooks.rename(source.id, f["name"]) }
+                    json(state())
+                }
                 session.method == Method.POST && path == "/api/icon/reset" -> {
                     val pkg = form(session)["app"].orEmpty()
                     if (installed(pkg)) { CustomIcons.clear(pkg); onMain { CustomIcons.changed() } }
@@ -115,9 +123,15 @@ class PhoneServer private constructor(private val context: Context, private val 
             .put("focusStyle", AerialSettings.focusStyle.key)
             .put("wallpapers", list)
             .put("apps", JSONArray().apply {
-                AppCatalog.loaded.sortedBy { it.label }.forEach { a ->
+                // Pinned inputs first: they can also be named here.
+                (AppCatalog.pinnedSources + AppCatalog.loaded.sortedBy { it.label }).forEach { a ->
                     // The stamp makes the phone fetch the tile again once its picture changes.
-                    put(JSONObject().put("key", a.key).put("label", a.label).put("custom", CustomIcons.has(a.key)).put("stamp", CustomIcons.stamp(a.key)))
+                    // An input's label as Home will show it once it has arranged the new look.
+                    val label = a.source?.let { src ->
+                        SourceLooks.of(src.id)?.let { it.name ?: it.device?.let { d -> context.getString(d.label) } } ?: src.label
+                    } ?: a.label
+                    put(JSONObject().put("key", a.key).put("label", label).put("custom", CustomIcons.has(a.key)).put("stamp", CustomIcons.stamp(a.key))
+                        .apply { a.source?.let { put("source", true).put("port", it.label).put("name", SourceLooks.of(it.id)?.name ?: "").put("look", SourceLooks.of(it.id).hashCode()) } })
                 }
             })
             .put("weather", JSONObject().apply {
@@ -127,10 +141,12 @@ class PhoneServer private constructor(private val context: Context, private val 
             })
     }
 
-    private fun installed(pkg: String) = CustomIcons.isValidKey(pkg) && AppCatalog.loaded.any { it.key == pkg }
+    /** An app on the TV or a pinned input: the only tiles a picture may be sent for. */
+    private fun installed(pkg: String) =
+        (CustomIcons.isValidKey(pkg) && AppCatalog.loaded.any { it.key == pkg }) || AppCatalog.pinnedSources.any { it.key == pkg }
 
     private fun tile(pkg: String): Response {
-        val app = AppCatalog.loaded.firstOrNull { it.key == pkg } ?: return text(Response.Status.NOT_FOUND, "")
+        val app = (AppCatalog.pinnedSources + AppCatalog.loaded).firstOrNull { it.key == pkg } ?: return text(Response.Status.NOT_FOUND, "")
         val bmp = TileArtFactory.flatten(app.art)
         val out = ByteArrayOutputStream()
         bmp.compress(Bitmap.CompressFormat.JPEG, 85, out)

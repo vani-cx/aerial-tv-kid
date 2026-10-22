@@ -35,9 +35,9 @@ Made for the Xiaomi, TCL and other TVs sold in China. It starts at boot and surv
 </p>
 
 - **Home**: your favorite apps in one row on a glass shelf at the bottom, every app below it. Hidden system apps like Xiaomi's App Store and Mi Home show up too.
-- **Organize**: hold OK (or press Menu) to move an app, put it in a folder, hide it or uninstall it.
+- **Organize**: hold OK (or press Menu) to move an app, put it in a folder, hide it or uninstall it. An HDMI input pinned to Home can say what is plugged in (Apple TV, PlayStation, Switch, Xbox, a computer...) and take its icon, or a name you type on your phone.
 - **Control Center**: press Up from the top row to the top right. Inputs, network, settings, volume, brightness and Personalize.
-- **Screensaver**: Apple TV's 114 aerial films, or your photos, or a clock.
+- **Screensaver**: Apple TV's 114 aerial films, in 4K or 4K Dolby Vision where the TV supports it, or your photos, or a clock.
 - **Wallpaper**: Bing's photo of the day, fourteen built-ins, or photos you upload by scanning a code with your phone.
 - **Personalize**: one or two rows, clock size and corner, app names, focus style and key sounds.
 
@@ -118,6 +118,7 @@ Add `--uninstall` (`bash -s restore --uninstall`) to remove Aerial as well. With
 
 ### Troubleshooting
 
+- **Installed only the APK from a USB stick**: from 1.32 Aerial has an icon in the TV's app list and, when opened, shows how to make it the Home screen. With the APK alone, Home, power-on and wake still go to the old launcher; run the command above or hand it to an agent once more (it installs over, settings stay).
 - **TCL shows a 多屏互动 prompt**: press Right, then OK, to choose 同意 (Agree).
 - **Skyworth: `adb install` fails with `INSTALL_FAILED_USER_RESTRICTED`**: run `adb shell settings put global verifier_verify_adb_installs 0`, then install again (from a user's report; see the [agent guide](site/en/agent.md#common-cases)).
 - **The firmware won't install home-screen apps**: add `-s guard` to the end of the command, or use [aerial-guard.apk](https://aerial.qust.me/download/aerial-guard.apk).

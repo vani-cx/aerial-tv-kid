@@ -35,16 +35,37 @@ data class AppEntry(
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
 }
 
-/** A Home tile for a TV input. Its key never collides with a package name. */
-fun sourceEntry(source: TvSource): AppEntry = AppEntry(
-    packageName = SOURCE_KEY_PREFIX + source.id,
-    label = source.label,
-    component = ComponentName("input", source.id),
-    leanback = false,
-    removable = false,
-    art = TileArtFactory.forSource(source.kind, source.label, source.deviceName),
-    source = source,
-)
+/**
+ * A Home tile for a TV input. Its key never collides with a package name. A device or name chosen
+ * for the input titles the tile, with the port underneath; a picture from the phone page covers it.
+ */
+fun sourceEntry(context: Context, source: TvSource): AppEntry {
+    val key = SOURCE_KEY_PREFIX + source.id
+    val look = SourceLooks.of(source.id)
+    val name = look?.name ?: look?.device?.let { context.getString(it.label) }
+    // Home arranges its tiles on every move and hide; the art is made again only when it changes.
+    val made = SourceArt(look, source.label, source.deviceName, CustomIcons.stamp(key), TileArtFactory.W)
+    val art = synchronized(sourceArt) { sourceArt[key]?.takeIf { it.first == made }?.second } ?: run {
+        val custom = CustomIcons.load(key)
+        when {
+            custom != null -> TileArtFactory.fromBanner(android.graphics.drawable.BitmapDrawable(android.content.res.Resources.getSystem(), custom))
+            name != null -> TileArtFactory.forSource(source.kind, name, source.label, look?.device)
+            else -> TileArtFactory.forSource(source.kind, source.label, source.deviceName)
+        }.also { synchronized(sourceArt) { sourceArt[key] = made to it } }
+    }
+    return AppEntry(
+        packageName = key,
+        label = name ?: source.label,
+        component = ComponentName("input", source.id),
+        leanback = false,
+        removable = false,
+        art = art,
+        source = source,
+    )
+}
+
+private data class SourceArt(val look: SourceLook?, val label: String, val device: String?, val stamp: Long, val width: Int)
+private val sourceArt = HashMap<String, Pair<SourceArt, TileArt>>()
 
 const val SOURCE_KEY_PREFIX = "input:"
 
@@ -114,6 +135,9 @@ object AppCatalog {
 
     /** The apps of the last load, for the phone page. */
     @Volatile var loaded: List<AppEntry> = emptyList(); private set
+
+    /** The TV inputs pinned to Home as Home last arranged them, for the phone page. */
+    @Volatile var pinnedSources: List<AppEntry> = emptyList()
 
     /**
      * Every app with a TV entry, plus apps that only have a phone-style entry. China-market firmwares

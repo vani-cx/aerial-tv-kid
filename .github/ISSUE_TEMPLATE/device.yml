@@ -1,5 +1,5 @@
 name: 机型适配 / Device support
-description: Aerial 在你的电视上有问题，或者想让它适配你的电视 / Aerial misbehaves on your TV, or you want it supported
+description: 装不上、按主页键回不到 Aerial、开机或待机后回到原桌面、信号源不对 / Installing fails, Home or boot lands on the old launcher, inputs are wrong
 title: "[机型] "
 body:
   - type: markdown
@@ -24,6 +24,12 @@ body:
       placeholder: Redmi X65 2026
     validations:
       required: true
+  - type: input
+    id: version
+    attributes:
+      label: Aerial 版本 / Aerial version
+      description: 控制中心最下面右边写的版本；装不上就写下载的文件名 / Bottom right of Control Center, or the APK you tried
+      placeholder: Aerial 1.31-guard
   - type: textarea
     id: problem
     attributes:

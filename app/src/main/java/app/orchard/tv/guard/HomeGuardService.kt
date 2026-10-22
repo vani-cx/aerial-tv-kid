@@ -345,9 +345,15 @@ class HomeGuardService : AccessibilityService() {
             packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN), PackageManager.GET_RESOLVED_FILTER)
                 .filter { ri -> ri.filter?.categoriesIterator()?.asSequence()?.any(::isVendorHomeCategory) == true }
         }.getOrDefault(emptyList())
+        // The TV player is where inputs play, even where it also declares a Home filter: TCL
+        // 85G60E (Android 11) lists com.tcl.tv as a Home next to com.tcl.cyberui, and every input
+        // switch, from Aerial or the remote, was taken back at once (issue #223). It stays one
+        // only where it is the Home the system resolves.
+        val resolved = resolvedHome()
         val homes = (standard + vendor)
             // Negative priority entries are fallbacks shown only while nothing else can be Home.
             .filter { it.activityInfo.packageName != packageName && it.priority >= 0 }
+            .filter { it.activityInfo.packageName !in INPUT_PLAYERS || it.activityInfo.packageName == resolved }
             .groupBy({ it.activityInfo.packageName }, { it.activityInfo.name })
             .mapValues { it.value.toSet() }
         // Some launchers register Home on a trampoline that starts the screen actually shown, which
@@ -389,6 +395,8 @@ class HomeGuardService : AccessibilityService() {
 
         /** VIDAA's assistant and its launcher (聚好看), on the two VIDAA builds reported (issues #7, #40). */
         private val VIDAA_PACKAGES = listOf("com.hisense.vidaaassistant", "com.jamdeo.tv.vod")
+        /** The apps that play the TV's inputs (SystemProbe's TCL and Xiaomi routes). */
+        private val INPUT_PLAYERS = setOf("com.tcl.tv", "com.xiaomi.mitv.tvplayer")
         /** TV services whose input switch shows the stock launcher on the way (Skyworth, #155). */
         private val SOURCE_SWITCHERS = setOf("com.tianci.tv")
         private const val VENDOR_HOME_PREFIX = "android.intent.category.HOME."

@@ -55,6 +55,8 @@ import androidx.compose.ui.unit.dp
 import app.orchard.tv.R
 import app.orchard.tv.apps.AppEntry
 import app.orchard.tv.apps.CustomIcons
+import app.orchard.tv.apps.SourceDevice
+import app.orchard.tv.apps.SourceLooks
 import app.orchard.tv.apps.Folder
 import app.orchard.tv.ui.components.Pressable
 import app.orchard.tv.ui.components.consumeTaps
@@ -115,7 +117,7 @@ fun MenuRow(
     }
 }
 
-private enum class MenuPage { Main, Folders, Rename }
+private enum class MenuPage { Main, Folders, Rename, Device }
 
 /**
  * Long-press menu, opening out of the tile it belongs to. Choosing a folder or a folder's name
@@ -135,6 +137,8 @@ fun AppMenu(
     onUninstall: (String) -> Unit,
     onUnpin: (String) -> Unit,
     onResetIcon: (String) -> Unit,
+    /** What is plugged into a pinned input, by its input id; null puts the input's own tile back. */
+    onSourceDevice: (String, SourceDevice?) -> Unit,
     /** Into folder id, or a new folder when null. */
     onToFolder: (String, String?) -> Unit,
     onOutOfFolder: (String) -> Unit,
@@ -191,6 +195,7 @@ fun AppMenu(
                     MenuPage.Main -> shownApp.label
                     MenuPage.Folders -> stringResource(R.string.menu_to_folder)
                     MenuPage.Rename -> stringResource(R.string.menu_rename_folder)
+                    MenuPage.Device -> stringResource(R.string.menu_source_device)
                 }
                 BasicText(
                     title, style = Type.Headline, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -212,6 +217,10 @@ fun AppMenu(
                             MenuRow(Glyph.Folder, stringResource(R.string.menu_to_folder), { page = MenuPage.Folders }, trailing = "›")
                             if (shownApp.source != null) {
                                 // A pinned TV input: no app info or uninstall, and "remove" unpins it.
+                                MenuRow(Glyph.Input, stringResource(R.string.menu_source_device), { page = MenuPage.Device }, trailing = "›")
+                                if (CustomIcons.has(shownApp.key)) {
+                                    MenuRow(Glyph.Photo, stringResource(R.string.menu_reset_icon), { onResetIcon(shownApp.key) })
+                                }
                                 MenuRow(Glyph.EyeSlash, stringResource(R.string.menu_unpin_source), { onUnpin(shownApp.key) })
                             } else {
                                 MenuRow(Glyph.EyeSlash, stringResource(R.string.menu_hide), { onHide(shownApp.key) })
@@ -231,6 +240,25 @@ fun AppMenu(
                         // The folder the app is already in is not offered.
                         folders.filter { it.id != holder?.id }.forEach { f ->
                             MenuRow(Glyph.Folder, f.name, { onToFolder(shownApp.key, f.id) })
+                        }
+                    }
+                    MenuPage.Device -> {
+                        // Picking one names the tile after the device, as folders take a name from
+                        // a list: typing on a remote is slow. A name of one's own is typed on the
+                        // phone page. The tile's current choice comes first, ticked.
+                        val source = shownApp.source
+                        val current = source?.let { SourceLooks.of(it.id)?.device }
+                        val choices = listOfNotNull(current) + listOf(null) + SourceDevice.entries.filter { it != current }
+                        Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
+                            choices.forEachIndexed { i, device ->
+                                MenuRow(
+                                    if (device == current) Glyph.Check else Glyph.Input,
+                                    device?.let { stringResource(it.label) } ?: (source?.label ?: ""),
+                                    { source?.let { onSourceDevice(it.id, device) } },
+                                    focusRequester = if (i == 0) first else null,
+                                    trailing = if (device == null) stringResource(R.string.menu_source_plain) else null,
+                                )
+                            }
                         }
                     }
                     MenuPage.Rename -> {

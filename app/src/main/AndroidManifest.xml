@@ -61,6 +61,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
+            <!-- Most Chinese TV launchers (Xiaomi PatchWall, Raybird, Huanshi) list only apps with
+                 this category: installed from a USB stick, Aerial had no icon to open it by
+                 (issues #207, #213). -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
         </activity>
 
         <provider

@@ -73,6 +73,7 @@ import app.orchard.tv.BuildConfig
 import app.orchard.tv.HomeViewModel
 import app.orchard.tv.Overlay
 import app.orchard.tv.R
+import app.orchard.tv.apps.SourceLooks
 import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.system.HomeStatus
 import app.orchard.tv.system.NetKind
@@ -113,7 +114,7 @@ fun ControlCenter(
             CcPage.Main -> onClose()
             CcPage.Inputs -> vm.overlay = Overlay.ControlCenter(CcPage.Main)
             CcPage.InputSettings -> vm.overlay = Overlay.ControlCenter(CcPage.Inputs)
-            CcPage.Update -> vm.overlay = Overlay.ControlCenter(CcPage.Main)
+            CcPage.Update, CcPage.Setup -> vm.overlay = Overlay.ControlCenter(CcPage.Main)
         }
     }
 
@@ -157,6 +158,7 @@ fun ControlCenter(
                         CcPage.Inputs -> InputsPage(vm, visible, onOpen)
                         CcPage.InputSettings -> InputSettingsPage(vm, visible)
                         CcPage.Update -> UpdatePage(vm, visible)
+                        CcPage.Setup -> SetupPage(vm, visible, onOpen)
                     }
                 }
             }
@@ -230,6 +232,11 @@ private fun MainPage(vm: HomeViewModel, now: LocalDateTime, takeFocus: Boolean, 
                 stringResource(R.string.cc_update_available, latest),
                 onClick = { vm.overlay = Overlay.ControlCenter(CcPage.Update) },
             )
+        }
+
+        // Installed from the APK alone: how to finish, on the TV or with a computer.
+        if (vm.homeStatus == HomeStatus.NotDefault) {
+            MenuRow(Glyph.Shield, stringResource(R.string.cc_setup_title), onClick = { vm.overlay = Overlay.ControlCenter(CcPage.Setup) }, trailing = "›")
         }
 
         Spacer(Modifier.height(12.dp))
@@ -316,6 +323,50 @@ private fun UpdatePage(vm: HomeViewModel, takeFocus: Boolean) {
                     Spacer(Modifier.height(6.dp))
                     BasicText(stringResource(R.string.cc_update_keeps), style = Type.Caption)
                 }
+            }
+        }
+    }
+}
+
+/**
+ * For a TV where Aerial was installed from the APK alone (a USB stick, an app store): it opens, but
+ * Home, power-on and wake still go to the stock launcher (issue #213). The settings pages that can
+ * fix that on the TV itself, where the TV has them, and a QR code to the website's page with this
+ * TV's install command, which does all of it.
+ */
+@Composable
+private fun SetupPage(vm: HomeViewModel, takeFocus: Boolean, onOpen: (android.content.Intent) -> Unit) {
+    val context = LocalContext.current
+    val first = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        if (!takeFocus) return@LaunchedEffect
+        withFrameNanos { }
+        runCatching { first.requestFocus() }
+    }
+    val guard = remember { SystemProbe.guardSettingsIntent(context) }
+    val home = remember { SystemProbe.homeSettingsIntent(context) }
+    val revival = remember { SystemProbe.revivalSettingsIntent(context) }
+    var qr by remember { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(Unit) {
+        val ip = PhoneServer.lanAddress(context)
+        val url = "https://aerial.qust.me/update/#setup=1&v=${Updates.current}&f=${BuildConfig.FLAVOR}" + (ip?.let { "&tv=$it" } ?: "")
+        qr = withContext(Dispatchers.Default) { PhoneServer.qr(url).asImageBitmap() }
+    }
+    Column {
+        MenuRow(Glyph.ChevronLeft, stringResource(R.string.cc_setup_title), focusRequester = first, onClick = { vm.overlay = Overlay.ControlCenter(CcPage.Main) })
+        BasicText(stringResource(R.string.cc_setup_body), style = Type.Caption, modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp))
+        guard?.let { MenuRow(Glyph.Shield, stringResource(R.string.cc_setup_guard), onClick = { vm.whenUnlocked { onOpen(it) } }, trailing = stringResource(R.string.cc_setup_guard_where) + " ›") }
+        home?.let { MenuRow(Glyph.Check, stringResource(R.string.cc_setup_home), onClick = { vm.whenUnlocked { onOpen(it) } }, trailing = "›") }
+        revival?.let { MenuRow(Glyph.Moon, stringResource(R.string.cc_setup_revival), onClick = { vm.whenUnlocked { onOpen(it) } }, trailing = stringResource(R.string.cc_setup_revival_where) + " ›") }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp)) {
+            Box(Modifier.size(104.dp).clip(RoundedCornerShape(12.dp)).background(Color.White).padding(8.dp)) {
+                qr?.let { Image(it, contentDescription = null, contentScale = ContentScale.Fit, filterQuality = FilterQuality.None, modifier = Modifier.fillMaxSize()) }
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                BasicText(stringResource(R.string.cc_setup_scan), style = Type.Body)
+                Spacer(Modifier.height(6.dp))
+                BasicText(stringResource(R.string.cc_setup_scan_hint), style = Type.Caption)
             }
         }
     }
@@ -473,7 +524,9 @@ private fun InputsPage(vm: HomeViewModel, takeFocus: Boolean, onOpen: (android.c
                     SourceKind.Other -> Glyph.Input
                 },
                 text = source.label,
-                trailing = source.deviceName ?: if (source.connected) connected else null,
+                // What the owner named the input on its tile, else what HDMI-CEC reports.
+                trailing = SourceLooks.of(source.id)?.let { it.name ?: it.device?.let { d -> stringResource(d.label) } }
+                    ?: source.deviceName ?: if (source.connected) connected else null,
                 focusRequester = if (i == 0) first else null,
                 onClick = { onOpen(source.intent) },
             )

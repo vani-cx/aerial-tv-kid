@@ -15,6 +15,7 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.getSystemService
+import app.orchard.tv.BuildConfig
 import app.orchard.tv.R
 import app.orchard.tv.guard.HomeGuardService
 
@@ -143,6 +144,24 @@ object SystemProbe {
         )
 
     // TCL MT5879 answers ACTION_WIFI_SETTINGS with its Wi-Fi side panel.
+    /**
+     * Where a viewer who installed only the APK (from a USB stick, issue #213) can make Aerial Home
+     * without a computer, or null where the TV has no such page: Accessibility for Home Guard
+     * (Xiaomi MiTV-MFTR0 has it, TCL MT5879 not), the Home picker (only the standard build is a
+     * Home; Xiaomi's firmware ignores the choice), and notification access, which brings Aerial
+     * back after a standby kill.
+     */
+    fun guardSettingsIntent(context: Context): Intent? = resolvable(context, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+
+    fun homeSettingsIntent(context: Context): Intent? =
+        if (BuildConfig.FLAVOR == "standard") resolvable(context, Intent(Settings.ACTION_HOME_SETTINGS)) else null
+
+    fun revivalSettingsIntent(context: Context): Intent? =
+        resolvable(context, Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"))
+
+    private fun resolvable(context: Context, intent: Intent): Intent? =
+        intent.takeIf { context.packageManager.resolveActivity(it, 0) != null }?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
     fun networkSettingsIntent(context: Context): Intent =
         firstResolvable(
             context,

@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.edit
 import android.os.SystemClock
 import android.provider.Settings
+import app.orchard.tv.wallpaper.AerialQuality
 import java.security.MessageDigest
 
 /**
@@ -93,6 +94,9 @@ object AerialSettings {
     var screensaverMinutes by mutableStateOf(DEFAULT_SCREENSAVER_MINUTES); private set
 
     val screensaverChoices = listOf(2, 5, 10, 20)
+
+    /** Which of Apple's files the aerial screensaver plays; Auto is the best this TV decodes (issues #198, #217). */
+    var aerialQuality by mutableStateOf(AerialQuality.Auto); private set
     private const val DEFAULT_SCREENSAVER_MINUTES = 5
 
     fun init(context: Context) {
@@ -118,6 +122,7 @@ object AerialSettings {
         }
         backStartsScreensaver = prefs.getBoolean("back_starts_screensaver", true)
         screensaverMinutes = prefs.getInt("screensaver_minutes", DEFAULT_SCREENSAVER_MINUTES)
+        aerialQuality = AerialQuality.of(prefs.getString("aerial_quality", null))
     }
 
     fun chooseBootSource(id: String?) {
@@ -179,6 +184,11 @@ object AerialSettings {
     fun chooseBackStartsScreensaver(on: Boolean) {
         backStartsScreensaver = on
         app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean("back_starts_screensaver", on) }
+    }
+
+    fun chooseAerialQuality(quality: AerialQuality) {
+        aerialQuality = quality
+        app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putString("aerial_quality", quality.key) }
     }
 
     fun chooseScreensaverMinutes(minutes: Int) {
