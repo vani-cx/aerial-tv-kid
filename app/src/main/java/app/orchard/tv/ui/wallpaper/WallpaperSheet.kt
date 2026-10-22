@@ -163,6 +163,16 @@ fun WallpaperSheet(
                             AerialSettings.clockRight, AerialSettings::chooseClockRight,
                         )
                         Choices(
+                            R.string.st_clock_size, stringResource(R.string.st_clock_size_hint), note,
+                            listOf(false to R.string.st_clock_small, true to R.string.st_clock_large),
+                            AerialSettings.largeClock, AerialSettings::chooseLargeClock,
+                        )
+                        Choices(
+                            R.string.st_names, stringResource(R.string.st_names_hint), note,
+                            listOf(false to R.string.st_names_focused, true to R.string.st_names_all),
+                            AerialSettings.showAllNames, AerialSettings::chooseShowAllNames,
+                        )
+                        Choices(
                             R.string.st_focus_style,
                             stringResource(if (AerialSettings.focusStyle == FocusStyle.HighContrast) R.string.st_focus_high_hint else R.string.st_focus_standard_hint),
                             note,

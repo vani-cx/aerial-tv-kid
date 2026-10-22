@@ -81,8 +81,11 @@ import kotlin.math.roundToInt
 
 private const val COLUMNS = 5
 
+/** Room under the tiles for every app's name, when all are shown. */
+private val NameRoom = 22.dp
+
 /** Grid geometry for the screen at hand. On a 1080p TV this is a 960×540 dp canvas. */
-private class GridMetrics(screenW: Dp, screenH: Dp, oneRow: Boolean) {
+private class GridMetrics(screenW: Dp, screenH: Dp, oneRow: Boolean, val nameRoom: Dp) {
     val margin = 56.dp
     val gap = 28.dp
     val tileW = (screenW - margin * 2 - gap * (COLUMNS - 1)) / COLUMNS
@@ -91,13 +94,14 @@ private class GridMetrics(screenW: Dp, screenH: Dp, oneRow: Boolean) {
     val pitchY = tileH + 50.dp
 
     /**
-     * The top row sits a little past the middle, under the shelf, as on tvOS. In one-row mode it
-     * sits low, with only the top of the second row showing under the focused app's name.
+     * The top row sits a little past the middle, under the shelf, as on tvOS. In one-row mode, or
+     * when every app fits in it, it sits low, with only the top of any second row showing under
+     * the focused app's name. [nameRoom] is kept under the tiles when every name is shown.
      */
-    val topRowY = if (oneRow) screenH - pitchY - 12.dp else screenH * 0.555f
+    val topRowY = if (oneRow) screenH - pitchY - 12.dp - nameRoom else screenH * 0.555f
 
-    /** Top of the shelf clock, in the standard layout. */
-    val clockY = screenH * 0.555f - 196.dp
+    /** Top of the large clock, just above the top row's plate. */
+    val clockY = topRowY - 196.dp
 
     /** Where a row rests once you go down into the grid: the row above stays in view. */
     val restY = screenH * 0.37f
@@ -237,10 +241,13 @@ fun HomeScreen(
                 }
             },
     ) {
-        val metrics = remember(maxWidth, maxHeight, AerialSettings.oneRowHome) {
-            GridMetrics(maxWidth, maxHeight, AerialSettings.oneRowHome)
-        }
         val rows = (apps.size + COLUMNS - 1) / COLUMNS
+        // With a single row of apps the two-row layout would leave the bottom of the screen empty.
+        val oneRow = AerialSettings.oneRowHome || rows <= 1
+        val nameRoom = if (AerialSettings.showAllNames) NameRoom else 0.dp
+        val metrics = remember(maxWidth, maxHeight, oneRow, nameRoom) {
+            GridMetrics(maxWidth, maxHeight, oneRow, nameRoom)
+        }
         val collapsePx = with(density) { (metrics.topRowY - metrics.restY).toPx() }
 
         val target = with(density) { metrics.scrollFor(focusedRow, rows).toPx() }
@@ -291,7 +298,7 @@ fun HomeScreen(
                     (metrics.margin - PlatePadH).toPx(),
                     (metrics.topRowY - PlatePadV).toPx(),
                     (metrics.margin + metrics.pitchX * (topCount - 1) + metrics.tileW + PlatePadH).toPx(),
-                    (metrics.topRowY + metrics.tileH + PlatePadV).toPx(),
+                    (metrics.topRowY + metrics.tileH + PlatePadV + metrics.nameRoom).toPx(),
                 )
             }
             HomeBackground(
@@ -305,9 +312,9 @@ fun HomeScreen(
 
             Box(Modifier.fillMaxSize().offset { IntOffset(0, -scroll.value.roundToInt()) }) {
                 val clockRight = AerialSettings.clockRight
-                // With one row the wallpaper keeps the screen, as under tvOS's full-screen shelf: no
-                // big clock, only the time and weather in one line, top left or beside the pill.
-                if (!AerialSettings.oneRowHome) {
+                // The large clock stands over the top row; the small one is the time and weather in
+                // one line, top left or beside the pill, so the wallpaper keeps the screen.
+                if (AerialSettings.largeClock) {
                     ShelfClock(
                         now = now,
                         alignEnd = clockRight,
@@ -384,8 +391,8 @@ fun HomeScreen(
         }
 
         // The pill holds only the network and Control Center. The time joins it once the clock
-        // above the top row has scrolled away, so the screen never shows the time twice. One-row
-        // Home with the clock on the right puts the time and weather just left of the pill.
+        // above the top row has scrolled away, so the screen never shows the time twice. The small
+        // clock on the right puts the time and weather just left of the pill.
         Row(
             Modifier
                 .align(Alignment.TopEnd)
@@ -393,7 +400,7 @@ fun HomeScreen(
                 .graphicsLayer { alpha = if (overlay is Overlay.ControlCenter) 0f else 1f },
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (AerialSettings.oneRowHome && AerialSettings.clockRight) {
+            if (!AerialSettings.largeClock && AerialSettings.clockRight) {
                 CornerClock(
                     now = now,
                     modifier = Modifier

@@ -122,7 +122,7 @@ Logo 的大小统一：先在 256×256 的采样里找出 Logo 的范围，再�
 
 ## 按键声音
 
-`system/Sounds.kt` 用 SoundPool 播放四个短音：焦点移动和控制中心滑块（音量、亮度）每走一格「嗒」、确认和长按打开菜单「咚」、返回（更低更轻）、在网格边上或滑块到头时的闷响。音效是自己合成的（`tools/make-sounds.py` 生成 `res/raw/ui_*.wav`，按 tvOS 的感觉做：几个衰减的泛音加一点噪声当「接触声」），没有用苹果的音频文件。`MainActivity.dispatchKeyEvent` 把每个按键先交给 `Sounds.onKey`：记下方向键按下的时间，返回键直接出声。`AppTile` 和 `Pressable` 拿到焦点时调 `Sounds.focusMoved()`，只有 250ms 内按过方向键才响，一次按键只响一次，所以打开面板、HOME 复位这类程序给的焦点不出声；唤醒屏保的那一下也不出声。个性化里「按键声音」可以关（`AerialSettings.uiSounds`，默认开）。小米 MFTR0 上从日志确认在播放（`AudioTrack start/stop`）。
+`system/Sounds.kt` 播放电视系统自带的按键音（`AudioManager.playSoundEffect`）：焦点移动和控制中心滑块（音量、亮度）每走一格按方向播 `FX_FOCUS_NAVIGATION_*`，确认和长按打开菜单播 `FX_KEY_CLICK`，返回播 `FX_BACK`（Android 13 以下用 `FX_KEY_CLICK`），在网格边上或滑块到头时播 `FX_KEYPRESS_INVALID`。每台电视听起来和它自己的菜单一样；系统设置里关了按键音（`sound_effects_enabled`）时也不响。小米 MFTR0 用的是 Android TV 那套（`/system/media/audio/ui/android_TV_*`）。1.26 及以前用的是自己合成的音效，用户反馈不好听，已删掉。`MainActivity.dispatchKeyEvent` 把每个按键先交给 `Sounds.onKey`：记下方向键按下的时间和方向，返回键直接出声。`AppTile` 和 `Pressable` 拿到焦点时调 `Sounds.focusMoved()`，只有 250ms 内按过方向键才响，一次按键只响一次，所以打开面板、HOME 复位这类程序给的焦点不出声；唤醒屏保的那一下也不出声。个性化里「按键声音」可以关（`AerialSettings.uiSounds`，默认开）。
 
 - `Wallpapers` 是 Compose 状态单例，只在主线程写。来源：
   - `daily:<date>`：必应 HPImageArchive，`cn.bing.com`，最近 8 张，存在 `files/daily/`；

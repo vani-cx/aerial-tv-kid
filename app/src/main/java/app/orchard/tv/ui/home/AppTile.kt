@@ -1,6 +1,7 @@
 package app.orchard.tv.ui.home
 
 import android.graphics.BitmapShader
+import android.graphics.BlurMaskFilter
 import android.graphics.ComposeShader
 import android.graphics.LinearGradient
 import android.graphics.Matrix
@@ -102,6 +103,8 @@ private const val RIM_AT_REST = 0.07f
 
 // High-contrast focus frame: a white ring this far outside the tile, as tvOS draws it.
 private val RingGap = 5.dp
+private val ShadowBlur = 14.dp
+private val ShadowDrop = 12.dp
 private val RingWidth = 3.dp
 
 /**
@@ -218,6 +221,30 @@ fun AppTile(
                 translationY = (1f - appear.value) * 18.dp.toPx()
             },
     ) {
+        if (lift > 0.01f) {
+            // A lifted tile casts a soft shadow below it, as cards do on tvOS. The system's
+            // elevation shadow is too faint to read on a TV; this one is baked, so it costs one
+            // image draw while a tile is lifted.
+            Canvas(
+                Modifier
+                    .size(width, height)
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        rotationY = leanY.value
+                        rotationX = leanX.value
+                        rotationZ = wobble?.value ?: 0f
+                        translationX = push.value.x
+                        translationY = push.value.y + ShadowDrop.toPx() * lift
+                        cameraDistance = 14f * density
+                        alpha = lift
+                        compositingStrategy = CompositingStrategy.ModulateAlpha
+                    },
+            ) {
+                val shadow = tileShadow(size.width.roundToInt(), size.height.roundToInt(), Corner.toPx(), ShadowBlur.toPx())
+                translate(-shadow.ext, -shadow.ext) { drawImage(shadow.image) }
+            }
+        }
         Box(
             Modifier
                 .size(width, height)
@@ -231,7 +258,6 @@ fun AppTile(
                     translationX = push.value.x
                     translationY = push.value.y
                     cameraDistance = 14f * density
-                    shadowElevation = 32.dp.toPx() * lift
                     // The plain rounded rect holds the continuous outline the tile draws itself,
                     // and the hardware clips to it for free.
                     shape = RoundedCornerShape(Corner)
@@ -430,8 +456,9 @@ fun AppTile(
                 .requiredSize(width + 36.dp, 24.dp)
                 .graphicsLayer {
                     // As on tvOS 26: no names on the glass of the top row; in the grid only the
-                    // focused app shows its name.
-                    alpha = lift * (1f - (onGlass?.invoke() ?: 0f))
+                    // focused app shows its name. With every name shown, the others stay a little
+                    // dimmer than the focused one.
+                    alpha = if (AerialSettings.showAllNames) 0.7f + 0.3f * lift else lift * (1f - (onGlass?.invoke() ?: 0f))
                     // Sits just under the lifted tile, and rises into place as it appears.
                     translationY = height.toPx() * (scale - 1f) / 2f - (1f - lift) * 6.dp.toPx() +
                         ring * ringIn * (RingGap + RingWidth).toPx() * scale
@@ -469,6 +496,25 @@ private fun tileRim(w: Int, h: Int, radius: Float, width: Float, alpha: Float = 
         drawPath(inner, Paint(Paint.ANTI_ALIAS_FLAG).apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR) })
     }
     bitmap.frozen().asImageBitmap()
+}
+
+/** A tile's shadow, soft black under its continuous outline; [ext] px of it lie outside the tile on each side. */
+private class TileShadow(val image: ImageBitmap, val ext: Float)
+
+private fun tileShadow(w: Int, h: Int, corner: Float, blur: Float): TileShadow = baked(listOf("shadow", w, h, corner, blur)) {
+    val ext = ceil(blur * 1.5f)
+    val bitmap = createBitmap(w + 2 * ext.toInt(), h + 2 * ext.toInt())
+    android.graphics.Canvas(bitmap).apply {
+        translate(ext, ext)
+        drawPath(
+            smoothRectPath(Rect(0f, 0f, w.toFloat(), h.toFloat()), corner).asAndroidPath(),
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.Black.copy(alpha = 0.7f).toArgb()
+                maskFilter = BlurMaskFilter(blur, BlurMaskFilter.Blur.NORMAL)
+            },
+        )
+    }
+    TileShadow(bitmap.frozen().asImageBitmap(), ext)
 }
 
 /** The high-contrast frame at its full gap; [ext] px of the picture lie outside the tile on each side. */

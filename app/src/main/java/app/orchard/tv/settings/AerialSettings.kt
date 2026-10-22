@@ -52,6 +52,12 @@ object AerialSettings {
     /** The clock, with the date and weather, in the top right instead of the top left. */
     var clockRight by mutableStateOf(false); private set
 
+    /** The date and weather over a big clock above the top row, instead of one small line in the corner. */
+    var largeClock by mutableStateOf(false); private set
+
+    /** Every app's name under its tile, not only the focused one's (issue #28). */
+    var showAllNames by mutableStateOf(false); private set
+
     /** Back on Home's top row starts the screensaver, as on tvOS; off for homes where it gets pressed by accident (issue #94). */
     var backStartsScreensaver by mutableStateOf(true); private set
 
@@ -85,6 +91,8 @@ object AerialSettings {
         pinSet = pinHash != null
         oneRowHome = prefs.getBoolean("one_row_home", true)
         clockRight = prefs.getBoolean("clock_right", false)
+        largeClock = prefs.getBoolean("large_clock", false)
+        showAllNames = prefs.getBoolean("show_all_names", false)
         uiSounds = prefs.getBoolean("ui_sounds", true)
         backStartsScreensaver = prefs.getBoolean("back_starts_screensaver", true)
         screensaverMinutes = prefs.getInt("screensaver_minutes", DEFAULT_SCREENSAVER_MINUTES)
@@ -129,6 +137,16 @@ object AerialSettings {
     fun chooseClockRight(on: Boolean) {
         clockRight = on
         app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean("clock_right", on) }
+    }
+
+    fun chooseLargeClock(on: Boolean) {
+        largeClock = on
+        app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean("large_clock", on) }
+    }
+
+    fun chooseShowAllNames(on: Boolean) {
+        showAllNames = on
+        app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean("show_all_names", on) }
     }
 
     fun chooseBackStartsScreensaver(on: Boolean) {

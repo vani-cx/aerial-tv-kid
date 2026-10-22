@@ -225,7 +225,7 @@ fun ShelfClock(now: LocalDateTime, modifier: Modifier = Modifier, alignEnd: Bool
 }
 
 /**
- * One-row Home: the time and the weather in one quiet line in the top left, level with the status
+ * The small clock: the time and the weather in one quiet line in the top left, level with the status
  * pill, so the wallpaper keeps the rest of the screen. A soft shadow keeps it readable on photos.
  */
 @Composable
