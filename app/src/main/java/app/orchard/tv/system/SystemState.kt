@@ -154,8 +154,17 @@ object SystemProbe {
     /**
      * Opens the TV's own picture settings where brightness lives, for TVs whose backlight Aerial
      * cannot set itself. TCL keeps it in a side panel that its settings app shows as a service.
+     * Xiaomi's settings app shows its backlight slider on a broadcast: older Xiaomi TVs have no
+     * picture_backlight setting and no display settings screen to open (MiTV-ASTP0, Android 9,
+     * found in PR #85; MiTV-MFTP0, Mi TV 4A, #23, #130, #185), and MiTV-MFTR0 has the receiver too.
      */
     fun openPictureSettings(context: Context): Boolean {
+        val backlight = Intent("com.xiaomi.mitv.settings.BACKLIGHT_POPUP")
+            .setComponent(ComponentName("com.xiaomi.mitv.settings", "com.xiaomi.mitv.settings.SettingsBroadcastReceiver"))
+        if (context.packageManager.queryBroadcastReceivers(backlight, 0).any { it.activityInfo.exported }) {
+            val shown = runCatching { context.sendBroadcast(backlight) }.isSuccess
+            if (shown) return true
+        }
         if (isInstalled(context, "com.tcl.settings")) {
             val shown = runCatching {
                 context.startService(Intent("com.tcl.settings.SHOW_WINDOW").setPackage("com.tcl.settings"))
@@ -327,6 +336,8 @@ object SystemProbe {
  * as DisplayPort; its tvplayer knows them as source 29 and 30 (#62, found in its MonitorUtils).
  * MiTV-ANTL0 (L42R7-RA, Amlogic, Android 5.1) registers only one HDMI input, HW6, labelled
  * HDMI2, but it is the HDMI 1 port and source 23 (#64, from the reporter's logcat).
+ * MiTV4-ANSM0 (Mi TV 4, Amlogic, Android 6.0.1) registers an HDMI input only for a port with a
+ * device in it; HW7 is source 23, not 25 (#191, the reporter scanned sources 1–32).
  */
 private class DeviceProfile(
     val hiddenHardware: Set<Int?> = emptySet(),
@@ -347,6 +358,9 @@ private class DeviceProfile(
             "MiTV_ANTL0", "MiTV-ANTL0" -> DeviceProfile(
                 labels = mapOf(6 to "HDMI 1"),
                 xiaomiSourceIds = mapOf(6 to 23),
+            )
+            "MiTV4-ANSM0", "MiTV4_ANSM0" -> DeviceProfile(
+                xiaomiSourceIds = mapOf(7 to 23),
             )
             else -> DeviceProfile()
         }
