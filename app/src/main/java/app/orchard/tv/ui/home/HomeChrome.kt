@@ -30,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
@@ -38,8 +39,11 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import app.orchard.tv.R
 import app.orchard.tv.system.NetKind
 import app.orchard.tv.system.NetworkStatus
 import app.orchard.tv.ui.components.Pressable
@@ -82,7 +86,12 @@ fun timeText(now: LocalDateTime): String {
 @Composable
 fun dateText(now: LocalDateTime): String {
     val locale = Locale.getDefault()
-    val pattern = remember(locale) { DateFormat.getBestDateTimePattern(locale, "MMMMdEEEE") }
+    // zh's best pattern runs the weekday into the date ("M月d日EEEE"); a space keeps them apart.
+    val pattern = remember(locale) {
+        DateFormat.getBestDateTimePattern(locale, "MMMMdEEEE")
+            .replace(Regex("(?<=[^\\s,，'])EEEE"), " EEEE")
+            .replace(Regex("EEEE(?=[^\\s,，'])"), "EEEE ")
+    }
     return now.format(DateTimeFormatter.ofPattern(pattern, locale))
 }
 
@@ -208,23 +217,57 @@ private fun darkened(src: ImageBitmap, alpha: Float): ImageBitmap {
 }
 
 /**
- * Date over a large, light clock: the lock-screen arrangement. The weather follows the date, with
- * the city it is for (issue #59). The clock screensaver shows the same.
+ * The large clock, as on the lock screen: the date over the time, and under it the weather, the
+ * city it is for (issue #59) and today's high and low. Left or right, the three lines share one
+ * edge, the tiles' edge. The digits stay proportional: tabular ones leave a narrow "1" short of
+ * that edge. A soft shadow keeps them readable on bright photos. The clock screensaver shows the same.
  */
 @Composable
 fun ShelfClock(now: LocalDateTime, modifier: Modifier = Modifier, alignEnd: Boolean = false) {
-    val dim = Color.White.copy(alpha = 0.86f)
+    val shadow = Shadow(Color.Black.copy(alpha = 0.28f), Offset(0f, 2f), blurRadius = 18f)
+    val secondary = Color.White.copy(alpha = 0.78f)
     Column(modifier, horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            BasicText(dateText(now), style = Type.Title.copy(color = dim))
-            Weather.now?.let { w ->
-                GlyphIcon(glyphFor(w), dim, 22.dp, Modifier.padding(start = 18.dp, end = 6.dp))
+        BasicText(dateText(now), style = Type.Title.copy(color = Color.White.copy(alpha = 0.9f), shadow = shadow))
+        BasicText(
+            timeText(now),
+            style = Type.Clock.copy(shadow = shadow),
+            modifier = Modifier.trimmed(top = ClockTrimTop, bottom = ClockTrimBottom),
+        )
+        Weather.now?.let { w ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                GlyphIcon(glyphFor(w), Color.White, 22.dp, Modifier.padding(end = 8.dp))
+                BasicText("${w.celsius}°", style = Type.Title.copy(color = Color.White, shadow = shadow))
                 val place = Weather.place?.takeIf { it.length <= 12 }
-                BasicText(listOfNotNull(place, "${w.celsius}°").joinToString(" "), style = Type.Title.copy(color = dim))
+                val range = if (w.high != null && w.low != null) stringResource(R.string.weather_high_low, w.high, w.low) else null
+                val detail = listOfNotNull(place, stringResource(conditionName(w.kind)), range).joinToString("  ·  ")
+                BasicText(detail, style = Type.Headline.copy(color = secondary, shadow = shadow), modifier = Modifier.padding(start = 12.dp))
             }
         }
-        BasicText(timeText(now), style = Type.Clock, modifier = Modifier.padding(top = 2.dp))
     }
+}
+
+/**
+ * The clock's line box reaches well past its digits (31dp above, 32dp below, measured on the
+ * Xiaomi). Trimmed so the date sits 14dp over the digits and the weather 18dp under them.
+ */
+private val ClockTrimTop = 17.dp
+private val ClockTrimBottom = 14.dp
+
+/** Lays the content out [top] and [bottom] shorter than it measures, drawn where it was. */
+private fun Modifier.trimmed(top: Dp, bottom: Dp) = layout { measurable, constraints ->
+    val p = measurable.measure(constraints)
+    val t = top.roundToPx()
+    layout(p.width, (p.height - t - bottom.roundToPx()).coerceAtLeast(0)) { p.place(0, -t) }
+}
+
+private fun conditionName(kind: WeatherKind): Int = when (kind) {
+    WeatherKind.Clear -> R.string.weather_clear
+    WeatherKind.PartlyCloudy -> R.string.weather_partly_cloudy
+    WeatherKind.Cloudy -> R.string.weather_cloudy
+    WeatherKind.Fog -> R.string.weather_fog
+    WeatherKind.Rain -> R.string.weather_rain
+    WeatherKind.Snow -> R.string.weather_snow
+    WeatherKind.Thunder -> R.string.weather_thunder
 }
 
 /**

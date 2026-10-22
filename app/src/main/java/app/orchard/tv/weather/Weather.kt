@@ -23,7 +23,8 @@ import kotlin.math.roundToInt
 
 enum class WeatherKind { Clear, PartlyCloudy, Cloudy, Fog, Rain, Snow, Thunder }
 
-data class WeatherNow(val celsius: Int, val kind: WeatherKind, val day: Boolean)
+/** [high] and [low] are today's, shown under the large clock; null in a reading saved by an older version. */
+data class WeatherNow(val celsius: Int, val kind: WeatherKind, val day: Boolean, val high: Int? = null, val low: Int? = null)
 
 /**
  * The weather beside the home clock, from Open-Meteo: no key, reachable from China. The place is
@@ -42,6 +43,8 @@ object Weather {
     private const val RELOCATE_MS = 24 * 60 * 60 * 1000L
     /** A reading older than this is not shown at all. */
     private const val STALE_MS = 3 * 60 * 60 * 1000L
+    /** Stands for "no high or low" in the prefs. */
+    private const val NONE = Int.MIN_VALUE
 
     var now by mutableStateOf<WeatherNow?>(null); private set
 
@@ -67,7 +70,11 @@ object Weather {
         chosen = prefs.getBoolean("chosen", false)
         if (System.currentTimeMillis() - prefs.getLong("fetched_at", 0) < STALE_MS) {
             val kind = runCatching { WeatherKind.valueOf(prefs.getString("kind", null) ?: "") }.getOrNull()
-            if (kind != null) now = WeatherNow(prefs.getInt("celsius", 0), kind, prefs.getBoolean("day", true))
+            if (kind != null) now = WeatherNow(
+                prefs.getInt("celsius", 0), kind, prefs.getBoolean("day", true),
+                high = prefs.getInt("high", NONE).takeIf { it != NONE },
+                low = prefs.getInt("low", NONE).takeIf { it != NONE },
+            )
         }
     }
 
@@ -96,6 +103,8 @@ object Weather {
                     putInt("celsius", reading.celsius)
                     putString("kind", reading.kind.name)
                     putBoolean("day", reading.day)
+                    putInt("high", reading.high ?: NONE)
+                    putInt("low", reading.low ?: NONE)
                 }
             }
         }
@@ -125,12 +134,16 @@ object Weather {
                 putLong("located_at", System.currentTimeMillis())
             }
         }
-        val json = JSONObject(get("https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,weather_code,is_day&timezone=auto"))
+        val json = JSONObject(get("https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto"))
         val current = json.getJSONObject("current")
+        val daily = json.optJSONObject("daily")
+        fun today(key: String) = daily?.optJSONArray(key)?.optDouble(0)?.takeIf { !it.isNaN() }?.roundToInt()
         return WeatherNow(
             celsius = current.getDouble("temperature_2m").roundToInt(),
             kind = kindOf(current.getInt("weather_code")),
             day = current.optInt("is_day", 1) == 1,
+            high = today("temperature_2m_max"),
+            low = today("temperature_2m_min"),
         )
     }
 

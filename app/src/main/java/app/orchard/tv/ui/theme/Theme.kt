@@ -78,8 +78,8 @@ val InterDisplay = inter(32f)
 
 object Type {
     val Clock = TextStyle(
-        fontFamily = InterDisplay, fontWeight = FontWeight.W200,
-        fontSize = 112.sp, lineHeight = 112.sp, letterSpacing = (-0.035).em, color = Palette.Label,
+        fontFamily = InterDisplay, fontWeight = FontWeight.W500,
+        fontSize = 104.sp, lineHeight = 104.sp, letterSpacing = (-0.02).em, color = Palette.Label,
     )
     val LargeTitle = TextStyle(
         fontFamily = InterDisplay, fontWeight = FontWeight.W600,

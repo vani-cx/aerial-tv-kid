@@ -100,8 +100,12 @@ private class GridMetrics(screenW: Dp, screenH: Dp, oneRow: Boolean, val nameRoo
      */
     val topRowY = if (oneRow) screenH - pitchY - 12.dp - nameRoom else screenH * 0.555f
 
-    /** Top of the large clock, just above the top row's plate. */
-    val clockY = topRowY - 196.dp
+    /**
+     * Top of the large clock: just under the status pill, left or right, in both layouts, as on the
+     * lock screen. Hung from the row it floated mid-screen in one-row mode and pressed on the plate
+     * in two-row mode; up here the middle of the screen stays the wallpaper's.
+     */
+    val clockY = 74.dp
 
     /** Where a row rests once you go down into the grid: the row above stays in view. */
     val restY = screenH * 0.37f

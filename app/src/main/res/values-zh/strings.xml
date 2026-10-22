@@ -105,7 +105,7 @@
     <string name="st_clock_size">时钟大小</string>
     <string name="st_clock_small">小</string>
     <string name="st_clock_large">大</string>
-    <string name="st_clock_size_hint">小：时间和天气在角上一行小字。大：第一排上方显示日期、天气和大时钟。</string>
+    <string name="st_clock_size_hint">小：时间和天气在角上一行小字。大：屏幕上方一个大时钟，上面是日期，下面是天气。</string>
     <string name="st_names">App 名称</string>
     <string name="st_names_focused">只显示选中的</string>
     <string name="st_names_all">全部显示</string>
@@ -158,4 +158,12 @@
     <string name="pin_confirm">再输入一次</string>
     <string name="pin_wrong">密码不对，请重试。</string>
     <string name="pin_mismatch">两次输入的不一样，请重新设置。</string>
+    <string name="weather_clear">晴</string>
+    <string name="weather_partly_cloudy">多云</string>
+    <string name="weather_cloudy">阴</string>
+    <string name="weather_fog">雾</string>
+    <string name="weather_rain">雨</string>
+    <string name="weather_snow">雪</string>
+    <string name="weather_thunder">雷雨</string>
+    <string name="weather_high_low">最高 %1$d°  最低 %2$d°</string>
 </resources>
