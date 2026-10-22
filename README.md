@@ -110,6 +110,8 @@ Windows 用 Agent 装，或照[安装说明](site/agent.md)里的 Windows 步骤
 curl -fsSL https://aerial.qust.me/install.sh | TV=192.168.1.20 bash -s restore
 ```
 
+最后加 `--uninstall`（`bash -s restore --uninstall`）会顺便卸载 Aerial。不能运行 bash（Windows）时，逐条的 adb 命令见[安装说明的「还原」](site/agent.md#还原)。
+
 ### 常见问题
 
 - **TCL 弹出「多屏互动」**：按遥控器「右」再按确认，选「同意」。

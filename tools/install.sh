@@ -53,7 +53,8 @@ fi
 # What counts is the service Android actually runs, not the settings entry: after an update, Xiaomi
 # MiTV-MFTP0 (Android 9) kept the entry while system_server still pointed at the old APK directory
 # and never bound it (issue #72).
-guard_bound() { adb shell dumpsys accessibility 2>/dev/null | grep -q "label=Aerial"; }
+# Some firmwares show the class name where the label goes (Xiaomi MiTV-ASTP0, Android 9, issue #183).
+guard_bound() { adb shell dumpsys accessibility 2>/dev/null | grep -q -E "label=(Aerial|app\.orchard\.tv)"; }
 
 wait_guard() {
   for _ in $(seq 1 "$1"); do sleep 1; guard_bound && return 0; done

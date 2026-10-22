@@ -151,7 +151,7 @@ python tcast-push.py <IP> http://127.0.0.1:8765/Aerial.apk app.orchard.tv Aerial
 ```
 adb shell "dumpsys package app.orchard.tv | grep versionName"
 adb shell settings get secure enabled_accessibility_services
-adb shell "dumpsys accessibility | grep -c 'label=Aerial'"
+adb shell "dumpsys accessibility | grep -c -E 'label=(Aerial|app.orchard.tv)'"
 adb shell input keyevent KEYCODE_HOME
 adb shell "sleep 3; dumpsys window | grep mCurrentFocus"
 ```

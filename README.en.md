@@ -112,6 +112,8 @@ On Windows, use an agent, or follow the Windows steps in the [install guide](sit
 curl -fsSL https://aerial.qust.me/install.sh | TV=192.168.1.20 bash -s restore
 ```
 
+Add `--uninstall` (`bash -s restore --uninstall`) to remove Aerial as well. Without bash (Windows), the adb commands one by one are under [Undo in the install guide](site/en/agent.md#undo).
+
 ### Troubleshooting
 
 - **TCL shows a 多屏互动 prompt**: press Right, then OK, to choose 同意 (Agree).
