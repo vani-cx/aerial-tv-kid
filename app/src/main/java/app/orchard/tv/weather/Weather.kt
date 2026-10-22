@@ -17,6 +17,7 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.util.Locale
 import javax.net.ssl.SSLException
 import kotlin.math.roundToInt
 
@@ -51,6 +52,7 @@ object Weather {
     var chosen by mutableStateOf(false); private set
 
     private lateinit var prefs: SharedPreferences
+    private lateinit var app: Context
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var started = false
     private var lastAttempt = 0L
@@ -59,7 +61,8 @@ object Weather {
     fun init(context: Context) {
         if (started) return
         started = true
-        prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        app = context.applicationContext
+        prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         place = prefs.getString("place", null)
         chosen = prefs.getBoolean("chosen", false)
         if (System.currentTimeMillis() - prefs.getLong("fetched_at", 0) < STALE_MS) {
@@ -103,15 +106,22 @@ object Weather {
         var lat = prefs.getFloat("lat", Float.NaN)
         var lon = prefs.getFloat("lon", Float.NaN)
         val guessedLongAgo = System.currentTimeMillis() - prefs.getLong("located_at", 0) > RELOCATE_MS
+        if (prefs.getBoolean("chosen", false) && !lat.isNaN() && !prefs.getBoolean("checked_against_cities", false)) {
+            correctChosenPlace(lat, lon)?.let { lat = it.lat.toFloat(); lon = it.lon.toFloat() }
+        }
         if (!prefs.getBoolean("chosen", false) && (lat.isNaN() || guessedLongAgo)) {
             // ipinfo.io: no key, and its "loc" is "lat,lon".
             val ip = JSONObject(get("https://ipinfo.io/json"))
             val loc = ip.getString("loc").split(',')
             lat = loc[0].toFloat()
             lon = loc[1].toFloat()
+            // ipinfo names the city in English ("Shangqiu"); in China, say it as the TV's owner would.
+            val city = ip.optString("city").ifBlank { null }
+            val zh = city?.takeIf { ip.optString("country") == "CN" && Locale.getDefault().language == "zh" }
+                ?.let { Cities.near(app, it, lat.toDouble(), lon.toDouble(), km = 80.0, ascii = true)?.name }
             prefs.edit {
                 putFloat("lat", lat); putFloat("lon", lon)
-                putString("place", ip.optString("city").ifBlank { null })
+                putString("place", zh ?: city)
                 putLong("located_at", System.currentTimeMillis())
             }
         }
@@ -125,22 +135,49 @@ object Weather {
     }
 
     /**
-     * Names the place (from the phone page), looked up in Open-Meteo's geocoder, and fetches its
-     * weather at once. False when there is no such place.
+     * A place chosen before 1.29 came from Open-Meteo's geocoder, which took 安庆 for a village in
+     * Jiangsu. If a listed city of that name is not where the chosen point is, the city is meant.
+     * Checked once.
+     */
+    private fun correctChosenPlace(lat: Float, lon: Float): Cities.City? {
+        val name = prefs.getString("place", null)
+        val city = name?.let { runCatching { Cities.find(app, it) }.getOrNull() }
+            ?.takeIf { Cities.near(app, it.name, lat.toDouble(), lon.toDouble(), km = 30.0) == null }
+        prefs.edit {
+            putBoolean("checked_against_cities", true)
+            if (city != null) {
+                Log.i(TAG, "chosen place $name moved to the city of that name")
+                putFloat("lat", city.lat.toFloat()); putFloat("lon", city.lon.toFloat())
+            }
+        }
+        return city
+    }
+
+    /**
+     * Names the place (from the phone page) and fetches its weather at once. Chinese names are
+     * looked up in Aerial's own list first, others (pinyin, places abroad) in Open-Meteo's geocoder.
+     * False when there is no such place.
      */
     suspend fun choose(name: String): Boolean {
         val hit = withContext(Dispatchers.IO) {
-            runCatching {
-                val q = URLEncoder.encode(name.trim(), "UTF-8")
-                JSONObject(get("https://geocoding-api.open-meteo.com/v1/search?name=$q&count=1&language=zh&format=json"))
-                    .optJSONArray("results")?.optJSONObject(0)
-            }.onFailure { Log.w(TAG, "could not look up $name", it) }.getOrNull()
+            runCatching { Cities.find(app, name) }.onFailure { Log.w(TAG, "could not read the city list", it) }.getOrNull()
+                ?.let { Triple(it.lat, it.lon, it.name) }
+                ?: runCatching {
+                    val q = URLEncoder.encode(name.trim(), "UTF-8")
+                    val results = JSONObject(get("https://geocoding-api.open-meteo.com/v1/search?name=$q&count=10&language=zh&format=json"))
+                        .optJSONArray("results")
+                    val all = (0 until (results?.length() ?: 0)).map { results!!.getJSONObject(it) }
+                    // Towns before villages of the same name.
+                    val best = all.firstOrNull { it.optString("feature_code").startsWith("PPLA") || it.optString("feature_code") == "PPLC" } ?: all.firstOrNull()
+                    best?.let { Triple(it.getDouble("latitude"), it.getDouble("longitude"), it.optString("name").ifBlank { name.trim() }) }
+                }.onFailure { Log.w(TAG, "could not look up $name", it) }.getOrNull()
         } ?: return false
         prefs.edit {
-            putFloat("lat", hit.getDouble("latitude").toFloat())
-            putFloat("lon", hit.getDouble("longitude").toFloat())
-            putString("place", hit.optString("name").ifBlank { name.trim() })
+            putFloat("lat", hit.first.toFloat())
+            putFloat("lon", hit.second.toFloat())
+            putString("place", hit.third)
             putBoolean("chosen", true)
+            putBoolean("checked_against_cities", true)
         }
         chosen = true
         place = prefs.getString("place", null)
