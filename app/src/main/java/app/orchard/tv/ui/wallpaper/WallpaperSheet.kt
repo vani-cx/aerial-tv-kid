@@ -269,6 +269,7 @@ private fun WallpaperRows() {
     }
     val daily = items.filter { it.kind == WallpaperKind.Daily }
     val rows = buildList {
+        add(R.string.wp_live to items.filter { it.kind == WallpaperKind.Live })
         if (daily.isNotEmpty()) {
             add(R.string.wp_daily to listOf(Wallpaper(Wallpapers.LATEST_DAILY, WallpaperKind.Daily, stringResource(R.string.wp_daily_latest))) + daily)
         }
@@ -330,6 +331,10 @@ private fun WallpaperCard(wp: Wallpaper, focusRequester: FocusRequester?) {
                         Modifier.align(Alignment.TopEnd).padding(7.dp).size(22.dp).clip(CircleShape).background(Palette.Focus),
                         contentAlignment = Alignment.Center,
                     ) { GlyphIcon(Glyph.Check, Palette.OnFocus, 13.dp) }
+                }
+                // The aerial wallpaper moves; its card shows the last frame it stopped on.
+                if (wp.kind == WallpaperKind.Live) {
+                    GlyphIcon(Glyph.Play, Color.White, 22.dp, Modifier.align(Alignment.BottomStart).padding(7.dp))
                 }
             }
             Spacer(Modifier.height(6.dp))

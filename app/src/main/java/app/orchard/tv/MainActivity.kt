@@ -290,6 +290,7 @@ class MainActivity : ComponentActivity() {
     private var openedAppSinceHome = false
 
     private fun restartIdleTimer() {
+        vm.lastInputAt = SystemClock.uptimeMillis()
         idleHandler.removeCallbacks(showScreensaver)
         idleHandler.postDelayed(showScreensaver, idleBeforeScreensaver())
     }
@@ -399,6 +400,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        vm.resumed = true
         DiagLog.i("onResume; screensaver after ${idleBeforeScreensaver() / 1000} s")
         restartIdleTimer()
         GuardSetup.setHomeInFront(this, true)
@@ -412,6 +414,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
+        vm.resumed = false
         DiagLog.i("onPause")
         GuardSetup.setHomeInFront(this, false)
         idleHandler.removeCallbacks(showScreensaver)

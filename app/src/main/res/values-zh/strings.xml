@@ -87,6 +87,7 @@
     <string name="wp_daily">每日精选</string>
     <string name="wp_daily_latest">每日自动更新</string>
     <string name="wp_builtin">内置</string>
+    <string name="wp_live">航拍 · 停在主屏幕 10 秒后播放</string>
     <string name="wp_photos">我的照片</string>
     <string name="wp_photos_rotate">每天换一张</string>
     <string name="wp_screensaver">屏幕保护程序</string>

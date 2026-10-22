@@ -4,6 +4,7 @@ import android.app.Application
 import android.os.Build
 import android.os.SystemClock
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -81,6 +82,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      * since a focus request made while another app is in front is lost.
      */
     var homeResetPending by mutableStateOf(false)
+
+    /** When a key, a touch or coming back to the front last reset the idle timer (uptime ms). */
+    var lastInputAt by mutableLongStateOf(0L)
+
+    /** Home is the resumed activity: the aerial wallpaper only moves while it is. */
+    var resumed by mutableStateOf(false)
 
     /** Aerial's screensaver is up (see MainActivity's idle timer). */
     var screensaverVisible by mutableStateOf(false)

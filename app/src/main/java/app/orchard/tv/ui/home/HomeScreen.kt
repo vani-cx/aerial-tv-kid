@@ -325,6 +325,16 @@ fun HomeScreen(
                     (metrics.topRowY + metrics.tileH + PlatePadV + metrics.nameRoom).toPx(),
                 )
             }
+            // The aerial wallpaper's film, under everything; it moves only on a still top row.
+            val filmCover = remember { Animatable(0f) }
+            if (Wallpapers.selectedId == Wallpapers.LIVE) {
+                LiveWallpaper(
+                    moving = vm.resumed && overlay == Overlay.None && !vm.screensaverVisible && !pastShelf &&
+                        focusedRow == 0 && moving == null,
+                    lastInputAt = vm.lastInputAt,
+                    cover = filmCover,
+                )
+            }
             HomeBackground(
                 // The chosen wallpaper; in "Follow App" mode, light from the focused app.
                 backdrop = Wallpapers.backdrop ?: ambientApp?.art?.backdrop,
@@ -332,6 +342,7 @@ fun HomeScreen(
                 plate = plate,
                 scroll = { scroll.value },
                 collapse = collapsePx,
+                cover = { filmCover.value },
             )
 
             Box(Modifier.fillMaxSize().offset { IntOffset(0, -scroll.value.roundToInt()) }) {

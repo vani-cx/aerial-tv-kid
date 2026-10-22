@@ -88,6 +88,7 @@
     <string name="wp_daily">Daily Photos</string>
     <string name="wp_daily_latest">Always Today\'s</string>
     <string name="wp_builtin">Built-in</string>
+    <string name="wp_live">Aerial · plays after 10 seconds on Home</string>
     <string name="wp_photos">My Photos</string>
     <string name="wp_photos_rotate">One a Day</string>
     <string name="wp_screensaver">Screensaver</string>

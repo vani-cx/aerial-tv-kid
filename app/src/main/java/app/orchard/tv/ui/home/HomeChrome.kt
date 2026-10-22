@@ -109,7 +109,15 @@ fun dateText(now: LocalDateTime): String {
  * full-screen fill (Xiaomi MiTV-MFTR0: 90th percentile 20 -> 30 ms when the crossfade ran end to end).
  */
 @Composable
-fun HomeBackground(backdrop: ImageBitmap?, frosted: ImageBitmap?, plate: Rect?, scroll: () -> Float, collapse: Float) {
+fun HomeBackground(
+    backdrop: ImageBitmap?,
+    frosted: ImageBitmap?,
+    plate: Rect?,
+    scroll: () -> Float,
+    collapse: Float,
+    /** How far the aerial wallpaper's film shows through (LiveWallpaper): picture and plate give way to it. */
+    cover: () -> Float = { 0f },
+) {
     Crossfade(
         targetState = backdrop to frosted,
         animationSpec = tween(450, easing = Motion.EaseOut),
@@ -125,6 +133,9 @@ fun HomeBackground(backdrop: ImageBitmap?, frosted: ImageBitmap?, plate: Rect?, 
         // while drawing.
         val plateFor = remember(plateSrc) { arrayOfNulls<Pair<Pair<Size, Rect>, ImageBitmap>>(1) }
         Canvas(Modifier.fillMaxSize()) {
+            val film = cover()
+            // On the top row, the film alone through the window: nothing of Compose's full-screen.
+            if (film > 0.99f && scroll() < collapse * 0.3f) return@Canvas
             if (bmp == null || glassSrc == null || dark == null || plateSrc == null) {
                 drawRect(Color.Black)
                 return@Canvas
@@ -134,14 +145,14 @@ fun HomeBackground(backdrop: ImageBitmap?, frosted: ImageBitmap?, plate: Rect?, 
             // The sharp picture and the grid's frosted one cross only through the middle of the
             // scroll; each end is one full-screen draw.
             val g = ((p - 0.3f) / 0.4f).coerceIn(0f, 1f)
-            if (g < 0.99f) drawImage(bmp, dstSize = full, filterQuality = FilterQuality.Low)
+            if (g < 0.99f && film < 0.99f) drawImage(bmp, dstSize = full, filterQuality = FilterQuality.Low, alpha = 1f - film)
             if (g > 0.01f) drawImage(dark, dstSize = full, filterQuality = FilterQuality.Low, alpha = g)
 
             // The plate rides with its row and dissolves into the frosted background: it fades
             // over the first half of the scroll, swelling a little as if lifting off, and settles
             // back the same way when focus returns to the top row. Kept small on purpose: the
             // whole screen shrinking back into the plate read as too much.
-            val fade = 1f - smooth((p / 0.55f).coerceIn(0f, 1f))
+            val fade = (1f - smooth((p / 0.55f).coerceIn(0f, 1f))) * (1f - film)
             if (plate == null || fade < 0.01f) return@Canvas
             val radius = PlateCorner.toPx()
             val grow = PlateSwell.toPx() * (1f - fade)

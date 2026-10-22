@@ -26,7 +26,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
 
-enum class WallpaperKind { Daily, Builtin, Photo, Auto }
+enum class WallpaperKind { Daily, Builtin, Photo, Auto, Live }
 
 data class Wallpaper(
     val id: String,
@@ -54,6 +54,8 @@ enum class ScreensaverMode(val key: String) {
  * - Photos: pictures uploaded from a phone through the setup page ([PhoneServer]). "photos:rotate"
  *   shows a different one of them each day (issue #27).
  * - Auto: the previous behaviour, light taken from the focused app's artwork.
+ * - Live: Apple's aerial films, moving once Home has sat still a while (ui/home/LiveWallpaper.kt).
+ *   Its picture is the frame the film last stopped on, so the glass and the grid match it.
  *
  * State is Compose snapshot state, written on the main thread only.
  */
@@ -62,6 +64,7 @@ object Wallpapers {
     const val LATEST_DAILY = "daily:latest"
     const val AUTO = "auto"
     const val ROTATE_PHOTOS = "photos:rotate"
+    const val LIVE = "aerial:live"
     private const val DEFAULT_FALLBACK = "grad:aurora"
 
     private lateinit var app: Context
@@ -70,6 +73,7 @@ object Wallpapers {
     private val prefs by lazy { app.getSharedPreferences("wallpaper", Context.MODE_PRIVATE) }
     private val dailyDir by lazy { File(app.filesDir, "daily").apply { mkdirs() } }
     private val photoDir by lazy { File(app.filesDir, "photos").apply { mkdirs() } }
+    private val liveFrame by lazy { File(app.filesDir, "live-frame.jpg") }
     private val thumbs = HashMap<String, Bitmap>()
 
     var items by mutableStateOf<List<Wallpaper>>(emptyList()); private set
@@ -168,6 +172,9 @@ object Wallpapers {
         WallpaperKind.Builtin -> Gradients.byKey(wp.id.removePrefix("grad:"))?.let { Gradients.render(it, w, h) }
         WallpaperKind.Daily, WallpaperKind.Photo -> fileFor(wp)?.takeIf { it.exists() }?.let { Images.decodeCover(it, w, h) }
         WallpaperKind.Auto -> null
+        // Until a film has stopped on a frame, the first built-in stands in.
+        WallpaperKind.Live -> liveFrame.takeIf { it.exists() }?.let { Images.decodeCover(it, w, h) }
+            ?: Gradients.render(Gradients.presets.first(), w, h)
     }
 
     /** A 16:9 thumbnail for pickers and the phone page. Call off the main thread. */
@@ -202,6 +209,25 @@ object Wallpapers {
         }
     }
 
+    /**
+     * The frame a moving wallpaper film stopped on becomes the wallpaper's picture: shaded, frosted
+     * and kept for the next start. Returns once Home has it. [frame] is screen-sized and is used up.
+     */
+    suspend fun useLiveFrame(frame: Bitmap) {
+        if (selectedId != LIVE) return
+        backdropJob?.cancel()
+        val (bmp, frost) = withContext(Dispatchers.Default) {
+            runCatching { liveFrame.outputStream().use { frame.compress(Bitmap.CompressFormat.JPEG, 90, it) } }
+                .onFailure { Log.w(TAG, "could not keep the film's frame", it) }
+            // Frosted before shading, which draws on the frame itself.
+            val frost = Images.frost(frame)
+            Images.shadeForHome(frame) to frost
+        }
+        synchronized(thumbs) { thumbs.remove(LIVE) }
+        backdrop = bmp.asImageBitmap()
+        frosted = frost.asImageBitmap()
+    }
+
     private fun rebuildList() {
         val daily = readDailyIndex().map { Wallpaper("daily:${it.first}", WallpaperKind.Daily, it.second, it.third) }
         val zh = Locale.getDefault().language == "zh"
@@ -210,7 +236,8 @@ object Wallpapers {
             .sortedByDescending { it.lastModified() }
             .map { Wallpaper("photo:${it.nameWithoutExtension}", WallpaperKind.Photo, if (zh) "我的照片" else "My Photo") }
         val auto = Wallpaper(AUTO, WallpaperKind.Auto, if (zh) "跟随 App" else "Follow App")
-        items = daily + builtins + photos + auto
+        val live = Wallpaper(LIVE, WallpaperKind.Live, if (zh) "航拍" else "Aerial")
+        items = listOf(live) + daily + builtins + photos + auto
     }
 
     // ---- daily photos ----
