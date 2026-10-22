@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.edit
 import android.os.SystemClock
+import android.provider.Settings
 import java.security.MessageDigest
 
 /**
@@ -20,6 +21,18 @@ enum class FocusStyle(val key: String) {
 
     companion object {
         fun of(key: String?) = entries.firstOrNull { it.key == key } ?: HighContrast
+    }
+}
+
+/**
+ * Where interface sounds come from. The TV's own are silent wherever its key sound setting is off,
+ * which many TVs ship with (Sony, issue #160; #169), so that is not the default there.
+ */
+enum class UiSounds(val key: String) {
+    Tv("tv"), Aerial("aerial"), Off("off");
+
+    companion object {
+        fun of(key: String?) = entries.firstOrNull { it.key == key }
     }
 }
 
@@ -47,7 +60,10 @@ object AerialSettings {
     var oneRowHome by mutableStateOf(true); private set
 
     /** Interface sounds (system/Sounds), as tvOS plays them on every press. */
-    var uiSounds by mutableStateOf(true); private set
+    var uiSounds by mutableStateOf(UiSounds.Tv); private set
+
+    /** The Liquid Glass plate under the top row; some prefer the apps straight on the wallpaper (#151). */
+    var homePlate by mutableStateOf(true); private set
 
     /** The clock, with the date and weather, in the top right instead of the top left. */
     var clockRight by mutableStateOf(false); private set
@@ -92,8 +108,14 @@ object AerialSettings {
         oneRowHome = prefs.getBoolean("one_row_home", true)
         clockRight = prefs.getBoolean("clock_right", false)
         largeClock = prefs.getBoolean("large_clock", false)
+        homePlate = prefs.getBoolean("home_plate", true)
         showAllNames = prefs.getBoolean("show_all_names", false)
-        uiSounds = prefs.getBoolean("ui_sounds", true)
+        // Before 1.28 this was on or off; on meant whichever sounds Aerial played.
+        uiSounds = UiSounds.of(prefs.getString("ui_sounds_kind", null)) ?: when {
+            !prefs.getBoolean("ui_sounds", true) -> UiSounds.Off
+            Settings.System.getInt(app.contentResolver, Settings.System.SOUND_EFFECTS_ENABLED, 1) == 1 -> UiSounds.Tv
+            else -> UiSounds.Aerial
+        }
         backStartsScreensaver = prefs.getBoolean("back_starts_screensaver", true)
         screensaverMinutes = prefs.getInt("screensaver_minutes", DEFAULT_SCREENSAVER_MINUTES)
     }
@@ -129,9 +151,14 @@ object AerialSettings {
         app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean("one_row_home", on) }
     }
 
-    fun chooseUiSounds(on: Boolean) {
-        uiSounds = on
-        app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean("ui_sounds", on) }
+    fun chooseUiSounds(kind: UiSounds) {
+        uiSounds = kind
+        app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putString("ui_sounds_kind", kind.key) }
+    }
+
+    fun chooseHomePlate(on: Boolean) {
+        homePlate = on
+        app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean("home_plate", on) }
     }
 
     fun chooseClockRight(on: Boolean) {

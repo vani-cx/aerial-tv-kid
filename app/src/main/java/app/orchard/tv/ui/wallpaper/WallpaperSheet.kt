@@ -61,6 +61,8 @@ import androidx.compose.ui.unit.dp
 import app.orchard.tv.R
 import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.settings.FocusStyle
+import app.orchard.tv.settings.UiSounds
+import app.orchard.tv.system.Sounds
 import app.orchard.tv.ui.components.Pressable
 import app.orchard.tv.ui.components.consumeTaps
 import app.orchard.tv.ui.components.dismissOnTap
@@ -158,6 +160,11 @@ fun WallpaperSheet(
                             AerialSettings.oneRowHome, AerialSettings::chooseOneRowHome, first = true,
                         )
                         Choices(
+                            R.string.st_plate, stringResource(R.string.st_plate_hint), note,
+                            listOf(true to R.string.st_plate_glass, false to R.string.st_plate_none),
+                            AerialSettings.homePlate, AerialSettings::chooseHomePlate,
+                        )
+                        Choices(
                             R.string.st_clock, stringResource(R.string.st_clock_hint), note,
                             listOf(false to R.string.st_clock_left, true to R.string.st_clock_right),
                             AerialSettings.clockRight, AerialSettings::chooseClockRight,
@@ -180,9 +187,11 @@ fun WallpaperSheet(
                             AerialSettings.focusStyle, AerialSettings::chooseFocusStyle,
                         )
                         Choices(
-                            R.string.st_sounds, stringResource(R.string.st_sounds_hint), note,
-                            listOf(true to R.string.st_on, false to R.string.st_off),
-                            AerialSettings.uiSounds, AerialSettings::chooseUiSounds,
+                            R.string.st_sounds,
+                            stringResource(if (AerialSettings.uiSounds == UiSounds.Tv) R.string.st_sounds_tv_hint else R.string.st_sounds_hint),
+                            note,
+                            listOf(UiSounds.Tv to R.string.st_sounds_tv, UiSounds.Aerial to R.string.st_sounds_aerial, UiSounds.Off to R.string.st_off),
+                            AerialSettings.uiSounds, { AerialSettings.chooseUiSounds(it); Sounds.prepare() },
                         )
                         // Apps taken off Home are kept with the rest of how Home looks.
                         SettingRow(R.string.st_hidden_apps, stringResource(R.string.st_hidden_apps_hint), note) {

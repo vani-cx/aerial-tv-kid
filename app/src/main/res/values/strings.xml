@@ -116,8 +116,15 @@
     <string name="st_home_standard">Two Rows</string>
     <string name="st_home_one_row">One Row</string>
     <string name="st_home_layout_hint">One Row puts only the top row on screen, low down, so more of the wallpaper shows, a family photo say. Two Rows shows the top of the second row too. Press down for the rest.</string>
+    <string name="st_plate">Top Row</string>
+    <string name="st_plate_hint">A plate of frosted glass under the top row, as on Apple TV, or the apps straight on the wallpaper.</string>
+    <string name="st_plate_glass">Glass</string>
+    <string name="st_plate_none">None</string>
     <string name="st_sounds">Sounds</string>
-    <string name="st_sounds_hint">The TV\'s own key sounds as focus moves, and on select and Back, as on Apple TV. They follow the TV\'s key sound setting.</string>
+    <string name="st_sounds_hint">A sound as focus moves, and on select and Back, as on Apple TV.</string>
+    <string name="st_sounds_tv_hint">The TV\'s own key sounds, as in its menus. Silent if key sounds are off in the TV\'s settings: choose Aerial then.</string>
+    <string name="st_sounds_tv">TV</string>
+    <string name="st_sounds_aerial">Aerial</string>
     <string name="st_on">On</string>
     <string name="st_off">Off</string>
     <string name="st_hidden_apps">Hidden Apps</string>

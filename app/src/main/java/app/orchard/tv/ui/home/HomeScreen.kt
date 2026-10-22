@@ -312,7 +312,7 @@ fun HomeScreen(
         ) {
             // The glass plate under the top row, as wide as the apps in it (tvOS 26).
             val topCount = apps.size.coerceAtMost(COLUMNS)
-            val plate = if (topCount == 0) null else with(density) {
+            val plate = if (topCount == 0 || !AerialSettings.homePlate) null else with(density) {
                 Rect(
                     (metrics.margin - PlatePadH).toPx(),
                     (metrics.topRowY - PlatePadV).toPx(),

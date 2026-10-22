@@ -40,8 +40,10 @@ object Images {
     }
 
     /**
-     * Shading baked into a home backdrop so the clock and the grid read over any picture, the way
+     * Shading baked into a home backdrop so the clock and the top row read over any picture, the way
      * tvOS darkens the area under its app rows. Baked once, so the TV draws a single full-screen layer.
+     * Light since 1.28: the grid has its own darkened frosted background and the top row its plate,
+     * and the old shade (88% black at the bottom, 42% more on the left) made photos look dim (#157).
      */
     fun shadeForHome(b: Bitmap): Bitmap {
         val out = if (b.isMutable) b else b.copy(Bitmap.Config.ARGB_8888, true)
@@ -51,12 +53,12 @@ object Images {
         c.drawRect(0f, 0f, w, h, Paint().apply {
             shader = LinearGradient(
                 0f, 0f, 0f, h,
-                intArrayOf(black(0.18f), black(0.12f), black(0.55f), black(0.88f)),
+                intArrayOf(black(0.12f), black(0.04f), black(0.22f), black(0.5f)),
                 floatArrayOf(0f, 0.3f, 0.66f, 1f), Shader.TileMode.CLAMP,
             )
         })
         c.drawRect(0f, 0f, w, h, Paint().apply {
-            shader = LinearGradient(0f, 0f, w * 0.6f, 0f, black(0.42f), 0, Shader.TileMode.CLAMP)
+            shader = LinearGradient(0f, 0f, w * 0.5f, 0f, black(0.2f), 0, Shader.TileMode.CLAMP)
         })
         return out
     }
