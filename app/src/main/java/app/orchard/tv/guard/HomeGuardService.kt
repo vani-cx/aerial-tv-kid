@@ -260,6 +260,7 @@ class HomeGuardService : AccessibilityService() {
         // Only activities count as what is in front. Overlays and dialogs also raise this event:
         // TCL's voice assistant (com.tcl.walleve) does at boot on TCL 75S365C, and taking it for
         // an app the viewer chose kept the guard from taking over (PR #45).
+        val before = lastWindow?.first
         if (isActivity(pkg, cls)) lastWindow = pkg to cls
         if (!GuardSetup.isUserUnlocked(this)) return
         val allowed = SystemClock.uptimeMillis() < allowStockUntil
@@ -268,6 +269,15 @@ class HomeGuardService : AccessibilityService() {
             // Only the stock launcher's home activity itself, not its dialogs or other screens.
             // Not gated on isDefaultHome(): see takeOverIfStockHomeInFront.
             if (cls !in stockHomes.getValue(pkg) || allowed) return
+            // Switching inputs passes through the stock launcher on Skyworth: the TV service starts
+            // its SkyLauncher, the launcher shows for a moment, then the input. Taking Home at once
+            // aborted the switch (Skyworth 8H26_M9, Android 5.1, issues #108, #155). Look again
+            // once it has settled; the input will be in front by then.
+            if (before in SOURCE_SWITCHERS || pkg in SOURCE_SWITCHERS) {
+                Log.i(TAG, "stock home $pkg came to the front during an input switch; looking again shortly")
+                takeOverOnceSettled("after an input switch", woke = false)
+                return
+            }
             Log.i(TAG, "stock home $pkg came to the front; bringing Aerial back")
             // Shortly after the screen lit, this is the wake itself (issue #111).
             goHome(woke = SystemClock.elapsedRealtime() - screenOnAt < WAKE_WINDOW_MS)
@@ -352,6 +362,8 @@ class HomeGuardService : AccessibilityService() {
 
         /** VIDAA's assistant and its launcher (聚好看), on the two VIDAA builds reported (issues #7, #40). */
         private val VIDAA_PACKAGES = listOf("com.hisense.vidaaassistant", "com.jamdeo.tv.vod")
+        /** TV services whose input switch shows the stock launcher on the way (Skyworth, #155). */
+        private val SOURCE_SWITCHERS = setOf("com.tianci.tv")
         private const val VENDOR_HOME_PREFIX = "android.intent.category.HOME."
         private const val VENDOR_HOME_SUFFIX = "_HOME"
 
