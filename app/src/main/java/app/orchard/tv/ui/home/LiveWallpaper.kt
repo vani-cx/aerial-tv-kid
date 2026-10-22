@@ -15,6 +15,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
@@ -59,7 +60,13 @@ private const val KEEP_STOPPED_MS = 2 * 60 * 1000L
  * Dolby Vision: a TV in Dolby Vision mode shows the tiles over it with Dolby's picture settings.
  */
 @Composable
-fun LiveWallpaper(moving: Boolean, lastInputAt: Long, cover: Animatable<Float, *>) {
+fun LiveWallpaper(
+    moving: Boolean,
+    /** False once the screensaver is up or Home is behind an app: the player's decoder goes at once. */
+    keep: Boolean,
+    lastInputAt: Long,
+    cover: Animatable<Float, *>,
+) {
     val context = LocalContext.current
     var player by remember { mutableStateOf<ExoPlayer?>(null) }
     var surface by remember { mutableStateOf<SurfaceView?>(null) }
@@ -73,6 +80,7 @@ fun LiveWallpaper(moving: Boolean, lastInputAt: Long, cover: Animatable<Float, *
         idle = true
     }
     val play = moving && idle
+    val keepNow by rememberUpdatedState(keep)
 
     fun release() {
         player?.release()
@@ -123,6 +131,12 @@ fun LiveWallpaper(moving: Boolean, lastInputAt: Long, cover: Animatable<Float, *
             cover.animateTo(1f, tween(1200, easing = Motion.EaseOut))
         } else {
             val p = player ?: return@LaunchedEffect
+            // Into the screensaver or an app: no frame to take, and the decoder is needed elsewhere.
+            if (!keepNow) {
+                cover.snapTo(0f)
+                release()
+                return@LaunchedEffect
+            }
             p.pause()
             if (cover.value > 0f) {
                 // The stopped frame becomes the picture; once Home has it, the film can go. Where
@@ -143,6 +157,11 @@ fun LiveWallpaper(moving: Boolean, lastInputAt: Long, cover: Animatable<Float, *
             delay(KEEP_STOPPED_MS)
             release()
         }
+    }
+    // A stopped player still holds its decoder, and some TVs have only one video path: on Xiaomi
+    // MiTV-MFTR0 the screensaver's decoder lost its resources and its films failed while it was held.
+    LaunchedEffect(keep) {
+        if (!keep && !play && player != null && cover.value == 0f) release()
     }
     DisposableEffect(Unit) { onDispose { release() } }
 

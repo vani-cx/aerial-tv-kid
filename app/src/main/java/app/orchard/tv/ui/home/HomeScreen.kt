@@ -331,6 +331,7 @@ fun HomeScreen(
                 LiveWallpaper(
                     moving = vm.resumed && overlay == Overlay.None && !vm.screensaverVisible && !pastShelf &&
                         focusedRow == 0 && moving == null,
+                    keep = vm.resumed && !vm.screensaverVisible,
                     lastInputAt = vm.lastInputAt,
                     cover = filmCover,
                 )
