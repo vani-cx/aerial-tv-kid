@@ -36,6 +36,11 @@ VT_HOME=$(adb shell settings get global aerial_vt_home_pkg | tr -d '\r')
 if [ -n "$VT_HOME" ] && [ "$VT_HOME" != null ]; then
   adb shell setprop persist.vt.use_home_pkg "$VT_HOME"
   adb shell settings delete global aerial_vt_home_pkg >/dev/null
+elif [ "$(adb shell getprop persist.vt.use_home_pkg | tr -d '\r')" = "$PKG" ] &&
+     adb shell pm path com.jamdeo.tv.vod 2>/dev/null | grep -q package:; then
+  # Set by hand before install.sh kept the old value (1.15 and earlier, issue #40): VIDAA's
+  # launcher is 聚好看 on every VIDAA build reported so far.
+  adb shell setprop persist.vt.use_home_pkg com.jamdeo.tv.vod
 fi
 adb shell cmd role remove-role-holder --user 0 android.app.role.HOME "$PKG" >/dev/null 2>&1 || true
 

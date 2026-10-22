@@ -209,11 +209,18 @@ object Wallpapers {
     }.getOrDefault(emptyList())
 
     private var lastDailyRefresh = 0L
+    private var dailyFailed = false
 
-    /** Bing publishes one photo a day; checking a few times a day is plenty. */
-    fun refreshDailyIfStale() {
-        if (!started || System.currentTimeMillis() - lastDailyRefresh < 6 * 60 * 60 * 1000L) return
-        scope.launch { refreshDaily() }
+    /**
+     * Bing publishes one photo a day; checking a few times a day is plenty. A check that failed,
+     * usually because the TV was on before its network was, is retried as soon as the network
+     * connects ([networkCameUp]), or else a few minutes later (issue #129).
+     */
+    fun refreshDailyIfStale(networkCameUp: Boolean = false) {
+        if (!started) return
+        val since = System.currentTimeMillis() - lastDailyRefresh
+        val due = since >= 6 * 60 * 60 * 1000L || (dailyFailed && (networkCameUp || since >= 10 * 60 * 1000L))
+        if (due) scope.launch { refreshDaily() }
     }
 
     suspend fun refreshDaily() = io.withLock {
@@ -242,7 +249,7 @@ object Wallpapers {
                 val keep = (0 until index.length()).map { index.getJSONObject(it).getString("date") + ".jpg" }.toSet()
                 dailyDir.listFiles { f -> f.extension == "jpg" && f.name !in keep }?.forEach { it.delete() }
                 true
-            }.onFailure { Log.w(TAG, "daily photos unavailable", it) }.getOrDefault(false)
+            }.onFailure { Log.w(TAG, "daily photos unavailable", it) }.isSuccess.also { dailyFailed = !it }
         }
         if (added) {
             synchronized(thumbs) { thumbs.remove(LATEST_DAILY) }

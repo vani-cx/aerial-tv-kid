@@ -193,7 +193,7 @@ Then:
 
 - If `adb shell settings get secure screensaver_components` is `app.orchard.tv/...`, put back the default: `adb shell settings put secure screensaver_components <value of adb shell settings get secure screensaver_default_component>`.
 - `adb shell settings get secure enabled_accessibility_services`: remove `app.orchard.tv/app.orchard.tv.guard.HomeGuardService` (and the colon next to it) and write the rest back unchanged. If nothing else is left, run `adb shell settings delete secure enabled_accessibility_services`.
-- Hisense VIDAA: if `adb shell settings get global aerial_vt_home_pkg` prints a value (not `null`), run `adb shell setprop persist.vt.use_home_pkg <that value>` and `adb shell settings delete global aerial_vt_home_pkg`.
+- Hisense VIDAA: if `adb shell settings get global aerial_vt_home_pkg` prints a value (not `null`), run `adb shell setprop persist.vt.use_home_pkg <that value>` and `adb shell settings delete global aerial_vt_home_pkg`. If it prints nothing but `adb shell getprop persist.vt.use_home_pkg` is `app.orchard.tv` (set by hand on 1.15 and earlier) and `com.jamdeo.tv.vod` is installed, run `adb shell setprop persist.vt.use_home_pkg com.jamdeo.tv.vod`.
 - To uninstall: `adb uninstall app.orchard.tv`.
 - Finally `adb shell input keyevent KEYCODE_HOME`; the TV goes back to its own home screen.
 

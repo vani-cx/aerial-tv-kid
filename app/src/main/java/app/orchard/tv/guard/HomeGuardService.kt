@@ -301,17 +301,30 @@ class HomeGuardService : AccessibilityService() {
         )
         // Coocaa's launcher (Skyworth 9H89_G91 and 9S60_G60, Android 8) declares only private
         // categories such as android.intent.category.HOME.CC; the firmware starts it by component
-        // (issues #69, #73). Every MAIN activity is listed so their filters can be read.
+        // (issues #69, #73). Coocaa 8R134_P6E (RTD2885N, Android 11) uses
+        // smartdevice.intent.category.LITE_HOME instead (issue #122). Every MAIN activity is
+        // listed so their filters can be read.
         val vendor = runCatching {
             packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN), PackageManager.GET_RESOLVED_FILTER)
-                .filter { ri -> ri.filter?.categoriesIterator()?.asSequence()?.any { it.startsWith(VENDOR_HOME_PREFIX) } == true }
+                .filter { ri -> ri.filter?.categoriesIterator()?.asSequence()?.any(::isVendorHomeCategory) == true }
         }.getOrDefault(emptyList())
-        stockHomes = (standard + vendor)
+        val homes = (standard + vendor)
             // Negative priority entries are fallbacks shown only while nothing else can be Home.
             .filter { it.activityInfo.packageName != packageName && it.priority >= 0 }
             .groupBy({ it.activityInfo.packageName }, { it.activityInfo.name })
             .mapValues { it.value.toSet() }
+        // Some launchers register Home on a trampoline that starts the screen actually shown, which
+        // declares no Home filter itself: LeTV's ExternalJumpActivity opens ui.activity.Launcher
+        // (LeTV Zero65 Pro, eUI 8.2, Android 6; reported with a local build in issue #121).
+        stockHomes = homes.mapValues { (pkg, classes) ->
+            classes + HOME_SCREENS_BEHIND_TRAMPOLINES[pkg].orEmpty().filter { isActivity(pkg, it) }
+        }
     }
+
+    /** Android's own SECONDARY_HOME is for other displays, and comes with CATEGORY_HOME anyway. */
+    private fun isVendorHomeCategory(category: String): Boolean =
+        category.startsWith(VENDOR_HOME_PREFIX) ||
+            (category.endsWith(VENDOR_HOME_SUFFIX) && category != "android.intent.category.SECONDARY_HOME")
 
     /**
      * Brings Aerial's one task to the front. No CATEGORY_HOME: on firmwares where Aerial is not the
@@ -340,6 +353,12 @@ class HomeGuardService : AccessibilityService() {
         /** VIDAA's assistant and its launcher (聚好看), on the two VIDAA builds reported (issues #7, #40). */
         private val VIDAA_PACKAGES = listOf("com.hisense.vidaaassistant", "com.jamdeo.tv.vod")
         private const val VENDOR_HOME_PREFIX = "android.intent.category.HOME."
+        private const val VENDOR_HOME_SUFFIX = "_HOME"
+
+        /** Launcher package to the screens its Home trampoline opens; see refreshStockHomes. */
+        private val HOME_SCREENS_BEHIND_TRAMPOLINES = mapOf(
+            "com.stv.deskplatform" to listOf("com.stv.deskplatform.ui.activity.Launcher"),
+        )
 
         @Volatile
         private var instance: HomeGuardService? = null

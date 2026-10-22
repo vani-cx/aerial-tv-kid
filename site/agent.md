@@ -194,7 +194,7 @@ adb shell cmd role remove-role-holder --user 0 android.app.role.HOME app.orchard
 
 - `adb shell settings get secure screensaver_components` 是 `app.orchard.tv/...` 时，用 `adb shell settings get secure screensaver_default_component` 的结果写回去：`adb shell settings put secure screensaver_components <默认值>`。
 - `adb shell settings get secure enabled_accessibility_services`：从结果里去掉 `app.orchard.tv/app.orchard.tv.guard.HomeGuardService`（和它前后多余的冒号），其他服务原样保留写回；只剩它自己时运行 `adb shell settings delete secure enabled_accessibility_services`。
-- 海信 VIDAA：`adb shell settings get global aerial_vt_home_pkg` 有值（不是 `null`）时，运行 `adb shell setprop persist.vt.use_home_pkg <这个值>` 和 `adb shell settings delete global aerial_vt_home_pkg`。
+- 海信 VIDAA：`adb shell settings get global aerial_vt_home_pkg` 有值（不是 `null`）时，运行 `adb shell setprop persist.vt.use_home_pkg <这个值>` 和 `adb shell settings delete global aerial_vt_home_pkg`。没有值、但 `adb shell getprop persist.vt.use_home_pkg` 是 `app.orchard.tv`（1.15 及以前手动改过）并且装有 `com.jamdeo.tv.vod` 时，运行 `adb shell setprop persist.vt.use_home_pkg com.jamdeo.tv.vod`。
 - 要卸载时 `adb uninstall app.orchard.tv`。
 - 最后 `adb shell input keyevent KEYCODE_HOME`，电视回到原来的桌面。
 

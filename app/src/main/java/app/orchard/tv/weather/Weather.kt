@@ -37,6 +37,7 @@ object Weather {
     private const val TAG = "AerialWeather"
     private const val PREFS = "weather"
     private const val REFRESH_MS = 60 * 60 * 1000L
+    private const val RETRY_MS = 10 * 60 * 1000L
     private const val RELOCATE_MS = 24 * 60 * 60 * 1000L
     /** A reading older than this is not shown at all. */
     private const val STALE_MS = 3 * 60 * 60 * 1000L
@@ -67,9 +68,13 @@ object Weather {
         }
     }
 
-    fun refreshIfStale() {
-        if (!started || System.currentTimeMillis() - lastAttempt < REFRESH_MS) return
-        refresh()
+    private var failed = false
+
+    /** Like the daily photos: a failed reading is retried when the network connects (issue #129). */
+    fun refreshIfStale(networkCameUp: Boolean = false) {
+        if (!started) return
+        val since = System.currentTimeMillis() - lastAttempt
+        if (since >= REFRESH_MS || (failed && (networkCameUp || since >= RETRY_MS))) refresh()
     }
 
     private fun refresh() {
@@ -80,6 +85,7 @@ object Weather {
                 runCatching { fetch() }.onFailure { Log.w(TAG, "weather unavailable", it) }.getOrNull()
             }
             prefs.getString("place", null)?.let { place = it }
+            failed = reading == null
             if (reading != null) {
                 now = reading
                 prefs.edit {

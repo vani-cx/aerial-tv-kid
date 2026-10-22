@@ -69,7 +69,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
-        override fun onAvailable(network: Network) = runOnUiThread { vm.refreshNetwork() }
+        override fun onAvailable(network: Network) = runOnUiThread {
+            vm.refreshNetwork()
+            Wallpapers.refreshDailyIfStale(networkCameUp = true)
+            Weather.refreshIfStale(networkCameUp = true)
+        }
         override fun onLost(network: Network) = runOnUiThread { vm.refreshNetwork() }
         override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) = runOnUiThread { vm.refreshNetwork() }
     }
