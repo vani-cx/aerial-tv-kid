@@ -317,11 +317,13 @@ class HomeGuardService : AccessibilityService() {
     private fun isApp(pkg: String): Boolean =
         packageManager.getLeanbackLaunchIntentForPackage(pkg) != null || packageManager.getLaunchIntentForPackage(pkg) != null
 
-    private fun isDefaultHome(): Boolean =
+    private fun isDefaultHome(): Boolean = resolvedHome() == packageName
+
+    private fun resolvedHome(): String? =
         packageManager.resolveActivity(
             Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME),
             PackageManager.MATCH_DEFAULT_ONLY,
-        )?.activityInfo?.packageName == packageName
+        )?.activityInfo?.packageName
 
     private fun refreshStockHomes() {
         val standard = packageManager.queryIntentActivities(
@@ -412,14 +414,21 @@ class HomeGuardService : AccessibilityService() {
         fun isStockHome(packageName: String): Boolean = instance?.stockHomes?.containsKey(packageName) == true
 
         /**
-         * Opens the stock launcher on purpose (its tile in Aerial's grid). Xiaomi's launcher
-         * activities require a signature permission (com.mitv.tvhome.permission.HOME_STATE), so an
-         * app cannot start them; the system Home action can. Returns false if the guard is not running.
+         * Opens the stock launcher [pkg] on purpose (its tile in Aerial's grid). While Home still
+         * resolves to it, through the system Home action, as the remote's Home key would: Xiaomi's
+         * launcher activities require a signature permission (com.mitv.tvhome.permission.HOME_STATE),
+         * and since 1.19 tried a direct start first, users of other Xiaomi models report the tile
+         * no longer opens PatchWall or its VIP content (not reproduced on MiTV-MFTR0, where the
+         * direct start throws and Home was used all along). Otherwise [startDirectly]
+         * first: Hisense VIDAA hands the Home action to Aerial once persist.vt.use_home_pkg points
+         * at it (issue #87), as does any firmware where Aerial is the default Home.
+         * Returns false if neither opened it.
          */
-        fun openStockLauncher(): Boolean {
-            val s = instance ?: return false
+        fun openStockLauncher(pkg: String, startDirectly: () -> Boolean): Boolean {
+            val s = instance ?: return startDirectly()
             allowStockLauncher()
-            return s.performGlobalAction(GLOBAL_ACTION_HOME)
+            if (s.resolvedHome() == pkg && s.performGlobalAction(GLOBAL_ACTION_HOME)) return true
+            return startDirectly() || s.performGlobalAction(GLOBAL_ACTION_HOME)
         }
 
         /** Lets the stock launcher stay in front until Aerial is back: the viewer opened it on purpose. */
