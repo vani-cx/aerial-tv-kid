@@ -48,7 +48,7 @@ enum class ScreensaverMode(val key: String) {
  * Everything behind the home screen: which wallpaper is chosen, where pictures come from, and what
  * the screensaver shows. Sources:
  *
- * - Built-in: Aerial's own generated light fields ([Gradients]).
+ * - Built-in: Aerial's own Mac-style pictures, drawn on the TV ([Gradients]).
  * - Daily: Bing's photo of the day (cn.bing.com, reachable from China without a proxy). The last
  *   eight are kept; "daily:latest" always follows the newest.
  * - Photos: pictures uploaded from a phone through the setup page ([PhoneServer]). "photos:rotate"
@@ -100,7 +100,9 @@ object Wallpapers {
             screenW = maxOf(it.widthPixels, it.heightPixels)
             screenH = minOf(it.widthPixels, it.heightPixels)
         }
-        selectedId = prefs.getString("selected", LATEST_DAILY) ?: LATEST_DAILY
+        selectedId = (prefs.getString("selected", LATEST_DAILY) ?: LATEST_DAILY)
+            // A built-in wallpaper from before the Mac-style set: its nearest one now.
+            .let { if (it.startsWith("grad:")) "grad:" + Gradients.currentKey(it.removePrefix("grad:")) else it }
         screensaver = ScreensaverMode.of(prefs.getString("screensaver", null))
         rebuildList()
         rebuildBackdrop()
@@ -157,7 +159,7 @@ object Wallpapers {
     fun thumbnail(id: String): Bitmap? {
         synchronized(thumbs) { thumbs[id] }?.let { return it }
         val wp = (if (id == LATEST_DAILY || id == ROTATE_PHOTOS) resolve(id) else items.firstOrNull { it.id == id }) ?: return null
-        val b = if (wp.kind == WallpaperKind.Auto) Gradients.render(Gradients.presets.last(), 384, 216) else picture(wp, 384, 216)
+        val b = if (wp.kind == WallpaperKind.Auto) Gradients.render(Gradients.autoThumb, 384, 216) else picture(wp, 384, 216)
         if (b != null) synchronized(thumbs) { thumbs[id] = b }
         return b
     }

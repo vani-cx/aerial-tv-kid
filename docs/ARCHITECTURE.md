@@ -30,7 +30,7 @@ app/src/main/java/app/orchard/tv/
 │   └── wallpaper/WallpaperSheet.kt  个性化面板（壁纸、屏保和开始时间、焦点样式、家长密码、天气）+ 手机扫码卡片
 ├── wallpaper/
 │   ├── Wallpapers.kt        壁纸单例：来源（每日/内置/照片/照片每天换一张/跟随App）、选择、首页背景烘焙、缩略图、上传
-│   ├── Gradients.kt         8 组内置渐变的参数与渲染
+│   ├── Gradients.kt         14 张 Mac 风格内置壁纸（山丘、沙丘、海、波浪、光晕），在电视上按实际分辨率画
 │   ├── Images.kt            解码裁剪、首页压暗烘焙、抖动、box blur
 │   ├── Aerials.kt           读取 assets/aerials.json（Apple 航拍目录）
 │   └── PhoneServer.kt       NanoHTTPD 手机配置页 + 二维码生成
@@ -127,7 +127,7 @@ Logo 的大小统一：先在 256×256 的采样里找出 Logo 的范围，再�
 - `Wallpapers` 是 Compose 状态单例，只在主线程写。来源：
   - `daily:<date>`：必应 HPImageArchive，`cn.bing.com`，最近 8 张，存在 `files/daily/`；
   - `daily:latest`：一直跟随最新一张；
-  - `grad:<key>`：内置渐变；
+  - `grad:<key>`：内置壁纸。照 Mac 壁纸的风格自己画的原创图（苹果的官方壁纸有版权，不能放进 MIT 项目）：山丘四张、沙丘两张、海两张、波浪三张、光晕三张，用 Canvas 的路径和渐变在电视上按屏幕实际分辨率生成，光晕先画小图再模糊放大，最后加抖动防色带。旧的 8 张光场改名后由 `Gradients.renamed` 映射到颜色最接近的新图，选过旧图的用户不会掉回默认；
   - `photo:<id>`：手机上传的照片，存在 `files/photos/`，id 是毫秒时间戳的 36 进制；
   - `auto`：跟随 App。
 - 首页背景按屏幕实际像素解码，压暗层已经烘焙进去（`Images.shadeForHome`）；网格用的模糊版见「首页」一节。
