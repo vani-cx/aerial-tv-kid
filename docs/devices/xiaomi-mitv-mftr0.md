@@ -77,3 +77,10 @@
 - 1.11 起按 HOME 会先让原桌面到前台。之前 MainActivity 设了 `excludeFromRecents="true"`：Aerial 在这里不是系统认可的 HOME，它的任务一离开前台就会被系统清理（`wm_destroy_activity ... finish-imm:recent-task-trimmed`）。守护服务拉回来时，只能新建一个 MainActivity，焦点于是总回到第一个 App。
 - 守护服务原来用 `CATEGORY_HOME` 拉回 Aerial，系统因此另开一个 `type=home` 的任务，同样会新建界面。现在统一用 `MainActivity.bringBackIntent`（只有 ACTION_MAIN，复用同一个任务），并去掉了 `excludeFromRecents`。
 - 查法：`adb logcat -b events | grep orchard` 看有没有 `wm_create_activity` 和 `recent-task-trimmed`；`dumpsys activity recents` 里应该只有一个 `type=standard` 的 Aerial 任务。
+
+## 应用内升级（2026-10-22，未发版代码）
+
+- 系统安装器 `com.android.packageinstaller` 先弹小米自己的确认框「该版本未经过安全审核」（会把包名、md5、设备 id 发给小米的服务器查），默认焦点在「取消更新」，按右再确认才是「继续更新」。装完是「安装成功 / 完成」。
+- 「安装未知应用」是 Android TV 设置里的总列表（`com.android.tv.settings/.device.apps.specialaccess.ExternalSourcesActivity`），不会直接定位到 Aerial；`install.sh` 用 appops 预先放行。
+- 按「完成」后露出的是 PatchWall 的 `com.mitv.tvhome/.DetailsActivity`，不是 HOME Activity，所以加了「安装器关闭后拉回 Aerial」那条规则（见 ARCHITECTURE.md「升级」）。
+

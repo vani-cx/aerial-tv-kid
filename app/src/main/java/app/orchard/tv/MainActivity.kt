@@ -48,6 +48,7 @@ import app.orchard.tv.ui.theme.canvasDensity
 import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.wallpaper.Wallpapers
 import app.orchard.tv.system.DiagLog
+import app.orchard.tv.system.Diagnostics
 import app.orchard.tv.system.MissingClipboard
 import app.orchard.tv.system.Sounds
 import app.orchard.tv.system.SystemProbe
@@ -264,7 +265,8 @@ class MainActivity : ComponentActivity() {
 
     override fun dump(prefix: String, fd: java.io.FileDescriptor?, writer: java.io.PrintWriter, args: Array<out String>?) {
         super.dump(prefix, fd, writer, args)
-        DiagLog.dump(writer)
+        // `... MainActivity report`: what tools/report.sh pastes into an issue.
+        if (args?.contains("report") == true) writer.print(Diagnostics.report(this)) else DiagLog.dump(writer)
     }
 
     // ---- Screensaver: Aerial's own, before the firmware's ad-carrying one can start ----
@@ -399,6 +401,7 @@ class MainActivity : ComponentActivity() {
         restartIdleTimer()
         GuardSetup.setHomeInFront(this, true)
         HomeGuardService.onAerialResumed()
+        Updates.onHomeResumed()
         vm.refreshSystem()
         // Back in front by any route (Home was handled in onNewIntent, which runs first; Back from
         // the app lands here directly), so the next Home press is a Home-on-Home again.

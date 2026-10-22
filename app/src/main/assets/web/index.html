@@ -92,6 +92,13 @@
   }
   .city button:active { transform: scale(.97); }
   .city button[disabled] { opacity: .6; }
+  .diag {
+    display: block; width: 100%; height: 220px; margin-top: 10px; font: 12px/1.4 ui-monospace, Menlo, monospace;
+    color: var(--label); background: var(--card); border: 0; border-radius: 12px; padding: 10px; box-shadow: var(--shadow);
+  }
+  .row { display: flex; gap: 8px; margin-top: 10px; }
+  .row .upload { flex: 1; padding: 13px; }
+  .row .upload.plain { background: var(--fill); color: var(--tint); text-decoration: none; }
   .link { appearance: none; border: 0; background: none; color: var(--tint); font: inherit; font-size: 13px; padding: 0; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -138,6 +145,15 @@
 <p class="hint" style="margin-top:0;margin-bottom:12px">点一个 App，从手机选一张图片换掉它在电视上的图标。图片会裁成 16:9；横图效果最好。</p>
 <div class="grid" id="apps"></div>
 <input id="iconFile" type="file" accept="image/*" hidden>
+
+<h2>反馈问题</h2>
+<p class="hint" style="margin-top:0;margin-bottom:12px">这台电视上 Aerial 有问题，或者想让 Aerial 适配它：复制诊断信息，贴进 GitHub 的「机型适配」反馈里。里面是机型、系统版本、桌面接管状态、信号源和 Aerial 的日志，不含账号、Wi-Fi 名称、IP 地址和照片。</p>
+<button class="upload" id="diagBtn">显示诊断信息</button>
+<textarea class="diag" id="diag" readonly hidden></textarea>
+<div class="row" id="diagActions" hidden>
+  <button class="upload" id="diagCopy">复制</button>
+  <a class="upload plain" href="https://github.com/pengchujin/aerial-tv/issues/new?template=device.yml" target="_blank" rel="noopener">去 GitHub 反馈</a>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -317,6 +333,24 @@ $('#iconFile').onchange = async e => {
     state = await r.json(); render();
     toast(state.saved ? '电视上已更换' : '这张图片用不了');
   } catch (err) { toast('发送失败，请重试'); }
+};
+
+$('#diagBtn').onclick = async () => {
+  const b = $('#diagBtn'); b.disabled = true; b.textContent = '正在收集…';
+  try {
+    const r = await fetch(base + 'api/diagnostics');
+    if (!r.ok) throw new Error(r.status);
+    $('#diag').value = await r.text();
+    $('#diag').hidden = false; $('#diagActions').hidden = false; b.hidden = true;
+  } catch (e) { toast('没有取到，请重试'); b.textContent = '显示诊断信息'; }
+  b.disabled = false;
+};
+// The page is plain HTTP on the LAN, where browsers offer no navigator.clipboard.
+$('#diagCopy').onclick = () => {
+  const t = $('#diag'); t.focus(); t.select(); t.setSelectionRange(0, t.value.length);
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) {}
+  toast(ok ? '已复制' : '请长按文本框全选后复制');
 };
 
 async function refresh() { try { state = await api('api/state'); render(); } catch (e) {} }

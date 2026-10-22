@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 安装说明 / Install guide
+    url: https://aerial.qust.me/agent.md
+    about: 安装、升级、还原的步骤 / Installing, updating and undoing

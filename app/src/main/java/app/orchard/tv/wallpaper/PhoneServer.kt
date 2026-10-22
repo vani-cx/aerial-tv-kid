@@ -11,6 +11,7 @@ import app.orchard.tv.apps.AppCatalog
 import app.orchard.tv.apps.CustomIcons
 import app.orchard.tv.apps.TileArtFactory
 import app.orchard.tv.settings.AerialSettings
+import app.orchard.tv.system.Diagnostics
 import app.orchard.tv.system.currentNetwork
 import app.orchard.tv.settings.FocusStyle
 import app.orchard.tv.weather.Weather
@@ -50,6 +51,7 @@ class PhoneServer private constructor(private val context: Context, private val 
             when {
                 path == "/" -> newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", page())
                 path == "/api/state" -> json(state())
+                path == "/api/diagnostics" -> text(Response.Status.OK, Diagnostics.report(context))
                 path.startsWith("/thumb/") -> thumb(path.removePrefix("/thumb/"))
                 session.method == Method.POST && path == "/api/wallpaper" -> {
                     val id = form(session)["id"].orEmpty()

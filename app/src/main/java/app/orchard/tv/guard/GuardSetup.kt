@@ -39,6 +39,7 @@ object GuardSetup {
     private const val KEY_KEEP_ADB = "keep_adb"
     private const val KEY_OWN_SCREENSAVER = "own_screensaver"
     private const val KEY_HOME_IN_FRONT = "home_in_front"
+    private const val KEY_INSTALLER_OPENED = "installer_opened_at"
 
     /**
      * Kept on disk while Aerial's home screen is in front, so a new process can tell how the last
@@ -50,6 +51,26 @@ object GuardSetup {
 
     fun wasHomeInFront(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_HOME_IN_FRONT, false)
+
+    /**
+     * Control Center opened the system installer on a new Aerial (update/Updates.kt). When the
+     * installer is done, Aerial has been replaced and its task is gone, so whatever was under it
+     * shows; on Xiaomi MiTV-MFTR0 that was a PatchWall details page, not its home activity. The
+     * guard of the new Aerial brings Home back then ([installerJustClosed]). Written at once: the
+     * install kills this process.
+     */
+    fun noteInstallerOpened(context: Context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putLong(KEY_INSTALLER_OPENED, System.currentTimeMillis()).commit()
+    }
+
+    /** Whether Control Center opened the installer in the last 15 minutes; asks only once. */
+    fun installerJustClosed(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val at = prefs.getLong(KEY_INSTALLER_OPENED, 0L)
+        if (at == 0L) return false
+        prefs.edit().remove(KEY_INSTALLER_OPENED).apply()
+        return System.currentTimeMillis() - at in 0..15 * 60_000L
+    }
 
     /**
      * Some firmwares (Xiaomi) switch ADB debugging off on their own, usually around standby.

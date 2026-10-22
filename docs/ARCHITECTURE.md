@@ -38,25 +38,29 @@ app/src/main/java/app/orchard/tv/
 ├── settings/
 │   └── AerialSettings.kt    Aerial 自己的偏好（SharedPreferences "settings"）：焦点样式 FocusStyle（默认高对比度）、固定到主屏幕的信号源、开机信号源、屏保开始时间、家长密码（SHA-256，解锁 10 分钟或按 HOME 重新上锁）
 ├── update/
-│   └── Updates.kt           每天最多一次读官网 download/version.txt，有新版时控制中心提示；不在后台下载安装
+│   └── Updates.kt           每 3 小时读一次官网 download/version.txt，有新版时控制中心提示；点「下载并安装」才下载 APK 并交给系统安装器（见「升级」）
 ├── weather/
 │   └── Weather.kt           时钟旁的天气：Open-Meteo 实时天气，城市来自手机页或 IP 定位
 ├── system/
 │   ├── SystemState.kt       SystemProbe：网络、音量、桌面状态、设置入口、信号源（TvInputManager + 小米路由 + 机型修正）
-│   └── Brightness.kt        亮度：小米 picture_backlight / 标准 screen_brightness / TCL 走面板
+│   ├── Brightness.kt        亮度：小米 picture_backlight / 标准 screen_brightness / TCL 走面板
+│   └── Diagnostics.kt       给 GitHub issue 用的诊断报告（手机页「反馈问题」、`dumpsys activity …MainActivity report`、tools/report.sh）
 ├── guard/
 │   ├── HomeGuardService.kt  无障碍「桌面守护」：原桌面出现就切回、从磁贴进原桌面时临时拦 HOME、亮屏检查、ADB 保持
 │   ├── GuardSetup.kt        用 WRITE_SECURE_SETTINGS 重新开启守护 / 保持 ADB / 「已启用未绑定」时强制重绑
 │   ├── RevivalListener.kt   通知监听服务：被强杀后由系统重绑，借此复活并重开守护；10 分钟内复活 3 次以上时，看不到前台就不再抢 HOME（乐视 #63）
 │   ├── RevivalSync.kt       同步适配器（挂在 settings 上，带一个自己的账号）：系统不许通知监听的低内存 Android 9（小米 MFTP0，#72）上，强停后约 30–60 秒由同步框架拉起 Aerial 并重开守护；守护在运行时什么都不做
 │   ├── BootReceiver.kt      真正重启后的兜底
-│   └── ConfigReceiver.kt    ADB 专用配置入口（keep_adb、own_screensaver、clear_pin、export_tiles），要求发送方持有 WRITE_SECURE_SETTINGS
+│   └── ConfigReceiver.kt    ADB 专用配置入口（keep_adb、own_screensaver、clear_pin、export_tiles、check_update、update_test），要求发送方持有 WRITE_SECURE_SETTINGS
 └── dream/AerialDream.kt    系统级屏保（DreamService + Compose）
 
 app/src/main/assets/aerials.json   Apple 航拍目录（114 条：地址 + 中英文地名 + 时间点说明）
 app/src/main/assets/web/index.html 手机配置页（单文件，iOS 风格，深浅色）
 app/src/standard/AndroidManifest.xml  只给 standard 版本加 HOME intent-filter
 tools/install.sh / restore.sh       部署与还原
+tools/report.sh                     收集机型适配信息（只读），输出贴进 issue 的 Markdown
+site/update/                        电视升级页二维码打开的页面：这台电视的安装命令和 Agent 提示词
+.github/ISSUE_TEMPLATE/device.yml   机型适配 issue 表单
 ```
 
 ## 两个构建版本（flavor）
@@ -144,6 +148,22 @@ NanoHTTPD 监听 8790 端口，路径前缀是 8 位随机令牌（每次打开�
 - **自定义图标**：图片裁成 16:9、1280×720 存成 PNG，有这张图的 App 直接当横幅画（`AppCatalog.entry`，排在系统 App 自绘磁贴前面）。磁贴缓存的键里带着图片的修改时间；`CustomIcons.version` 变化时 `HomeViewModel` 重新加载 App。电视上的长按菜单里有「恢复默认图标」。包名必须是已安装的 App，同时也保证它是一个合法的文件名。
 - **文件夹**（像 tvOS）：长按菜单「移到文件夹」→ 选已有的文件夹或「新建文件夹」。新文件夹占这个 App 原来的位置，名字按 App 自动起（系统 App 叫「系统应用」，其他叫「文件夹」，重名加数字），可在文件夹的长按菜单里从预设名字（`folder_names`）中改；电视上没有好用的输入法，所以不做自由输入。文件夹在 `LayoutStore` 的排序里占一个 `folder:<id>` 键，里面的 App 不再出现在排序里；存成 JSON（`folders`），只记包名。文件夹磁贴是 `folderEntry`，画面是 `TileArtFactory.forFolder`：半透明底板上三乘三排最多九个 App 的缩略图，只在里面的 App 变了时重画。打开文件夹是全屏的 `FolderView`：主屏模糊变暗，上面是名字和同样大小的磁贴；在里面长按，菜单第一项是「移出文件夹」（放到文件夹后面）而不是「移动」，关掉菜单回到文件夹。最后一个 App 移出后文件夹自动消失；「解散文件夹」把里面的 App 按顺序放回文件夹的位置。浮层（菜单、文件夹）关闭时，Compose 会先把焦点交给浮层下面的磁贴，所以打开时记下要回到哪个磁贴（`focusAfterOverlay`、`FolderView` 的 `menuKey`）。小米 MFTR0 上验证过：新建、放入、打开、文件夹里的菜单、重命名、移出、解散，测完排列和原来一样。
 - **天气**（`Weather`）：Open-Meteo 的实时天气接口和地名查询接口都不需要 Key，国内能访问。城市优先用手机页里设置的；没设置时用 ipinfo.io 按 IP 定位，每天最多一次。整个家庭网络走代理时 IP 定位会定到别的国家（家里的网络就会定到新加坡），所以手机页会显示定位结果，让用户改。回到主页时刷新，最多每小时一次；最近一次结果缓存 3 小时，开机后先显示缓存。老系统不信任 Let's Encrypt 的根证书，HTTPS 失败时改用 HTTP（`network_security_config.xml` 只对这几个域名放行明文）。
+
+## 升级（update/Updates.kt）
+
+控制中心「有新版本」→ 升级页：
+
+- **下载并安装**：先从官网 `download/aerial-<flavor>.apk` 下载，失败再从 GitHub `releases/latest/download`（不用第三方 GitHub 代理）。下载后检查包名、签名（和这台电视上的 Aerial 比）和 versionCode，不对就不打开安装器，并在页上说明原因（`Updates.Failure`）。改过包名的版本（OPPO）不显示按钮。
+- **交给系统安装器**：用 `ACTION_VIEW` + FileProvider（`res/xml/update_files.xml`，Android 7 以下用 `file://`）打开系统安装器，不用 PackageInstaller session：TCL 的安装校验只放行由 `com.android.packageinstaller` 发起的安装，`ACTION_VIEW` 时发起者就是系统安装器（和当贝一样）。要 `REQUEST_INSTALL_PACKAGES`：小米有「安装未知应用」设置页，没开时跳过去；TCL 没有这个页面，靠 `install.sh` 用 `appops set … REQUEST_INSTALL_PACKAGES allow` 放行。
+- **装完回到 Aerial**：安装会杀掉 Aerial 的任务，露出底下的东西（小米上是 PatchWall 的详情页，不是原桌面的 HOME Activity，守护原来的规则不管）。所以打开安装器前记下时间（`GuardSetup.noteInstallerOpened`，用 commit 立刻写盘），新进程的守护在 15 分钟内看到原桌面的任意页面就拉回 Aerial；在安装器里取消、回到 Aerial 时清掉这个记录。
+- **二维码**：装不上的电视（以及 1.31 及以前的版本）还是要再运行一次安装命令。升级页不再显示长命令，而是一个二维码，打开 `https://aerial.qust.me/update/#v=…&f=…&tv=<局域网IP>`（参数放在 `#` 后面，浏览器不会发给服务器），页面上先是 Agent 提示词，再是电视上的按钮说明和可复制的安装命令。
+- 测试：`ConfigReceiver --ez check_update true` 立刻检查新版本；`--ez update_test true` 让「下载并安装」改用 `Android/data/app.orchard.tv/files/update-test.apk`（到 Aerial 重启为止），发版前就能测整条流程。做法：装一个只把 `versionName` 改低的包，推一个带新代码的包当 update-test.apk。
+
+## 诊断报告（system/Diagnostics.kt）
+
+给维护者没有的电视用：机型、固件指纹、屏幕和内存、HOME 解析和所有候选、守护看着的原桌面、守护和通知监听的状态、各项授权、屏保和按键音设置、亮度、`TvInputManager` 的输入和 Aerial 显示的信号源、Aerial 认识的厂商包（只列这些，不列全部 App）、DiagLog 最近 150 行、本进程 Aerial 各 tag 的 logcat（不含 AerialWeather，里面有城市）。日志里的 IP、MAC、手机页令牌打码。不收集账号、序列号、Wi-Fi 名称、天气城市。
+
+三个出口：手机页 `GET api/diagnostics`（页面最下面「反馈问题」，可复制，局域网 HTTP 没有 `navigator.clipboard`，用 `execCommand`）；`adb shell dumpsys activity app.orchard.tv/.MainActivity report`；`tools/report.sh` 在它前面再加只有 shell 能读的：getprop、包信息和 appops、HOME 候选和 role、相关 settings、无障碍绑定、tv_input 硬件、系统服务里关于 Aerial 的 logcat（只按 tag 取：小米应用商店会在日志里打印已装 App 列表）。
 
 ## 开机信号源
 

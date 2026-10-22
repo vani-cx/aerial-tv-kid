@@ -104,7 +104,7 @@ adb shell am start -n app.orchard.tv/.MainActivity
 
 Windows 用 Agent 装，或照[安装说明](site/agent.md)里的 Windows 步骤。
 
-**升级**：再运行一次安装命令。
+**升级**：1.32 起，有新版本时控制中心会出现「有新版本」，点进去选「下载并安装」，在电视自己的安装界面确认（小米、TCL 上验证过），装完回到 Aerial，设置都保留。电视不让 App 安装应用时，升级就是再运行一次安装命令：升级页上有二维码，手机扫码能直接复制这台电视的命令，或者交给 Agent。1.31 及以前没有这个按钮，这一次还是要再运行一次安装命令。
 
 ### 还原
 
@@ -143,7 +143,7 @@ curl -fsSL https://aerial.qust.me/install.sh | TV=192.168.1.20 bash -s restore
 | 康佳 2861、PPTV K55U27、极米 m7642、腾讯极光盒子 7S | Android 5–9 | 用户验证，各有小问题，见 [Issues](https://github.com/pengchujin/aerial-tv/issues) |
 | 雷鸟 55S595C Ultra | Android 11 | 能装，但接管不了 HOME（[#52](https://github.com/pengchujin/aerial-tv/issues/52)） |
 
-能装但开机进不了 Aerial 的：Vidda、海信、雷鸟鹤 6 2025 Ultra。你的电视能用的话，欢迎[提 Issue](https://github.com/pengchujin/aerial-tv/issues) 告诉我们。
+能装但开机进不了 Aerial 的：Vidda、海信、雷鸟鹤 6 2025 Ultra。你的电视能用，或者有问题，欢迎用[机型适配模板](https://github.com/pengchujin/aerial-tv/issues/new?template=device.yml)告诉我们，附上诊断信息：电脑上运行 `curl -fsSL https://aerial.qust.me/tools/report.sh | TV=<电视IP> bash`（只读，不改电视），或者在手机配置页最下面「反馈问题」里复制。诊断信息不含账号、IP、Wi-Fi 名称和 App 列表。
 
 ## 开发
 

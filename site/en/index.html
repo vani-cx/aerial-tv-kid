@@ -275,6 +275,10 @@
         <p>Some agents report success without running anything. Ask for the raw output of the "Check" commands in the <a href="agent.md">install guide</a>: the last one must include <code>app.orchard.tv</code>.</p>
       </details>
       <details>
+        <summary>How do I update?</summary>
+        <p>From 1.32, the TV's Control Center shows New Version when there is one: choose Download and Install, then confirm in the TV's own installer. On TVs that do not let apps install apps, updating means running the install command again (or asking the agent again); the update page has a QR code that opens this TV's command on a phone. Settings, layout and wallpaper are kept.</p>
+      </details>
+      <details>
         <summary>What permissions does it use?</summary>
         <p><code>WRITE_SECURE_SETTINGS</code> turns Home Guard back on if it's switched off. The notification listener lets Android restart Aerial; it reads no notifications. Accessibility only sees which window is in front, not what's on screen. Location only shows your Wi-Fi name.</p>
       </details>
@@ -284,7 +288,7 @@
       </details>
       <details>
         <summary>My TV isn't listed. Will it work?</summary>
-        <p>Probably. Stock Android TV and Google TV are the easiest. LG webOS, Samsung Tizen, Huawei Vision (HarmonyOS) and Android 4.4 or older aren't supported. If something goes wrong, <a href="https://github.com/pengchujin/aerial-tv/issues">open an issue on GitHub</a> with your TV model and the install output.</p>
+        <p>Probably. Stock Android TV and Google TV are the easiest. LG webOS, Samsung Tizen, Huawei Vision (HarmonyOS) and Android 4.4 or older aren't supported. If something goes wrong, tell us with the <a href="https://github.com/pengchujin/aerial-tv/issues/new?template=device.yml">device support form</a> and its diagnostics: run <code>curl -fsSL https://aerial.qust.me/tools/report.sh | TV=&lt;tv-ip&gt; bash</code> on a computer, or copy them from 反馈问题 (Report a problem) at the bottom of the phone page.</p>
       </details>
     </div>
   </div>

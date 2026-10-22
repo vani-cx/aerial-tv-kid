@@ -87,6 +87,7 @@ Run these in PowerShell, with the adb from step 1. Everything inside `adb shell 
    adb shell pm grant app.orchard.tv android.permission.WRITE_SECURE_SETTINGS
    adb shell appops set app.orchard.tv SYSTEM_ALERT_WINDOW allow
    adb shell appops set app.orchard.tv WRITE_SETTINGS allow
+   adb shell appops set app.orchard.tv REQUEST_INSTALL_PACKAGES allow
    adb shell cmd notification allow_listener app.orchard.tv/app.orchard.tv.guard.RevivalListener
    adb shell appops set app.orchard.tv APP_AUTO_START allow
    adb shell appops set app.orchard.tv APP_ASSOC_START allow
@@ -184,6 +185,7 @@ adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigR
 adb shell cmd notification disallow_listener app.orchard.tv/app.orchard.tv.guard.RevivalListener
 adb shell pm revoke app.orchard.tv android.permission.WRITE_SECURE_SETTINGS
 adb shell appops set app.orchard.tv SYSTEM_ALERT_WINDOW default
+adb shell appops set app.orchard.tv REQUEST_INSTALL_PACKAGES default
 adb shell appops set app.orchard.tv APP_AUTO_START default
 adb shell appops set app.orchard.tv APP_ASSOC_START default
 adb shell am force-stop app.orchard.tv
@@ -218,5 +220,6 @@ Then:
 - **Do my apps and subscriptions stay?** Yes. Aerial only replaces the home screen; apps, accounts and memberships are unchanged, and open from Aerial.
 - **Can I still use the old home screen?** Yes. It stays in Aerial's app list (including Xiaomi's PatchWall) and opens as before, with its recommendations.
 - **Can it remove the boot ad?** No. The firmware plays it before Aerial starts.
-- **How do I update later?** Run the same install command again (on Windows, repeat items 1, 2, 3 and 6 of step 3).
+- **How do I update later?** From 1.32, when Control Center shows New Version, choose Download and Install and confirm in the system installer (checked on Xiaomi). On TVs that do not let apps install apps, run the same install command again (on Windows, repeat items 1, 2, 3 and 6 of step 3); every setting is kept.
+- **Something is wrong on the TV and the user wants to report it**: on macOS / Linux run `curl -fsSL https://aerial.qust.me/tools/report.sh | TV=<IP> bash`. It only reads, and writes `aerial-report-<model>.md`; read it, then paste it into https://github.com/pengchujin/aerial-tv/issues/new?template=device.yml . Without a computer: scan the QR code in Personalize and use 反馈问题 (Report a problem) at the bottom of the phone page to copy the diagnostics.
 - **Where do I report problems?** https://github.com/pengchujin/aerial-tv/issues, with the TV model (`adb shell getprop ro.product.model`) and the install output.

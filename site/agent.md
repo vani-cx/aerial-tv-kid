@@ -88,6 +88,7 @@ curl -fsSL https://aerial.qust.me/install.sh | KEEP_ADB=1 TV=<IP> bash
    adb shell pm grant app.orchard.tv android.permission.WRITE_SECURE_SETTINGS
    adb shell appops set app.orchard.tv SYSTEM_ALERT_WINDOW allow
    adb shell appops set app.orchard.tv WRITE_SETTINGS allow
+   adb shell appops set app.orchard.tv REQUEST_INSTALL_PACKAGES allow
    adb shell cmd notification allow_listener app.orchard.tv/app.orchard.tv.guard.RevivalListener
    adb shell appops set app.orchard.tv APP_AUTO_START allow
    adb shell appops set app.orchard.tv APP_ASSOC_START allow
@@ -185,6 +186,7 @@ adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigR
 adb shell cmd notification disallow_listener app.orchard.tv/app.orchard.tv.guard.RevivalListener
 adb shell pm revoke app.orchard.tv android.permission.WRITE_SECURE_SETTINGS
 adb shell appops set app.orchard.tv SYSTEM_ALERT_WINDOW default
+adb shell appops set app.orchard.tv REQUEST_INSTALL_PACKAGES default
 adb shell appops set app.orchard.tv APP_AUTO_START default
 adb shell appops set app.orchard.tv APP_ASSOC_START default
 adb shell am force-stop app.orchard.tv
@@ -219,5 +221,6 @@ adb shell cmd role remove-role-holder --user 0 android.app.role.HOME app.orchard
 - **会员和 App 还在吗？** 在。Aerial 只换桌面，电视里的 App、账号和会员都不变，从 Aerial 里打开即可。
 - **原来的桌面还能用吗？** 能。原来的桌面作为一个 App 留在 Aerial 的 App 列表里（小米的 PatchWall 也在），打开就是原来的界面和推荐内容。
 - **开机广告能去掉吗？** 不能。开机广告是固件在 Aerial 启动之前播的。
-- **以后怎么升级？** 再运行一次同样的安装命令（Windows 重复第 3 步的 1、2、3、6 条）。
+- **以后怎么升级？** 1.32 起，电视上控制中心出现「有新版本」时点「下载并安装」，在系统安装界面确认即可（小米上验证过）。电视不让 App 安装应用时，再运行一次同样的安装命令（Windows 重复第 3 步的 1、2、3、6 条），设置都会保留。
+- **电视上有问题，想反馈给作者**：macOS / Linux 运行 `curl -fsSL https://aerial.qust.me/tools/report.sh | TV=<IP> bash`，它只读不改，生成 `aerial-report-<机型>.md`；读一遍，再贴进 https://github.com/pengchujin/aerial-tv/issues/new?template=device.yml 。没有电脑时，用手机扫个性化里的二维码，在手机页底部「反馈问题」复制诊断信息。
 - **出问题去哪反馈？** https://github.com/pengchujin/aerial-tv/issues ，附上电视型号（`adb shell getprop ro.product.model`）和安装输出。

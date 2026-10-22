@@ -51,6 +51,8 @@ TCL 手机 App 有一个「把手机里的 APK 推到电视」的功能。电视
 5. **versionCode 必须比已装的大**，否则当贝会把它从列表里隐藏。
 6. 每一步都先截图确认焦点再按 OK。当贝左侧有「批量删除」和「一键清空」，列表还没加载出来时焦点会停在那里。
 
+**方法三：Aerial 自己的「下载并安装」**（2026-10-22 实测，从自称 1.30 的 guard 包升到官方 1.31-guard）：Aerial 用 `ACTION_VIEW` 把 APK 交给 `com.android.packageinstaller`，和当贝一样能过校验。这台没有「安装未知应用」设置页（`ACTION_MANAGE_UNKNOWN_APP_SOURCES` 解析不到），`REQUEST_INSTALL_PACKAGES` 要由 `install.sh` 用 appops 放行。安装界面用遥控器要按 4 次「下」再按「右」才到「安装」；装完弹「应用安装已完成，是否立即体验？」，选「暂不体验」时露出 TCL 原桌面 `com.tcl.cyberui`，守护照常拉回 Aerial。
+
 ## 打开 ADB
 
 设置 → 关于 → 本机信息，在这个页面依次按「上、下、左、右」（`DeviceInfoItemModel.HIDE_KEY_LIST = {19, 20, 21, 22}`，两次按键间隔要小于 1 秒），页面会刷新出隐藏的「商场」和「更多」分组，「更多」里有「ADB」开关。2026-10-20 在这台电视上实测有效。注意刷新后焦点会落在「商场模式」开关上，不要直接按确认。

@@ -6,6 +6,7 @@ import android.content.Intent
 import app.orchard.tv.apps.TileSheet
 import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.system.DiagLog
+import app.orchard.tv.update.Updates
 import kotlinx.coroutines.launch
 
 /**
@@ -15,6 +16,9 @@ import kotlinx.coroutines.launch
  *   ... --ez clear_pin true         (turn the parental PIN off, for an owner who forgot it)
  *   ... --ez large_clock true --ez clock_right false --ez one_row_home true
  *                                   (Home's layout, as in Personalize; for screenshots of each)
+ *   ... --ez check_update true      (look for a new version now, not within three hours)
+ *   ... --ez update_test true       ("Download and Install" takes files/update-test.apk instead,
+ *                                   until Aerial restarts; for trying an update before a release)
  * The manifest requires the sender to hold WRITE_SECURE_SETTINGS, which the ADB shell has and
  * ordinary apps cannot get, so no other app on the TV can flip these.
  */
@@ -46,6 +50,15 @@ class ConfigReceiver : BroadcastReceiver() {
         if (intent.hasExtra("diag")) DiagLog.setEnabled(context, intent.getBooleanExtra("diag", false))
         for (key in listOf("mode_switch", "soft_layer")) {
             if (intent.hasExtra(key)) DiagLog.setOption(context, key, intent.getBooleanExtra(key, false))
+        }
+        if (intent.hasExtra("update_test")) {
+            Updates.testApk = if (intent.getBooleanExtra("update_test", false)) {
+                java.io.File(context.getExternalFilesDir(null) ?: context.filesDir, "update-test.apk")
+            } else null
+        }
+        if (intent.getBooleanExtra("check_update", false)) {
+            Updates.init(context)
+            Updates.checkIfStale(force = true)
         }
         if (intent.hasExtra("keep_adb")) GuardSetup.setKeepAdb(context, intent.getBooleanExtra("keep_adb", false))
         if (intent.hasExtra("own_screensaver")) GuardSetup.setOwnScreensaver(context, intent.getBooleanExtra("own_screensaver", false))

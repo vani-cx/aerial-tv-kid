@@ -106,7 +106,7 @@ adb shell am start -n app.orchard.tv/.MainActivity
 
 On Windows, use an agent, or follow the Windows steps in the [install guide](site/en/agent.md).
 
-**Updating**: run the install command again.
+**Updating**: from 1.32, Control Center shows New Version when there is one; choose Download and Install there and confirm in the TV's own installer (checked on Xiaomi and TCL). Aerial comes back afterwards with every setting kept. On TVs that do not let apps install apps, updating means running the install command again: the update page has a QR code that opens this TV's command on a phone, ready to copy or to hand to an agent. 1.31 and earlier have no such button, so this once, run the install command again.
 
 ### Undo
 
@@ -145,7 +145,7 @@ Most TVs sold in China only accept their own home screen and clear third-party a
 | Konka 2861, PPTV K55U27, XGIMI m7642, Tencent Aurora box 7S | Android 5–9 | User-verified with small issues, see [Issues](https://github.com/pengchujin/aerial-tv/issues) |
 | FFALCON 55S595C Ultra | Android 11 | Installs, but can't take over Home ([#52](https://github.com/pengchujin/aerial-tv/issues/52)) |
 
-Installs but doesn't start at boot: Vidda, Hisense, FFALCON Crane 6 2025 Ultra. If yours works, [open an issue](https://github.com/pengchujin/aerial-tv/issues) and tell us.
+Installs but doesn't start at boot: Vidda, Hisense, FFALCON Crane 6 2025 Ultra. If yours works, or doesn't, tell us with the [device support form](https://github.com/pengchujin/aerial-tv/issues/new?template=device.yml) and its diagnostics: run `curl -fsSL https://aerial.qust.me/tools/report.sh | TV=<tv-ip> bash` on a computer (it only reads), or copy them from 反馈问题 (Report a problem) at the bottom of the phone page. They hold no accounts, addresses, Wi-Fi names or app lists.
 
 ## Development
 

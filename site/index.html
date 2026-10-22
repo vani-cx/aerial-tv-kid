@@ -280,6 +280,10 @@
         <p>有用户用手机 ADB 工具（比如甲壳虫 ADB 助手）装成功过，我们没测过。命令和 <a href="agent.md">安装说明</a> 里 Windows 的步骤一样。</p>
       </details>
       <details>
+        <summary>怎么升级？</summary>
+        <p>1.32 起，有新版本时电视的控制中心会出现「有新版本」，选「下载并安装」，再在电视自己的安装界面确认就行。电视不让 App 安装应用时，升级就是再运行一次安装命令（或者再交给 Agent 一次）：升级页上有二维码，手机扫码能复制这台电视的命令。设置、排列和壁纸都会保留。</p>
+      </details>
+      <details>
         <summary>需要哪些权限？</summary>
         <p><code>WRITE_SECURE_SETTINGS</code>：桌面守护被关掉后重新打开。通知监听：被杀后由系统拉起，不读通知。无障碍：只看哪个窗口在前台，不读屏幕内容。定位：只用来显示 Wi-Fi 名称。</p>
       </details>
@@ -289,7 +293,7 @@
       </details>
       <details>
         <summary>我的电视不在列表里，能用吗？</summary>
-        <p>大概率可以，原生 Android TV / Google TV 最省事。不支持 LG webOS、三星 Tizen、华为鸿蒙和 Android 4.4 及更老的电视。遇到问题请到 <a href="https://github.com/pengchujin/aerial-tv/issues">GitHub 提 Issue</a>，附上型号和安装输出。</p>
+        <p>大概率可以，原生 Android TV / Google TV 最省事。不支持 LG webOS、三星 Tizen、华为鸿蒙和 Android 4.4 及更老的电视。遇到问题请用 <a href="https://github.com/pengchujin/aerial-tv/issues/new?template=device.yml">机型适配模板</a> 告诉我们，附上诊断信息：电脑上运行 <code>curl -fsSL https://aerial.qust.me/tools/report.sh | TV=&lt;电视IP&gt; bash</code>，或在手机配置页最下面「反馈问题」里复制。</p>
       </details>
     </div>
   </div>

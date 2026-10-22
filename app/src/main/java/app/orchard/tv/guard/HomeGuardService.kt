@@ -284,6 +284,12 @@ class HomeGuardService : AccessibilityService() {
         if (!GuardSetup.isUserUnlocked(this)) return
         val allowed = SystemClock.uptimeMillis() < allowStockUntil
         if (pkg in stockHomes) {
+            // Any of its screens, uncovered once the installer of an update from Control Center closed.
+            if (!allowed && isActivity(pkg, cls) && GuardSetup.installerJustClosed(this)) {
+                Log.i(TAG, "stock launcher $pkg in front after an update; bringing Aerial back")
+                goHome()
+                return
+            }
             filterKeys(allowed)
             // Only the stock launcher's home activity itself, not its dialogs or other screens.
             // Not gated on isDefaultHome(): see takeOverIfStockHomeInFront.
@@ -410,6 +416,9 @@ class HomeGuardService : AccessibilityService() {
             return true
         }
 
+        /** The stock launchers the guard keeps away from the front, or null while it is not running. */
+        fun stockHomes(): Map<String, Set<String>>? = instance?.stockHomes
+
         /** True if [packageName] is a stock launcher the guard keeps away from the front. */
         fun isStockHome(packageName: String): Boolean = instance?.stockHomes?.containsKey(packageName) == true
 
@@ -439,6 +448,8 @@ class HomeGuardService : AccessibilityService() {
         /** Called when Aerial comes back to the front: the stock launcher is fair game again. */
         fun onAerialResumed() {
             val s = instance ?: return
+            // Back in Aerial: an installer opened from Control Center was left without updating.
+            GuardSetup.installerJustClosed(s)
             s.allowStockUntil = 0L
             s.filterKeys(false)
         }

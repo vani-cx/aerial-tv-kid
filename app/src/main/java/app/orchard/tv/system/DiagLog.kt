@@ -104,6 +104,9 @@ object DiagLog {
             "Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT}), ${Build.FINGERPRINT}, " +
             "Aerial ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
 
+    /** The last [n] lines, oldest first. */
+    fun recent(n: Int): List<String> = synchronized(lines) { lines.toList().takeLast(n) }
+
     fun dump(writer: PrintWriter) {
         writer.println("Aerial log (${device()}):")
         synchronized(lines) { lines.forEach { writer.println("  $it") } }
