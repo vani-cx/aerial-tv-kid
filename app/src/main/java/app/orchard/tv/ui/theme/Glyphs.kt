@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.Dp
  * closest to SF Symbols among icons an Android app may ship (SF Symbols are licensed for Apple
  * platforms only). Vector paths, so they stay crisp at every size, in a square box.
  */
-enum class Glyph { Wifi, Ethernet, Offline, Gear, Input, Speaker, SpeakerMuted, Switches, EyeSlash, Move, Info, Trash, ChevronRight, ChevronLeft, Check, Hdmi, Antenna, Av, Sun, Photo, Play, Bag, CloudSun, Calendar, Cast, Shield, Globe, Moon, Cloud, CloudRain, CloudSnow, CloudFog, CloudBolt }
+enum class Glyph { Folder, Pencil, Wifi, Ethernet, Offline, Gear, Input, Speaker, SpeakerMuted, Switches, EyeSlash, Move, Info, Trash, ChevronRight, ChevronLeft, Check, Hdmi, Antenna, Av, Sun, Photo, Play, Bag, CloudSun, Calendar, Cast, Shield, Globe, Moon, Cloud, CloudRain, CloudSnow, CloudFog, CloudBolt }
 
 @Composable
 fun GlyphIcon(glyph: Glyph, color: Color, size: Dp, modifier: Modifier = Modifier, level: Float = 1f) {
@@ -49,6 +49,8 @@ fun DrawScope.drawGlyph(glyph: Glyph, color: Color, level: Float = 1f) {
         Glyph.Switches -> null
         Glyph.EyeSlash -> GlyphPaths.VISIBILITY_OFF
         Glyph.Move -> GlyphPaths.OPEN_WITH
+        Glyph.Folder -> GlyphPaths.FOLDER
+        Glyph.Pencil -> GlyphPaths.EDIT
         Glyph.Info -> GlyphPaths.INFO
         Glyph.Trash -> GlyphPaths.DELETE
         Glyph.ChevronRight -> GlyphPaths.CHEVRON_RIGHT

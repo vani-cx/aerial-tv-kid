@@ -223,6 +223,35 @@ object TileArtFactory {
         drawContext.transform.translate(-g * 0.10f, -g * 0.12f)
     }
 
+    /**
+     * A folder, as on tvOS: a frosted plate holding up to nine of its apps, three by three, in
+     * their own colors.
+     */
+    fun forFolder(apps: List<TileArt>): TileArt {
+        val back = layer {
+            drawRect(0f, 0f, W.toFloat(), H.toFloat(), Paint().apply { color = 0x40FFFFFF })
+            drawRect(0f, 0f, W.toFloat(), H.toFloat(), Paint().apply {
+                shader = LinearGradient(0f, 0f, 0f, H.toFloat(), 0x22FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP)
+            })
+            val pad = H * 0.09f
+            val gap = H * 0.045f
+            val th = (H - 2 * pad - 2 * gap) / 3f
+            val tw = th * 16f / 9f
+            val left = (W - 3 * tw - 2 * gap) / 2f
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+            apps.take(9).forEachIndexed { i, art ->
+                val x = left + (i % 3) * (tw + gap)
+                val y = pad + (i / 3) * (th + gap)
+                val flat = flatten(art)
+                paint.shader = android.graphics.BitmapShader(flat, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP).apply {
+                    setLocalMatrix(android.graphics.Matrix().apply { setScale(tw / flat.width, th / flat.height); postTranslate(x, y) })
+                }
+                drawRoundRect(RectF(x, y, x + tw, y + th), th * 0.14f, th * 0.14f, paint)
+            }
+        }
+        return finish(back, null)
+    }
+
     /** Aerial's own tile color: a diagonal gradient with soft light from the top left. */
     private fun colorTile(top: Int, bottom: Int): Bitmap = layer {
         drawRect(0f, 0f, W.toFloat(), H.toFloat(), Paint().apply {

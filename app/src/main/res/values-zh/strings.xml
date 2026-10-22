@@ -30,6 +30,22 @@
     <string name="input_av">AV</string>
 
     <string name="menu_move">移动</string>
+    <string name="menu_to_folder">移到文件夹</string>
+    <string name="menu_new_folder">新建文件夹</string>
+    <string name="menu_out_of_folder">移出文件夹</string>
+    <string name="menu_rename_folder">重命名</string>
+    <string name="menu_ungroup">解散文件夹</string>
+    <string name="menu_back">返回</string>
+    <string name="folder_default">文件夹</string>
+    <string-array name="folder_names">
+        <item>系统应用</item>
+        <item>影视</item>
+        <item>音乐</item>
+        <item>游戏</item>
+        <item>儿童</item>
+        <item>工具</item>
+        <item>文件夹</item>
+    </string-array>
     <string name="menu_hide">从主屏幕隐藏</string>
     <string name="menu_info">应用信息</string>
     <string name="menu_reset_icon">恢复默认图标</string>

@@ -139,6 +139,10 @@ fun HomeScreen(
     val pillRequester = remember { FocusRequester() }
 
     var focusedKey by remember { mutableStateOf<String?>(null) }
+    // Where focus goes when the overlay closes, when that is not the tile it was on. Kept apart
+    // from focusedKey: a closing menu hands focus to whatever tile lies under it first.
+    var focusAfterOverlay by remember { mutableStateOf<String?>(null) }
+    var indexAfterOverlay by remember { mutableStateOf(0) }
     var pillFocused by remember { mutableStateOf(false) }
     var lastFocusedIndex by remember { mutableStateOf(0) }
     val focusedIndex = apps.indexOfFirst { it.key == focusedKey }
@@ -160,8 +164,19 @@ fun HomeScreen(
     LaunchedEffect(vm.loaded, overlay) {
         if (!vm.loaded || overlay != Overlay.None) return@LaunchedEffect
         withFrameNanos { }
+        val wanted = focusAfterOverlay
+        focusAfterOverlay = null
+        if (wanted != null) { focusedKey = wanted; pillFocused = false }
         val index = apps.indexOfFirst { it.key == focusedKey }
-        if (pillFocused && focusedKey != null) runCatching { pillRequester.requestFocus() } else focusApp(if (index >= 0) index else 0)
+        // A tile that went while the overlay was up (hidden, put in a folder, a folder ungrouped)
+        // leaves focus where it was.
+        if (pillFocused && focusedKey != null) runCatching { pillRequester.requestFocus() }
+        else focusApp(if (index >= 0) index else if (wanted != null) indexAfterOverlay else lastFocusedIndex)
+    }
+    // A folder whose last app left closes.
+    LaunchedEffect(overlay, vm.folderApps) {
+        val open = (overlay as? Overlay.Folder)?.id ?: (overlay as? Overlay.AppMenu)?.inFolder ?: return@LaunchedEffect
+        if (vm.folderApps[open].isNullOrEmpty()) vm.overlay = Overlay.None
     }
     // An app vanished from under the focus (uninstalled or hidden): take its neighbour.
     LaunchedEffect(apps) {
@@ -230,6 +245,8 @@ fun HomeScreen(
                         // OK never reads as held had no other way to it (issue #28). Control
                         // Center stays one press up, on the status pill, where Menu still opens it.
                         if (overlay == Overlay.None && !pillFocused && focusedIndex >= 0) return@onPreviewKeyEvent false
+                        // Inside a folder, Menu is the focused app's, as on Home.
+                        if (overlay is Overlay.Folder) return@onPreviewKeyEvent false
                         vm.overlay = if (overlay is Overlay.ControlCenter) Overlay.None else Overlay.ControlCenter()
                         true
                     }
@@ -262,8 +279,10 @@ fun HomeScreen(
             else scroll.animateTo(target, spring(dampingRatio = 1f, stiffness = 170f))
         }
 
+        // The folder open, or under its app's menu.
+        val openFolder = (overlay as? Overlay.Folder)?.id ?: (overlay as? Overlay.AppMenu)?.inFolder
         val backdropBlur by animateDpAsState(
-            if (overlay is Overlay.ControlCenter || overlay is Overlay.HiddenApps) 30.dp else 0.dp,
+            if (overlay is Overlay.ControlCenter || overlay is Overlay.HiddenApps || openFolder != null) 30.dp else 0.dp,
             tween(320, easing = Motion.EaseOut), label = "backdrop-blur",
         )
 
@@ -361,7 +380,16 @@ fun HomeScreen(
                             },
                             onClick = { bounds ->
                                 val mover = moving
-                                if (mover == null) onLaunch(app, bounds)
+                                if (mover == null) {
+                                    val folder = app.folder
+                                    if (folder == null) onLaunch(app, bounds)
+                                    else {
+                                        // Closing the folder comes back to its tile.
+                                        focusAfterOverlay = app.key
+                                        indexAfterOverlay = index
+                                        vm.overlay = Overlay.Folder(folder.id)
+                                    }
+                                }
                                 // While moving, tapping a tile puts the app there; tapping the app
                                 // itself is done.
                                 else if (mover == app.key) vm.endMove()
@@ -371,7 +399,11 @@ fun HomeScreen(
                                 }
                             },
                             onLongPress = { bounds ->
-                                if (moving == null) vm.overlay = Overlay.AppMenu(app.key, bounds ?: Rect.Zero)
+                                if (moving == null) {
+                                    focusAfterOverlay = app.key
+                                    indexAfterOverlay = index
+                                    vm.overlay = Overlay.AppMenu(app.key, bounds ?: Rect.Zero)
+                                }
                             },
                             modifier = Modifier.offset { slot.value },
                         )
@@ -460,26 +492,61 @@ fun HomeScreen(
             onClose = { vm.overlay = Overlay.None },
         )
 
+        FolderView(
+            name = openFolder?.let { id -> apps.firstOrNull { it.folder?.id == id }?.label },
+            apps = openFolder?.let { vm.folderApps[it] }.orEmpty(),
+            visible = openFolder != null,
+            enabled = overlay is Overlay.Folder,
+            tileW = metrics.tileW,
+            tileH = metrics.tileH,
+            columns = COLUMNS,
+            onLaunch = onLaunch,
+            onLongPress = { app, bounds -> vm.overlay = Overlay.AppMenu(app.key, bounds ?: Rect.Zero, inFolder = openFolder) },
+            onDismiss = { vm.overlay = Overlay.None },
+        )
+
         val menu = overlay as? Overlay.AppMenu
+        // A menu opened in a folder closes back to the folder.
+        fun closeMenu() { vm.overlay = menu?.inFolder?.let { Overlay.Folder(it) } ?: Overlay.None }
         AppMenu(
-            app = menu?.let { m -> apps.firstOrNull { it.key == m.key } },
+            app = menu?.let { vm.entry(it.key) },
             anchor = menu?.anchor,
+            inFolder = menu?.inFolder != null,
+            folders = vm.folders(),
             onMove = { vm.startMove(it) },
             onHide = { key ->
-                vm.overlay = Overlay.None
+                closeMenu()
                 vm.hide(key)
             },
-            onInfo = { vm.overlay = Overlay.None; onAppInfo(it) },
-            onUninstall = { vm.overlay = Overlay.None; onUninstall(it) },
+            onInfo = { closeMenu(); onAppInfo(it) },
+            onUninstall = { closeMenu(); onUninstall(it) },
             onUnpin = { key ->
-                vm.overlay = Overlay.None
-                apps.firstOrNull { it.key == key }?.source?.let { vm.setSourcePinned(it, false) }
+                closeMenu()
+                vm.entry(key)?.source?.let { vm.setSourcePinned(it, false) }
             },
             onResetIcon = { key ->
-                vm.overlay = Overlay.None
+                closeMenu()
                 vm.resetIcon(key)
             },
-            onDismiss = { vm.overlay = Overlay.None },
+            onToFolder = { key, id ->
+                val folderKey = vm.putInFolder(key, id)
+                // From Home, focus goes to the folder the app went into.
+                if (menu?.inFolder == null) focusAfterOverlay = folderKey
+                closeMenu()
+            },
+            onOutOfFolder = { key ->
+                vm.takeOutOfFolder(key)
+                closeMenu()
+            },
+            onRenameFolder = { id, name ->
+                vm.renameFolder(id, name)
+                closeMenu()
+            },
+            onUngroup = { id ->
+                vm.ungroup(id)
+                closeMenu()
+            },
+            onDismiss = { closeMenu() },
         )
 
         HiddenAppsSheet(

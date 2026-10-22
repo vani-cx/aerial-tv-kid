@@ -31,6 +31,22 @@
     <string name="input_av">AV</string>
 
     <string name="menu_move">Move</string>
+    <string name="menu_to_folder">Move to Folder</string>
+    <string name="menu_new_folder">New Folder</string>
+    <string name="menu_out_of_folder">Move Out of Folder</string>
+    <string name="menu_rename_folder">Rename</string>
+    <string name="menu_ungroup">Remove Folder</string>
+    <string name="menu_back">Back</string>
+    <string name="folder_default">Folder</string>
+    <string-array name="folder_names">
+        <item>System</item>
+        <item>Video</item>
+        <item>Music</item>
+        <item>Games</item>
+        <item>Kids</item>
+        <item>Tools</item>
+        <item>Folder</item>
+    </string-array>
     <string name="menu_hide">Hide from Home</string>
     <string name="menu_reset_icon">Restore Default Icon</string>
     <string name="menu_info">App Info</string>

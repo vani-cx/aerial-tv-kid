@@ -24,6 +24,8 @@ data class AppEntry(
     val art: TileArt,
     /** Set for a TV input pinned to Home (HDMI, tuner...) rather than an app. */
     val source: TvSource? = null,
+    /** Set for a folder's tile; [packageName] is then the folder's key. */
+    val folder: Folder? = null,
 ) {
     val key: String get() = packageName
 
@@ -45,6 +47,17 @@ fun sourceEntry(source: TvSource): AppEntry = AppEntry(
 )
 
 const val SOURCE_KEY_PREFIX = "input:"
+
+/** A Home tile for [folder], with [art] made from the apps in it. */
+fun folderEntry(folder: Folder, art: TileArt): AppEntry = AppEntry(
+    packageName = folder.key,
+    label = folder.name,
+    component = ComponentName("folder", folder.id),
+    leanback = false,
+    removable = false,
+    art = art,
+    folder = folder,
+)
 
 object AppCatalog {
     /** Xiaomi's app store declares only this category, not CATEGORY_LAUNCHER (MiTV-MFTR0). */
