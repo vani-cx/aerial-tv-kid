@@ -1,7 +1,11 @@
 package app.orchard.tv.ui.components
 
 import android.graphics.BitmapShader
+import android.graphics.ComposeShader
+import android.graphics.LinearGradient
 import android.graphics.Matrix
+import android.graphics.Paint
+import android.graphics.PorterDuff
 import android.graphics.Shader
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.getValue
@@ -12,24 +16,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.createBitmap
 import app.orchard.tv.ui.theme.Palette
 import app.orchard.tv.wallpaper.Wallpapers
+import kotlin.math.roundToInt
 
 /**
  * Liquid Glass, the material of tvOS 26's panels, without a live blur: the TVs here mostly run
@@ -40,6 +48,8 @@ import app.orchard.tv.wallpaper.Wallpapers
  * "Follow App" mode there is no frosted wallpaper and the panel is the plain dark glass color.
  *
  * Replaces clip + background + border; [bottomCorners] false for a sheet rising from the bottom.
+ * The continuous outline is a baked mask (see SmoothCorners.kt); children are clipped to a plain
+ * rounded rect, which holds it.
  */
 fun Modifier.liquidGlass(corner: Dp, bottomCorners: Boolean = true): Modifier = composed {
     val frost = Wallpapers.frosted.takeIf { Wallpapers.backdrop != null }
@@ -56,11 +66,17 @@ fun Modifier.liquidGlass(corner: Dp, bottomCorners: Boolean = true): Modifier = 
         .clip(shape)
         .drawWithCache {
             val shader = frost?.let { BitmapShader(it.asAndroidBitmap(), Shader.TileMode.CLAMP, Shader.TileMode.CLAMP) }
-            val brush = shader?.let { ShaderBrush(it) }
             val radius = corner.toPx()
+            val w = size.width.roundToInt().coerceAtLeast(1)
+            val h = size.height.roundToInt().coerceAtLeast(1)
+            val mask = smoothMask(w, h, radius, if (bottomCorners) radius else 0f)
+            val shape = BitmapShader(mask, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+                .apply { setLocalMatrix(Matrix().apply { setScale(size.width / w, size.height / h) }) }
+            val brush = shader?.let { ShaderBrush(ComposeShader(it, shape, PorterDuff.Mode.DST_IN)) }
+            val flat = mask.asImageBitmap()
             onDrawBehind {
                 if (shader == null || brush == null || root == IntSize.Zero) {
-                    drawRect(Palette.Glass)
+                    drawImage(flat, dstSize = IntSize(w, h), colorFilter = ColorFilter.tint(Palette.Glass))
                 } else {
                     shader.setLocalMatrix(Matrix().apply {
                         setScale(root.width.toFloat() / frost.width, root.height.toFloat() / frost.height)
@@ -68,47 +84,52 @@ fun Modifier.liquidGlass(corner: Dp, bottomCorners: Boolean = true): Modifier = 
                     })
                     drawRect(brush, colorFilter = PanelTint)
                 }
-                // A sheet's rim runs off the bottom with its corners.
-                val h = if (bottomCorners) size.height else size.height + radius
-                drawGlassEdge(Offset.Zero, Size(size.width, h), radius, 1f)
+                drawGlassEdge(size, radius, bottomCorners)
             }
         }
 }
 
 /**
  * The lit edge of a piece of glass: a sheen inside the top, and a rim bright where light falls on
- * it from the top left, faint along the sides, and catching again at the far corner. [strength]
- * fades it (the top-row plate loses its edge as it grows into the grid's background).
+ * it from the top left, faint along the sides, and catching again at the far corner.
  */
-fun DrawScope.drawGlassEdge(topLeft: Offset, size: Size, radius: Float, strength: Float) {
-    if (strength <= 0.01f) return
-    drawRoundRect(
-        Brush.verticalGradient(
-            0f to Color.White.copy(alpha = 0.10f * strength),
-            1f to Color.Transparent,
-            startY = topLeft.y,
-            endY = topLeft.y + size.height * 0.5f,
-        ),
-        topLeft = topLeft,
-        size = Size(size.width, size.height * 0.5f),
-        cornerRadius = CornerRadius(radius),
-    )
-    val w = 1.2.dp.toPx()
-    drawRoundRect(
-        Brush.linearGradient(
-            0f to Color.White.copy(alpha = 0.55f * strength),
-            0.35f to Color.White.copy(alpha = 0.10f * strength),
-            0.7f to Color.White.copy(alpha = 0.06f * strength),
-            1f to Color.White.copy(alpha = 0.30f * strength),
-            start = topLeft,
-            end = Offset(topLeft.x + size.width, topLeft.y + size.height),
-        ),
-        topLeft = topLeft + Offset(w / 2, w / 2),
-        size = Size(size.width - w, size.height - w),
-        cornerRadius = CornerRadius(radius - w / 2),
-        style = Stroke(width = w),
-    )
+private fun DrawScope.drawGlassEdge(size: Size, radius: Float, bottomCorners: Boolean) {
+    val w = size.width.roundToInt()
+    val h = size.height.roundToInt()
+    if (w <= 0 || h <= 0) return
+    drawImage(glassEdge(w, h, radius, 1.2.dp.toPx(), bottomCorners), dstSize = IntSize(w, h))
 }
+
+/** The lit edge of a [w]×[h] piece of glass at full strength, white with alpha; made once per size. */
+fun glassEdge(w: Int, h: Int, radius: Float, rim: Float, bottomCorners: Boolean = true): ImageBitmap =
+    baked(listOf("glass-edge", w, h, radius, rim, bottomCorners)) {
+        val bitmap = createBitmap(w, h)
+        val canvas = android.graphics.Canvas(bitmap)
+        // A sheet's rim runs off the bottom with its corners.
+        val bottom = if (bottomCorners) h.toFloat() else h + radius
+        fun white(alpha: Float) = Color.White.copy(alpha = alpha).toArgb()
+        // The sheen fades out by the middle.
+        canvas.drawPath(
+            smoothRectPath(Rect(0f, 0f, w.toFloat(), bottom), radius).asAndroidPath(),
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(0f, 0f, 0f, bottom, intArrayOf(white(0.10f), 0), floatArrayOf(0f, 0.5f), Shader.TileMode.CLAMP)
+            },
+        )
+        canvas.drawPath(
+            smoothRectPath(Rect(rim / 2, rim / 2, w - rim / 2, bottom - rim / 2), radius - rim / 2).asAndroidPath(),
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = rim
+                shader = LinearGradient(
+                    0f, 0f, w.toFloat(), bottom,
+                    intArrayOf(white(0.55f), white(0.10f), white(0.06f), white(0.30f)),
+                    floatArrayOf(0f, 0.35f, 0.7f, 1f),
+                    Shader.TileMode.CLAMP,
+                )
+            },
+        )
+        bitmap.frozen().asImageBitmap()
+    }
 
 /** Panels: the frosted picture at half its light, lifted a little, so white text reads on snow. */
 private val PanelTint = ColorFilter.colorMatrix(ColorMatrix(floatArrayOf(
