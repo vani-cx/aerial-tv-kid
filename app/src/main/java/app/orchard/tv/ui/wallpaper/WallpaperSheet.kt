@@ -64,6 +64,7 @@ import app.orchard.tv.settings.FocusStyle
 import app.orchard.tv.ui.components.Pressable
 import app.orchard.tv.ui.components.consumeTaps
 import app.orchard.tv.ui.components.dismissOnTap
+import app.orchard.tv.ui.components.liquidGlass
 import app.orchard.tv.ui.theme.Glyph
 import app.orchard.tv.ui.theme.GlyphIcon
 import app.orchard.tv.ui.theme.Motion
@@ -88,7 +89,14 @@ import kotlin.math.roundToInt
  * right opens the same settings on a phone, where sending photos is easy.
  */
 @Composable
-fun WallpaperSheet(visible: Boolean, onDismiss: () -> Unit, onStartScreensaver: () -> Unit, onPin: (on: Boolean) -> Unit) {
+fun WallpaperSheet(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    hiddenCount: Int,
+    onHiddenApps: () -> Unit,
+    onStartScreensaver: () -> Unit,
+    onPin: (on: Boolean) -> Unit,
+) {
     val context = LocalContext.current
     var phoneUrl by remember { mutableStateOf<String?>(null) }
     var qr by remember { mutableStateOf<ImageBitmap?>(null) }
@@ -124,11 +132,10 @@ fun WallpaperSheet(visible: Boolean, onDismiss: () -> Unit, onStartScreensaver: 
                     .fillMaxWidth()
                     .height(360.dp)
                     .consumeTaps()
-                    .clip(RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
-                    // Nearly opaque: Home is not blurred behind this sheet, so the wallpaper above
-                    // it stays sharp while you choose, and the app grid must not show through.
-                    .background(Color(0xF71C1C1E))
-                    .border(1.dp, Palette.Hairline, RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
+                    // Glass made from the wallpaper itself, opaque: Home is not blurred behind
+                    // this sheet, so the wallpaper above it stays sharp while you choose, and the
+                    // app grid must not show through.
+                    .liquidGlass(30.dp, bottomCorners = false)
                     .padding(start = 40.dp, end = 32.dp, top = 24.dp),
             ) {
                 val scroll = rememberScrollState()
@@ -147,7 +154,7 @@ fun WallpaperSheet(visible: Boolean, onDismiss: () -> Unit, onStartScreensaver: 
                     Group { note ->
                         Choices(
                             R.string.st_layout, stringResource(R.string.st_home_layout_hint), note,
-                            listOf(false to R.string.st_home_standard, true to R.string.st_home_one_row),
+                            listOf(true to R.string.st_home_one_row, false to R.string.st_home_standard),
                             AerialSettings.oneRowHome, AerialSettings::chooseOneRowHome, first = true,
                         )
                         Choices(
@@ -156,17 +163,25 @@ fun WallpaperSheet(visible: Boolean, onDismiss: () -> Unit, onStartScreensaver: 
                             AerialSettings.clockRight, AerialSettings::chooseClockRight,
                         )
                         Choices(
-                            R.string.st_names, stringResource(R.string.st_names_hint), note,
-                            listOf(false to R.string.st_names_focused, true to R.string.st_names_all),
-                            AerialSettings.showAllNames, AerialSettings::chooseShowAllNames,
-                        )
-                        Choices(
                             R.string.st_focus_style,
                             stringResource(if (AerialSettings.focusStyle == FocusStyle.HighContrast) R.string.st_focus_high_hint else R.string.st_focus_standard_hint),
                             note,
                             listOf(FocusStyle.HighContrast to R.string.st_focus_high, FocusStyle.Standard to R.string.st_focus_standard),
                             AerialSettings.focusStyle, AerialSettings::chooseFocusStyle,
                         )
+                        Choices(
+                            R.string.st_sounds, stringResource(R.string.st_sounds_hint), note,
+                            listOf(true to R.string.st_on, false to R.string.st_off),
+                            AerialSettings.uiSounds, AerialSettings::chooseUiSounds,
+                        )
+                        // Apps taken off Home are kept with the rest of how Home looks.
+                        SettingRow(R.string.st_hidden_apps, stringResource(R.string.st_hidden_apps_hint), note) {
+                            ActionChip(
+                                if (hiddenCount == 0) stringResource(R.string.st_hidden_none) else stringResource(R.string.st_hidden_count, hiddenCount),
+                                Glyph.ChevronRight,
+                                onHiddenApps,
+                            )
+                        }
                     }
 
                     Spacer(Modifier.height(22.dp))
@@ -418,6 +433,23 @@ private fun Chip(label: String, on: Boolean, onFocused: (() -> Unit)? = null, on
         ) {
             if (on) GlyphIcon(Glyph.Check, fg, 14.dp)
             BasicText(label, style = Type.Body.copy(color = fg))
+        }
+    }
+}
+
+/** A pill that does something rather than choosing a value: white when focused, a glyph after its label. */
+@Composable
+private fun ActionChip(label: String, glyph: Glyph, onClick: () -> Unit) {
+    Pressable(onClick = onClick, focusedScale = 1.06f) { state ->
+        val bg by animateColorAsState(if (state.focused) Palette.Focus else Palette.FillStrong, tween(140, easing = Motion.EaseOut), label = "action-bg")
+        val fg = if (state.focused) Palette.OnFocus else Palette.Label
+        Row(
+            Modifier.clip(RoundedCornerShape(50)).background(bg).height(40.dp).padding(start = 20.dp, end = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            BasicText(label, style = Type.Body.copy(color = fg))
+            GlyphIcon(glyph, fg, 18.dp)
         }
     }
 }

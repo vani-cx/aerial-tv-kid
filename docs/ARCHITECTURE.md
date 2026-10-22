@@ -17,16 +17,17 @@ app/src/main/java/app/orchard/tv/
 │   └── CustomIcons.kt       用户在手机页给 App 换的磁贴图（files/icons/<包名>.png，16:9）
 ├── ui/
 │   ├── theme/Theme.kt       Palette（tvOS 深色系统色）、Motion（缓动曲线）、Inter 字体（opsz 14/32）、Type
-│   ├── theme/Glyphs.kt      自绘 SF Symbols 风格图标（Canvas 线条）
+│   ├── theme/Glyphs.kt      图标：Material Symbols Rounded 实心款的路径（GlyphPaths.kt，Apache 2.0），控制中心的开关图标自绘
 │   ├── components/Pressable.kt  遥控器可按控件：按下缩放、只在「本控件上开始的按压」抬起时触发
+│   ├── components/LiquidGlass.kt  面板的 Liquid Glass 材质（取模糊版壁纸里面板身后的一块）和玻璃边缘
 │   ├── home/HomeScreen.kt   首页布局：网格几何、滚动、焦点管理、各浮层挂载、返回键
 │   ├── home/AppTile.kt      单个磁贴：聚焦弹簧、阴影、柔光、视差、边缘回弹、长按、移动抖动
 │   ├── home/HomeChrome.kt   背景（AmbientBackground）、大时钟、右上角状态胶囊、时间格式
 │   ├── home/Overlays.kt     长按菜单、隐藏的 App 面板、MenuRow、MiniTile
 │   ├── home/PinPad.kt       家长密码键盘（设置 / 解锁，遥控器数字键或屏幕键盘）
 │   ├── home/Screensaver.kt  屏保 UI：航拍（Media3 ExoPlayer，见 wallpaper/AerialStream.kt）/ 照片（Ken Burns）/ 时钟
-│   ├── control/ControlCenter.kt  控制中心：按钮、音量/亮度滑块、「个性化」「隐藏的 App」两个入口、有新版本时的提示和升级说明页、底部版本号；信号源页（只负责切换）和信号源设置页（显示在主屏幕、开机时打开）
-│   └── wallpaper/WallpaperSheet.kt  个性化面板（壁纸、屏保和开始时间、焦点样式、App 名称、家长密码、天气）+ 手机扫码卡片
+│   ├── control/ControlCenter.kt  控制中心：按钮、音量/亮度滑块、「个性化」入口、有新版本时的提示和升级说明页、底部版本号；信号源页（只负责切换）和信号源设置页（显示在主屏幕、开机时打开）
+│   └── wallpaper/WallpaperSheet.kt  个性化面板（壁纸、屏保和开始时间、焦点样式、家长密码、天气）+ 手机扫码卡片
 ├── wallpaper/
 │   ├── Wallpapers.kt        壁纸单例：来源（每日/内置/照片/照片每天换一张/跟随App）、选择、首页背景烘焙、缩略图、上传
 │   ├── Gradients.kt         8 组内置渐变的参数与渲染
@@ -34,7 +35,7 @@ app/src/main/java/app/orchard/tv/
 │   ├── Aerials.kt           读取 assets/aerials.json（Apple 航拍目录）
 │   └── PhoneServer.kt       NanoHTTPD 手机配置页 + 二维码生成
 ├── settings/
-│   └── AerialSettings.kt    Aerial 自己的偏好（SharedPreferences "settings"）：焦点样式 FocusStyle（默认高对比度）、固定到主屏幕的信号源、开机信号源、屏保开始时间、是否显示全部 App 名称、家长密码（SHA-256，解锁 10 分钟或按 HOME 重新上锁）
+│   └── AerialSettings.kt    Aerial 自己的偏好（SharedPreferences "settings"）：焦点样式 FocusStyle（默认高对比度）、固定到主屏幕的信号源、开机信号源、屏保开始时间、家长密码（SHA-256，解锁 10 分钟或按 HOME 重新上锁）
 ├── update/
 │   └── Updates.kt           每天最多一次读官网 download/version.txt，有新版时控制中心提示；不在后台下载安装
 ├── weather/
@@ -71,12 +72,14 @@ tools/install.sh / restore.sh       部署与还原
 - **画布**：`MainActivity` 用 `LocalDensity` 把内容缩放到 960×540dp 的设计画布（`density = 屏幕宽 / 960`）。不同厂商的 1080p 屏幕 dpi 不同（小米 320，TCL 240），这样排版完全一致。Compose 里所有 dp/sp 都按这个画布理解。
 - **分辨率**：系统给 App 的界面多大，就按多大画（`ui/theme/Theme.kt` 的 `canvasDensity`：1080p 界面是 2，4K 界面是 4）。预先画好的位图也按它算：磁贴图是「聚焦放大后的磁贴」的实际像素（1080p 时 352×198，4K 时 704×396），壁纸按屏幕像素解码，界面超过 1080p 时每日精选下载必应的 UHD 图。大部分 4K 电视的界面其实是 1080p，由硬件放大（Android TV 的 `config_maxUiWidth` = 1920，Google TV 模拟器和家里三台电视都是这样）；只有厂商放开这个限制的电视才会拿到 4K 界面。4K 路径在 Android 15 的 4K 模拟器（`Aerial4KUI`，非 TV 镜像，没有这个限制）上验证过。
 - **刷新率**：Android 12 起，如果面板能无黑屏地切到更高的刷新率（`Display.Mode.getAlternativeRefreshRates`），首页会选最高的那个（最高 120Hz），见 `MainActivity.preferSmoothestRefreshRate`。会黑屏的切换一律不做：桌面每次回来都黑一下是不可接受的。
-- **网格**（`HomeScreen.GridMetrics`）：5 列，16:9 磁贴，边距 56dp、间距 28dp，第一行在屏幕高 55.5% 处。个性化里选「主屏幕：只显示一排」（`AerialSettings.oneRowHome`，默认关）时，第一行下移到底部（屏幕高减一个行距再减 12dp，第二行只露一条边），好让壁纸里的合照露出来，像 tvOS 全屏 Top Shelf 时那样；这时不显示大时钟和日期，把屏幕让给壁纸：时钟选「左上」时左上角只留一行小字的时间和天气（`HomeChrome.CornerClock`），选「右上」时时间和天气并进右上角的状态按钮。进网格后的位置和模糊背景不变。标准布局下大时钟也可以放右边（`AerialSettings.clockRight`）。磁贴用绝对 `offset` 定位，没有用 Row，所以移动 App 时组件不会重建、焦点不会丢，位置变化由 `animateIntOffsetAsState` 做重排动画。
+- **网格**（`HomeScreen.GridMetrics`）：5 列，16:9 磁贴，边距 56dp、间距 28dp，第一行在屏幕高 55.5% 处。个性化里选「主屏幕：单排」（`AerialSettings.oneRowHome`，1.23 起默认开；选过「双排」的保持不变）时，第一行下移到底部（屏幕高减一个行距再减 12dp，第二行只露一条边），好让壁纸里的合照露出来，像 tvOS 全屏 Top Shelf 时那样；这时不显示大时钟和日期，把屏幕让给壁纸：时钟选「左上」时左上角只留一行小字的时间和天气（`HomeChrome.CornerClock`），选「右上」时时间和天气放在右上角状态按钮的左边。进网格后的位置和模糊背景不变。标准布局下大时钟也可以放右边（`AerialSettings.clockRight`）。磁贴用绝对 `offset` 定位，没有用 Row，所以移动 App 时组件不会重建、焦点不会丢，位置变化由 `animateIntOffsetAsState` 做重排动画。
 - **滚动**：不用 `verticalScroll`（它会自动 bringIntoView），而是一个 `Animatable` 加内容 `offset`，目标由聚焦行决定（`scrollFor`），用弹簧动画以便连按时平滑改变目标。
 - **焦点**：每个磁贴一个 `FocusRequester`（按包名存在 map 里）。方向键由磁贴自己处理：`moveFocus` 失败时触发边缘回弹。浮层打开时磁贴 `focusable(enabled=false)`，焦点不会逃出浮层；浮层关闭后恢复到原磁贴。HOME 键重置通过 `homeResetPending` 加「窗口重新获得焦点」两个条件触发（在别的 App 在前台时请求焦点会丢）。
 - **返回键**：网格里 → 回第一行；第一行 → 启动屏保（tvOS 行为）。
-- **焦点样式**：`AppTile` 聚焦时放大 1.15 倍，加阴影、顶部高光和加粗的名字。`FocusStyle.HighContrast`（默认）时，另在磁贴外 5dp 处画 3dp 白色描边（外加一圈淡黑边，保证在亮壁纸上也看得见）。描边画在一个不裁剪的独立图层上，和磁贴共用放大、倾斜、推移、抖动这些变换。起因：国产电视都是方向键遥控器，没有 Siri 遥控器那种跟着手指的倾斜，只靠放大的话用户找不到焦点。
-- **背景**（`HomeChrome.HomeBackground`）：`Wallpapers.backdrop`（选中壁纸，已烘焙压暗），否则（「跟随 App」模式）用聚焦 App 的 `TileArt.backdrop`。和 tvOS 一样分两种状态：焦点在第一排时显示清晰的壁纸；往下进入网格后，整屏换成模糊、压暗的壁纸。模糊版（`Wallpapers.frosted`，320×180）由 `Images.frost` 用压暗之前的原图预先做好，网格的压暗也预先做在里面，不做实时模糊或颜色滤镜。切换跟着滚动的弹簧走，没有单独的动画；两张全屏图只在滚动的中段（进度 30%–70%）交叉淡化，其余时间每帧只画一张。小米 MFTR0 实测：第一排 14ms、网格 18ms、上下切换 90 分位 20ms，和改之前一样；全程交叉淡化时切换的 90 分位是 30ms。试过 tvOS 26 那样在第一排下面垫一块玻璃底板，但聚焦时要给 App 名字留位置，上下边距只能不对称，还会压到第二排，所以没有保留。
+- **焦点样式**：`AppTile` 聚焦时放大 1.15 倍，加阴影、顶部高光和加粗的名字。放大用临界阻尼弹簧（`dampingRatio = 1`，和 Android TV 的 Leanback / Compose for TV 一样不回弹）：之前 0.66 的回弹在白框上会显得发抖。`FocusStyle.HighContrast`（默认）时，另在磁贴外 5dp 处画 3dp 白色描边（外加一圈淡黑边，保证在亮壁纸上也看得见），描边带玻璃那样左上和右下更亮的渐变，内侧一圈细光。描边有自己的透明度弹簧：出现时跟着放大从磁贴边缘长出来，消失得更快，所以左右移动时不会同时看到两个框。描边画在一个不裁剪的独立图层上，和磁贴共用放大、倾斜、推移、抖动这些变换。起因：国产电视都是方向键遥控器，没有 Siri 遥控器那种跟着手指的倾斜，只靠放大的话用户找不到焦点。
+- **App 名称**：和 tvOS 26 一样，第一排在玻璃底板上时不显示名称；网格里只显示选中的那个 App 的名称。原来的「App 名称：只显示选中的 / 全部显示」设置已去掉。
+- **背景**（`HomeChrome.HomeBackground`）：`Wallpapers.backdrop`（选中壁纸，已烘焙压暗），否则（「跟随 App」模式）用聚焦 App 的 `TileArt.backdrop`。和 tvOS 26 一样分两种状态：焦点在第一排时显示清晰的壁纸，第一排下面垫一块 Liquid Glass 底板（比磁贴左右宽 26dp、上下宽 20dp，圆角 32dp，宽度跟第一排的 App 数走）；往下进入网格后，整屏换成模糊、压暗的壁纸。玻璃不做实时模糊：模糊版壁纸（`Wallpapers.frosted`，320×180）由 `Images.frost` 用压暗之前的原图预先做好，通过 BitmapShader 按屏幕坐标铺开，所以底板里看到的正是它身后那块壁纸。切换跟着滚动的弹簧走，没有单独的动画：底板跟着第一排移动，在滚动的前 55% 里淡出，同时最多放大 14dp，像从壁纸上浮起后化开；回到第一排时反过来，淡入并收回原位。两张全屏图只在滚动的中段（进度 30%–70%）交叉淡化，其余时间每帧只画一张。试过让底板一路长大、越过屏幕边缘变成整屏背景，往下时好看，但从网格回到第一排时整屏缩回一条，太夸张，所以没有保留。底板的边缘（顶部内侧的柔光、左上亮右下再亮一点的描边，`LiquidGlass.drawGlassEdge`）跟着底板一起淡出。小米 MFTR0 实测（整屏扩散的版本，同一组按键各测 2–3 次）：GPU 90 分位从 12–13ms 变成 15–16ms。以前没保留玻璃底板，是因为要给聚焦磁贴下面的名字留位置；现在第一排不显示名称，这个问题没有了。
+- **右上角**（`HomeChrome.StatusPill`）：按钮里只有网络和控制中心图标，进入网格、大时钟滚走后才加上时间，所以屏幕上不会同时出现两个时间。单排加「时钟：右上」时，时间和天气是按钮左边的一行字（`CornerClock`），不放进按钮。
 
 ### 性能约束（重要）
 
@@ -84,6 +87,7 @@ tools/install.sh / restore.sh       部署与还原
 - 首页每帧只允许一次全屏绘制：壁纸和压暗层在 CPU 上预先合成；窗口背景设为 null。
 - 空闲时不能有任何持续动画（测量结果是 0 帧）。
 - 模糊（`BlurEffect`）只在控制中心 / 隐藏 App 面板打开时用。
+- 面板（控制中心、个性化、长按菜单、隐藏的 App、家长密码、移动提示）都用 `Modifier.liquidGlass`：同样取模糊版壁纸里面板身后的那一块，压到一半亮度保证白字可读，再加玻璃边缘。每个面板只填一次自己的面积，和原来的纯色一样；「跟随 App」模式没有模糊版壁纸，退回原来的深色 `Palette.Glass`。
 - 加任何全屏效果前，先测：`adb shell dumpsys gfxinfo app.orchard.tv framestats`。
 - 一定要装 release 版，并执行 `cmd package compile -m speed -f app.orchard.tv`。debug 版的 Compose 在电视上明显卡顿。
 
@@ -91,7 +95,7 @@ tools/install.sh / restore.sh       部署与还原
 
 优先级：
 
-1. **固件自带的 App**（设置、相册、天气、投屏、应用商店、日历、媒体中心、安全中心、浏览器）用 Aerial 自己画的磁贴：渐变底色加白色线条图标（`SystemTile` + `Glyphs.kt`），像 tvOS 的系统 App。这些 App 在小米和 TCL 上都没有声明标准的 App 分类，所以按包名列在 `AppCatalog.SYSTEM_TILES`，每个都注明在哪台机器上核对过；声明了标准分类（`CATEGORY_APP_GALLERY` 等）而且没有横幅的系统 App 也走这条。
+1. **固件自带的 App**（设置、相册、天气、投屏、应用商店、日历、媒体中心、安全中心、浏览器）用 Aerial 自己画的磁贴：渐变底色加白色实心图标，图标下面垫一层很淡的阴影（`SystemTile` + `Glyphs.kt`），像 tvOS 的系统 App；天气是黄色太阳加白云。图标用 Material Symbols Rounded：SF Symbols 的授权只允许用在苹果平台上，Material Symbols 是 Apache 2.0，风格最接近。这些 App 在小米和 TCL 上都没有声明标准的 App 分类，所以按包名列在 `AppCatalog.SYSTEM_TILES`，每个都注明在哪台机器上核对过；声明了标准分类（`CATEGORY_APP_GALLERY` 等）而且没有横幅的系统 App 也走这条。
 2. **精选图标库**（`TileRecipes`）：按包名写的「重绘配方」，只决定怎么用 App 自己的图标，不打包别家的图：
    - `top`/`bottom`：磁贴用品牌色渐变，图标的底板去掉，只留 logo（`cutOut`）；
    - `white`：logo 画成白色，只适合单色 logo 配另一种颜色的底板（WPS、夸克、小米「桌面」）；和 `top`/`bottom` 一起用在整张图片式的图标上时，只按亮度取出图里的白色 logo（Z视介：蓝色晶格上的白色 Z）；
@@ -112,7 +116,13 @@ Logo 的大小统一：先在 256×256 的采样里找出 Logo 的范围，再�
 
 ## 个性化：壁纸、屏保、焦点样式、天气
 
-控制中心的「个性化」打开 `WallpaperSheet`，按「看得到的效果」从上到下分组：壁纸（缩略图行）、主屏幕（布局、时钟、App 名称、焦点样式）、屏幕保护程序（类型和立即开始、开始时间）、天气（只读）、家长密码。除壁纸外都是 tvOS 设置那样的分组卡片，一行一个设置，左边名称、右边选项；每组下面一条说明，跟着组里聚焦的那一行变（`Group` / `SettingRow`），说明区固定两行高，焦点移动时面板不跳。天气的城市在手机页设置。右边是手机扫码卡片。焦点移到最后一行「家长密码」时，面板滚到底，让它下面的说明也露出来。
+控制中心的「个性化」打开 `WallpaperSheet`，按「看得到的效果」从上到下分组：壁纸（缩略图行）、主屏幕（布局、时钟、焦点样式、按键声音、隐藏的 App）、屏幕保护程序（类型和立即开始、开始时间）、天气（只读）、家长密码。除壁纸外都是 tvOS 设置那样的分组卡片，一行一个设置，左边名称、右边选项；每组下面一条说明，跟着组里聚焦的那一行变（`Group` / `SettingRow`），说明区固定两行高，焦点移动时面板不跳。天气的城市在手机页设置。右边是手机扫码卡片。焦点移到最后一行「家长密码」时，面板滚到底，让它下面的说明也露出来。
+
+「隐藏的 App」从控制中心挪到了这里：点开是原来的 `HiddenAppsSheet`，返回回到个性化；设了家长密码时先输密码。
+
+## 按键声音
+
+`system/Sounds.kt` 用 SoundPool 播放四个短音：焦点移动和控制中心滑块（音量、亮度）每走一格「嗒」、确认和长按打开菜单「咚」、返回（更低更轻）、在网格边上或滑块到头时的闷响。音效是自己合成的（`tools/make-sounds.py` 生成 `res/raw/ui_*.wav`，按 tvOS 的感觉做：几个衰减的泛音加一点噪声当「接触声」），没有用苹果的音频文件。`MainActivity.dispatchKeyEvent` 把每个按键先交给 `Sounds.onKey`：记下方向键按下的时间，返回键直接出声。`AppTile` 和 `Pressable` 拿到焦点时调 `Sounds.focusMoved()`，只有 250ms 内按过方向键才响，一次按键只响一次，所以打开面板、HOME 复位这类程序给的焦点不出声；唤醒屏保的那一下也不出声。个性化里「按键声音」可以关（`AerialSettings.uiSounds`，默认开）。小米 MFTR0 上从日志确认在播放（`AudioTrack start/stop`）。
 
 - `Wallpapers` 是 Compose 状态单例，只在主线程写。来源：
   - `daily:<date>`：必应 HPImageArchive，`cn.bing.com`，最近 8 张，存在 `files/daily/`；

@@ -46,6 +46,7 @@ import app.orchard.tv.ui.theme.canvasDensity
 import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.wallpaper.Wallpapers
 import app.orchard.tv.system.MissingClipboard
+import app.orchard.tv.system.Sounds
 import app.orchard.tv.system.SystemProbe
 import app.orchard.tv.system.settingsLaunchIntent
 import app.orchard.tv.update.Updates
@@ -90,6 +91,7 @@ class MainActivity : ComponentActivity() {
         Updates.init(this)
         CustomIcons.init(this)
         AerialSettings.init(this)
+        Sounds.init(this)
         val reducedMotion = Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
 
         // The home screen paints every pixel itself; a window background would be one more
@@ -243,6 +245,8 @@ class MainActivity : ComponentActivity() {
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         restartIdleTimer()
+        // The key that wakes the screensaver only wakes it, silently.
+        if (!vm.screensaverVisible && event.keyCode != swallowKeyUp) Sounds.onKey(event)
         // Left / right step through the films or photos and keep the screensaver up.
         if (vm.screensaverVisible && vm.screensaverSkips.onKey(event)) return true
         if (vm.screensaverVisible && event.action == KeyEvent.ACTION_DOWN) {

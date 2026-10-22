@@ -54,7 +54,7 @@ Hold OK to **Move** (other tiles make room), **Hide from Home**, open **App Info
 
 ![Control Center](site/img/control-center.jpg)
 
-Press Up from the top row to reach the top right, then OK (once there, the menu button ≡ opens it too). You get inputs (with HDMI-CEC devices), network and settings, volume and brightness sliders, plus Personalize (wallpaper, screensaver, focus style, weather) and Hidden Apps. Network and settings open your TV's own panels. On an app, the menu button opens that app's menu (move, hide and so on), the same as holding OK.
+Press Up from the top row to reach the top right, then OK (once there, the menu button ≡ opens it too). You get inputs (with HDMI-CEC devices), network and settings, volume and brightness sliders, plus Personalize (wallpaper, screensaver, Home layout, focus style, sounds, hidden apps, weather). Network and settings open your TV's own panels. On an app, the menu button opens that app's menu (move, hide and so on), the same as holding OK.
 
 ### Screensaver
 

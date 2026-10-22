@@ -15,6 +15,7 @@ import android.graphics.drawable.Drawable
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import app.orchard.tv.ui.theme.Glyph
@@ -187,15 +188,39 @@ object TileArtFactory {
     /** One of Aerial's own glyphs in white over [top] to [bottom]; also for [TileRecipe.glyph]. */
     fun glyphTile(top: Int, bottom: Int, glyph: Glyph): TileArt {
         val back = colorTile(top, bottom)
-        // The glyph on its own layer, so it shifts against the color when the tile leans.
-        val g = H * 0.46f
+        // The glyph on its own layer, so it shifts against the color when the tile leans. The
+        // symbols keep a margin inside their box, so the box is larger than the glyph looks.
+        val g = H * 0.58f
         val fore = layer {
             translate((W - g) / 2f, (H - g) / 2f)
             CanvasDrawScope().draw(Density(1f), LayoutDirection.Ltr, androidx.compose.ui.graphics.Canvas(this), Size(g, g)) {
-                drawGlyph(glyph, Color.White)
+                // A soft shadow under the glyph lifts it off the color, as on tvOS's own icons.
+                val drop = g * 0.025f
+                for ((dy, a) in listOf(drop * 2f to 0.06f, drop to 0.12f)) {
+                    drawContext.transform.translate(0f, dy)
+                    paintGlyph(glyph, Color.Black.copy(alpha = a), shadow = true)
+                    drawContext.transform.translate(0f, -dy)
+                }
+                paintGlyph(glyph, Color.White, shadow = false)
             }
         }
         return finish(back, fore)
+    }
+
+    /**
+     * Weather gets its colors, as on tvOS: a warm sun half behind a white cloud. Everything else is
+     * one white glyph.
+     */
+    private fun androidx.compose.ui.graphics.drawscope.DrawScope.paintGlyph(glyph: Glyph, color: Color, shadow: Boolean) {
+        if (glyph != Glyph.CloudSun) return drawGlyph(glyph, color)
+        val g = size.minDimension
+        drawContext.transform.translate(-g * 0.14f, -g * 0.15f)
+        scale(0.78f, pivot = androidx.compose.ui.geometry.Offset(g / 2, g / 2)) {
+            drawGlyph(Glyph.Sun, if (shadow) color else Color(0xFFFFD60A))
+        }
+        drawContext.transform.translate(g * 0.24f, g * 0.27f)
+        scale(0.86f, pivot = androidx.compose.ui.geometry.Offset(g / 2, g / 2)) { drawGlyph(Glyph.Cloud, color) }
+        drawContext.transform.translate(-g * 0.10f, -g * 0.12f)
     }
 
     /** Aerial's own tile color: a diagonal gradient with soft light from the top left. */

@@ -20,7 +20,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -68,10 +67,12 @@ import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.system.HomeStatus
 import app.orchard.tv.system.NetKind
 import app.orchard.tv.system.SourceKind
+import app.orchard.tv.system.Sounds
 import app.orchard.tv.system.SystemProbe
 import app.orchard.tv.ui.components.Pressable
 import app.orchard.tv.ui.components.consumeTaps
 import app.orchard.tv.ui.components.dismissOnTap
+import app.orchard.tv.ui.components.liquidGlass
 import app.orchard.tv.ui.home.MenuRow
 import app.orchard.tv.ui.home.dateText
 import app.orchard.tv.ui.home.timeText
@@ -127,9 +128,7 @@ fun ControlCenter(
                 Modifier
                     .width(360.dp)
                     .consumeTaps()
-                    .clip(RoundedCornerShape(30.dp))
-                    .background(Palette.Glass)
-                    .border(1.dp, Palette.Hairline, RoundedCornerShape(30.dp))
+                    .liquidGlass(30.dp)
                     .padding(22.dp),
             ) {
                 AnimatedContent(
@@ -209,17 +208,11 @@ private fun MainPage(vm: HomeViewModel, now: LocalDateTime, takeFocus: Boolean, 
         BrightnessRow(vm)
 
         Spacer(Modifier.height(8.dp))
-        // How Home looks (wallpaper, screensaver, focus style, weather) lives in one place.
+        // How Home looks (wallpaper, screensaver, focus style, hidden apps, weather) lives in one place.
         MenuRow(
             Glyph.Photo,
             stringResource(R.string.cc_personalize),
             onClick = { vm.overlay = Overlay.Wallpaper },
-        )
-        MenuRow(
-            Glyph.EyeSlash,
-            stringResource(R.string.cc_hidden_apps),
-            onClick = { vm.whenUnlocked { vm.overlay = Overlay.HiddenApps } },
-            trailing = vm.hiddenApps.size.toString(),
         )
         Updates.available?.let { latest ->
             MenuRow(
@@ -315,7 +308,14 @@ private fun SliderRow(
     onStep: (Int) -> Unit,
     onClick: () -> Unit,
 ) {
-    val step by rememberUpdatedState(onStep)
+    // Each step ticks, as focus does; a step past either end bumps instead. Read through state:
+    // the drag handler below is made once and outlives this composition's values.
+    val atLevel by rememberUpdatedState(level)
+    val doStep by rememberUpdatedState(onStep)
+    val step = { by: Int ->
+        if ((by > 0 && atLevel >= 0.999f) || (by < 0 && atLevel <= 0.001f)) Sounds.limit() else Sounds.step()
+        doStep(by)
+    }
     val stepCount by rememberUpdatedState(steps.coerceAtLeast(1))
     Pressable(
         onClick = onClick,
@@ -324,7 +324,7 @@ private fun SliderRow(
         onKey = { e ->
             val code = e.nativeKeyEvent.keyCode
             if (code != NativeKeyEvent.KEYCODE_DPAD_LEFT && code != NativeKeyEvent.KEYCODE_DPAD_RIGHT) return@Pressable false
-            if (e.type == KeyEventType.KeyDown) onStep(if (code == NativeKeyEvent.KEYCODE_DPAD_RIGHT) 1 else -1)
+            if (e.type == KeyEventType.KeyDown) step(if (code == NativeKeyEvent.KEYCODE_DPAD_RIGHT) 1 else -1)
             true
         },
     ) { state ->

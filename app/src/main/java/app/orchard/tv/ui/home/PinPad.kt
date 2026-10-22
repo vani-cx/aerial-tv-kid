@@ -46,6 +46,7 @@ import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.ui.components.Pressable
 import app.orchard.tv.ui.components.consumeTaps
 import app.orchard.tv.ui.components.dismissOnTap
+import app.orchard.tv.ui.components.liquidGlass
 import app.orchard.tv.ui.theme.Glyph
 import app.orchard.tv.ui.theme.GlyphIcon
 import app.orchard.tv.ui.theme.Motion
@@ -133,9 +134,7 @@ private fun PinPanel(mode: PinMode, onDone: () -> Unit, onCancel: () -> Unit) {
         Column(
             Modifier
                 .consumeTaps()
-                .clip(RoundedCornerShape(28.dp))
-                .background(Palette.Glass)
-                .border(1.dp, Palette.Hairline, RoundedCornerShape(28.dp))
+                .liquidGlass(28.dp)
                 .padding(horizontal = 36.dp, vertical = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {

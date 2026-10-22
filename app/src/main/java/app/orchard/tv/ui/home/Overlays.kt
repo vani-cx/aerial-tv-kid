@@ -55,6 +55,7 @@ import app.orchard.tv.apps.CustomIcons
 import app.orchard.tv.ui.components.Pressable
 import app.orchard.tv.ui.components.consumeTaps
 import app.orchard.tv.ui.components.dismissOnTap
+import app.orchard.tv.ui.components.liquidGlass
 import app.orchard.tv.ui.theme.Glyph
 import app.orchard.tv.ui.theme.GlyphIcon
 import app.orchard.tv.ui.theme.Motion
@@ -162,9 +163,7 @@ fun AppMenu(
                 Modifier
                     .width(250.dp)
                     .consumeTaps()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Palette.Glass)
-                    .border(1.dp, Palette.Hairline, RoundedCornerShape(20.dp))
+                    .liquidGlass(20.dp)
                     .padding(8.dp),
             ) {
                 BasicText(
@@ -241,9 +240,7 @@ fun HiddenAppsSheet(
                     .consumeTaps()
                     // The canvas is 540 dp tall: past three rows the grid scrolls inside the sheet.
                     .heightIn(max = 480.dp)
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(Palette.Glass)
-                    .border(1.dp, Palette.Hairline, RoundedCornerShape(28.dp))
+                    .liquidGlass(28.dp)
                     .padding(28.dp),
             ) {
                 BasicText(stringResource(R.string.hidden_title), style = Type.LargeTitle)

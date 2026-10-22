@@ -18,19 +18,18 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,7 +44,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlurEffect
@@ -73,9 +71,9 @@ import app.orchard.tv.apps.AppEntry
 import app.orchard.tv.ui.control.ControlCenter
 import app.orchard.tv.ui.wallpaper.WallpaperSheet
 import app.orchard.tv.wallpaper.Wallpapers
+import app.orchard.tv.ui.components.liquidGlass
 import app.orchard.tv.ui.theme.LocalReducedMotion
 import app.orchard.tv.ui.theme.Motion
-import app.orchard.tv.ui.theme.Palette
 import app.orchard.tv.ui.theme.Type
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
@@ -286,10 +284,21 @@ fun HomeScreen(
                     renderEffect = if (r > 0.5f && Build.VERSION.SDK_INT >= 31) BlurEffect(r, r, TileMode.Clamp) else null
                 },
         ) {
+            // The glass plate under the top row, as wide as the apps in it (tvOS 26).
+            val topCount = apps.size.coerceAtMost(COLUMNS)
+            val plate = if (topCount == 0) null else with(density) {
+                Rect(
+                    (metrics.margin - PlatePadH).toPx(),
+                    (metrics.topRowY - PlatePadV).toPx(),
+                    (metrics.margin + metrics.pitchX * (topCount - 1) + metrics.tileW + PlatePadH).toPx(),
+                    (metrics.topRowY + metrics.tileH + PlatePadV).toPx(),
+                )
+            }
             HomeBackground(
                 // The chosen wallpaper; in "Follow App" mode, light from the focused app.
                 backdrop = Wallpapers.backdrop ?: ambientApp?.art?.backdrop,
                 frosted = Wallpapers.frosted.takeIf { Wallpapers.backdrop != null },
+                plate = plate,
                 scroll = { scroll.value },
                 collapse = collapsePx,
             )
@@ -297,7 +306,7 @@ fun HomeScreen(
             Box(Modifier.fillMaxSize().offset { IntOffset(0, -scroll.value.roundToInt()) }) {
                 val clockRight = AerialSettings.clockRight
                 // With one row the wallpaper keeps the screen, as under tvOS's full-screen shelf: no
-                // big clock, only the time and weather in one line, or inside the pill on the right.
+                // big clock, only the time and weather in one line, top left or beside the pill.
                 if (!AerialSettings.oneRowHome) {
                     ShelfClock(
                         now = now,
@@ -334,6 +343,10 @@ fun HomeScreen(
                             enabled = gridEnabled,
                             moving = moving == app.key,
                             appearDelayMs = (index * 28).coerceAtMost(320),
+                            // The top row sits on the glass until the grid comes in.
+                            onGlass = if (index < COLUMNS) {
+                                { (1f - scroll.value / collapsePx * 2f).coerceIn(0f, 1f) }
+                            } else null,
                             onFocused = {
                                 focusedKey = app.key
                                 lastFocusedIndex = index
@@ -370,36 +383,48 @@ fun HomeScreen(
             drawRect(Brush.verticalGradient(0f to Color.Black, 0.5f to Color.Black.copy(alpha = 0.82f), 1f to Color.Transparent))
         }
 
-        // One-row Home with the clock on the right: the pill carries the time and weather.
-        val inPill = AerialSettings.oneRowHome && AerialSettings.clockRight
-        StatusPill(
-            now = now,
-            network = vm.network,
-            showTime = inPill || (if (dragged) pastShelf else focusedRow > 0),
-            showWeather = inPill,
-            enabled = gridEnabled && moving == null,
-            focusRequester = pillRequester,
-            onFocused = { gained ->
-                // The window hands its first focus to the top-most control; the top row is where Home starts.
-                if (gained) {
-                    if (focusedKey == null) {
-                        if (apps.isNotEmpty()) focusApp(0)
-                    } else {
-                        pillFocused = true
-                    }
-                }
-            },
-            onClick = {
-                // A tap focuses the pill and opens Control Center in the same frame, before
-                // onFocused hears of it: note it here so focus comes back to the pill.
-                pillFocused = true
-                vm.overlay = Overlay.ControlCenter()
-            },
-            modifier = Modifier
+        // The pill holds only the network and Control Center. The time joins it once the clock
+        // above the top row has scrolled away, so the screen never shows the time twice. One-row
+        // Home with the clock on the right puts the time and weather just left of the pill.
+        Row(
+            Modifier
                 .align(Alignment.TopEnd)
                 .padding(top = 28.dp, end = metrics.margin - 14.dp)
                 .graphicsLayer { alpha = if (overlay is Overlay.ControlCenter) 0f else 1f },
-        )
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (AerialSettings.oneRowHome && AerialSettings.clockRight) {
+                CornerClock(
+                    now = now,
+                    modifier = Modifier
+                        .padding(end = 14.dp)
+                        .graphicsLayer { alpha = 1f - (scroll.value / collapsePx * 1.6f).coerceIn(0f, 1f) },
+                )
+            }
+            StatusPill(
+                now = now,
+                network = vm.network,
+                showTime = if (dragged) pastShelf else focusedRow > 0,
+                enabled = gridEnabled && moving == null,
+                focusRequester = pillRequester,
+                onFocused = { gained ->
+                    // The window hands its first focus to the top-most control; the top row is where Home starts.
+                    if (gained) {
+                        if (focusedKey == null) {
+                            if (apps.isNotEmpty()) focusApp(0)
+                        } else {
+                            pillFocused = true
+                        }
+                    }
+                },
+                onClick = {
+                    // A tap focuses the pill and opens Control Center in the same frame, before
+                    // onFocused hears of it: note it here so focus comes back to the pill.
+                    pillFocused = true
+                    vm.overlay = Overlay.ControlCenter()
+                },
+            )
+        }
 
         AnimatedVisibility(
             visible = moving != null,
@@ -413,8 +438,7 @@ fun HomeScreen(
                 stringResource(if (touch) R.string.move_hint_touch else R.string.move_hint),
                 style = Type.Body,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(Palette.Glass)
+                    .liquidGlass(20.dp)
                     .height(40.dp)
                     .padding(horizontal = 20.dp, vertical = 10.dp),
             )
@@ -456,14 +480,17 @@ fun HomeScreen(
             apps = vm.hiddenApps,
             onUnhide = { key ->
                 vm.unhide(key)
-                if (vm.hiddenApps.isEmpty()) vm.overlay = Overlay.None
+                if (vm.hiddenApps.isEmpty()) vm.overlay = Overlay.Wallpaper
             },
-            onDismiss = { vm.overlay = Overlay.ControlCenter() },
+            // Hidden apps are reached from Personalization, and Back returns there.
+            onDismiss = { vm.overlay = Overlay.Wallpaper },
         )
 
         WallpaperSheet(
             visible = overlay is Overlay.Wallpaper,
             onDismiss = { vm.overlay = Overlay.ControlCenter() },
+            hiddenCount = vm.hiddenApps.size,
+            onHiddenApps = { vm.whenUnlocked { vm.overlay = Overlay.HiddenApps } },
             onStartScreensaver = {
                 vm.overlay = Overlay.None
                 onStartScreensaver()

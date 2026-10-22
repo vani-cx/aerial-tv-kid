@@ -24,6 +24,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import app.orchard.tv.system.Sounds
 import app.orchard.tv.ui.theme.LocalReducedMotion
 import app.orchard.tv.ui.theme.Motion
 
@@ -92,6 +93,7 @@ fun Pressable(
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .focusRequester(requester)
             .onFocusChanged {
+                if (it.isFocused && !state.focused) Sounds.focusMoved()
                 state.focused = it.isFocused
                 if (!it.isFocused) {
                     state.pressed = false
@@ -108,6 +110,7 @@ fun Pressable(
                     },
                     onTap = {
                         runCatching { requester.requestFocus() }
+                        Sounds.select()
                         click()
                     },
                 )
@@ -127,7 +130,10 @@ fun Pressable(
                         val was = state.pressed && state.byKey
                         state.pressed = false
                         state.byKey = false
-                        if (was) onClick()
+                        if (was) {
+                            Sounds.select()
+                            onClick()
+                        }
                         true
                     }
                     else -> false

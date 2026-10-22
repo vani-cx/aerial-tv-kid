@@ -41,17 +41,13 @@ object AerialSettings {
     var bootSource by mutableStateOf<String?>(null); private set
 
     /**
-     * Minutes of no input on Home before Aerial's screensaver starts (issue #66). The firmware's own
-     * screensaver still caps it: Aerial starts just ahead of that one, see MainActivity.
-     */
-    /** Every app's name under its tile, not only the focused one's (issue #28). */
-    var showAllNames by mutableStateOf(false); private set
-
-    /**
      * Only the top row on Home, low on the screen, so the wallpaper (a family photo) shows above it,
      * as tvOS does under a full-screen top shelf. The rest of the grid is one press down.
      */
-    var oneRowHome by mutableStateOf(false); private set
+    var oneRowHome by mutableStateOf(true); private set
+
+    /** Interface sounds (system/Sounds), as tvOS plays them on every press. */
+    var uiSounds by mutableStateOf(true); private set
 
     /** The clock, with the date and weather, in the top right instead of the top left. */
     var clockRight by mutableStateOf(false); private set
@@ -68,6 +64,10 @@ object AerialSettings {
     private var unlockedUntil = 0L
     private const val UNLOCK_MS = 10 * 60 * 1000L
 
+    /**
+     * Minutes of no input on Home before Aerial's screensaver starts (issue #66). The firmware's own
+     * screensaver still caps it: Aerial starts just ahead of that one, see MainActivity.
+     */
     var screensaverMinutes by mutableStateOf(DEFAULT_SCREENSAVER_MINUTES); private set
 
     val screensaverChoices = listOf(2, 5, 10, 20)
@@ -83,9 +83,9 @@ object AerialSettings {
         bootSource = prefs.getString("boot_source", null)
         pinHash = prefs.getString("pin_hash", null)
         pinSet = pinHash != null
-        showAllNames = prefs.getBoolean("show_all_names", false)
-        oneRowHome = prefs.getBoolean("one_row_home", false)
+        oneRowHome = prefs.getBoolean("one_row_home", true)
         clockRight = prefs.getBoolean("clock_right", false)
+        uiSounds = prefs.getBoolean("ui_sounds", true)
         backStartsScreensaver = prefs.getBoolean("back_starts_screensaver", true)
         screensaverMinutes = prefs.getInt("screensaver_minutes", DEFAULT_SCREENSAVER_MINUTES)
     }
@@ -116,14 +116,14 @@ object AerialSettings {
     private fun hash(pin: String): String =
         MessageDigest.getInstance("SHA-256").digest("aerial:$pin".toByteArray()).joinToString("") { "%02x".format(it) }
 
-    fun chooseShowAllNames(on: Boolean) {
-        showAllNames = on
-        app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean("show_all_names", on) }
-    }
-
     fun chooseOneRowHome(on: Boolean) {
         oneRowHome = on
         app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean("one_row_home", on) }
+    }
+
+    fun chooseUiSounds(on: Boolean) {
+        uiSounds = on
+        app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean("ui_sounds", on) }
     }
 
     fun chooseClockRight(on: Boolean) {

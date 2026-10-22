@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import app.orchard.tv.apps.AppEntry
 import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.settings.FocusStyle
+import app.orchard.tv.system.Sounds
 import app.orchard.tv.ui.components.isSelect
 import app.orchard.tv.ui.theme.LocalReducedMotion
 import app.orchard.tv.ui.theme.Motion
@@ -95,6 +96,7 @@ fun AppTile(
     enabled: Boolean,
     moving: Boolean,
     appearDelayMs: Int,
+    onGlass: (() -> Float)?,
     onFocused: () -> Unit,
     onClick: (Rect?) -> Unit,
     onLongPress: (Rect?) -> Unit,
@@ -125,8 +127,10 @@ fun AppTile(
             focused || moving -> FOCUSED_SCALE
             else -> 1f
         },
-        // Press answers immediately; focus settles on a spring so rapid D-pad presses retarget smoothly.
-        animationSpec = if (pressed) tween(110, easing = Motion.EaseOut) else spring(dampingRatio = 0.66f, stiffness = 460f),
+        // Press answers immediately; focus settles on a spring so rapid D-pad presses retarget
+        // smoothly. Critically damped, as Android TV's focus zoom (Leanback, Compose for TV) is: an
+        // overshoot reads as a wobble on a lit tile and makes the white frame shimmer.
+        animationSpec = if (pressed) tween(110, easing = Motion.EaseOut) else spring(dampingRatio = 1f, stiffness = 520f),
         label = "tile-scale",
     )
     val lift by animateFloatAsState(
@@ -138,6 +142,13 @@ fun AppTile(
         targetValue = if (AerialSettings.focusStyle == FocusStyle.HighContrast) 1f else 0f,
         animationSpec = tween(200, easing = Motion.EaseOut),
         label = "tile-ring",
+    )
+    // The frame comes on quickly with the zoom and goes off faster still, so moving along a row
+    // never shows two frames at once. It grows out from the tile's edge to its place.
+    val ringIn by animateFloatAsState(
+        targetValue = if (focused || moving) 1f else 0f,
+        animationSpec = if (focused || moving) spring(dampingRatio = 1f, stiffness = 700f) else spring(dampingRatio = 1f, stiffness = 2400f),
+        label = "tile-ring-in",
     )
 
     // tvOS "jiggle" while the app is being moved.
@@ -201,6 +212,7 @@ fun AppTile(
                 }
                 .focusRequester(focusRequester)
                 .onFocusChanged {
+                    if (it.isFocused && !focused) Sounds.focusMoved()
                     focused = it.isFocused
                     if (it.isFocused) onFocused() else {
                         pressed = false
@@ -219,6 +231,7 @@ fun AppTile(
                     }
                     if (dir != null) {
                         if (down && !focusManager.moveFocus(dir)) {
+                            Sounds.limit()
                             when (dir) {
                                 FocusDirection.Left -> nudge(-1f, 0f)
                                 FocusDirection.Right -> nudge(1f, 0f)
@@ -235,6 +248,7 @@ fun AppTile(
                         if (down && e.nativeKeyEvent.repeatCount == 0) menuPressed = true
                         else if (e.type == KeyEventType.KeyUp && menuPressed) {
                             menuPressed = false
+                            Sounds.select()
                             onLongPress(bounds)
                         }
                         return@onKeyEvent true
@@ -246,6 +260,7 @@ fun AppTile(
                             longPressJob?.cancel()
                             longFired = true
                             pressed = false
+                            Sounds.select()
                             onLongPress(bounds)
                         } else if (e.nativeKeyEvent.repeatCount == 0) {
                             pressed = true
@@ -256,13 +271,17 @@ fun AppTile(
                                 if (pressed) {
                                     longFired = true
                                     pressed = false
+                                    Sounds.select()
                                     onLongPress(bounds)
                                 }
                             }
                         }
                     } else if (e.type == KeyEventType.KeyUp) {
                         longPressJob?.cancel()
-                        if (pressed && !longFired) onClick(bounds)
+                        if (pressed && !longFired) {
+                            Sounds.select()
+                            onClick(bounds)
+                        }
                         pressed = false
                     }
                     true
@@ -281,11 +300,13 @@ fun AppTile(
                         },
                         onTap = {
                             runCatching { focusRequester.requestFocus() }
+                            Sounds.select()
                             click(bounds)
                         },
                         onLongPress = {
                             pressed = false
                             runCatching { focusRequester.requestFocus() }
+                            Sounds.select()
                             longPress(bounds)
                         },
                     )
@@ -333,7 +354,7 @@ fun AppTile(
             }
         }
 
-        if (ring > 0.01f && lift > 0.01f) {
+        if (ring > 0.01f && ringIn > 0.01f) {
             // The frame sits outside the tile, so it is drawn on its own unclipped layer that moves
             // exactly as the tile does: same lift, lean, push and jiggle.
             Canvas(
@@ -348,10 +369,10 @@ fun AppTile(
                         translationX = push.value.x
                         translationY = push.value.y
                         cameraDistance = 14f * density
-                        alpha = ring * lift
+                        alpha = ring * ringIn
                     },
             ) {
-                val gap = RingGap.toPx()
+                val gap = RingGap.toPx() * (0.4f + 0.6f * ringIn)
                 val w = RingWidth.toPx()
                 val out = gap + w / 2
                 // A faint dark edge outside the white one keeps the frame visible over bright sky or snow.
@@ -363,12 +384,28 @@ fun AppTile(
                     cornerRadius = CornerRadius(Corner.toPx() + halo),
                     style = Stroke(width = 2.dp.toPx()),
                 )
+                // Lit like the glass it sits on: brightest where light falls from the top left and
+                // at the far corner, still near white everywhere so it reads from across the room.
                 drawRoundRect(
-                    Color.White,
+                    Brush.linearGradient(
+                        0f to Color.White,
+                        0.45f to Color.White.copy(alpha = 0.78f),
+                        1f to Color.White.copy(alpha = 0.94f),
+                        start = Offset(-out, -out),
+                        end = Offset(size.width + out, size.height + out),
+                    ),
                     topLeft = Offset(-out, -out),
                     size = Size(size.width + out * 2, size.height + out * 2),
                     cornerRadius = CornerRadius(Corner.toPx() + out),
                     style = Stroke(width = w),
+                )
+                // A thin inner line of light, the glass's thickness.
+                drawRoundRect(
+                    Color.White.copy(alpha = 0.35f),
+                    topLeft = Offset(-out + w / 2 + 0.75.dp.toPx(), -out + w / 2 + 0.75.dp.toPx()),
+                    size = Size(size.width + (out - w / 2 - 0.75.dp.toPx()) * 2, size.height + (out - w / 2 - 0.75.dp.toPx()) * 2),
+                    cornerRadius = CornerRadius(Corner.toPx() + out - w / 2 - 0.75.dp.toPx()),
+                    style = Stroke(width = 1.dp.toPx()),
                 )
             }
         }
@@ -387,11 +424,12 @@ fun AppTile(
                 .offset(y = height + 10.dp)
                 .requiredSize(width + 36.dp, 24.dp)
                 .graphicsLayer {
-                    // With every name shown, the others stay a little dimmer than the focused one.
-                    alpha = if (AerialSettings.showAllNames) 0.7f + 0.3f * lift else lift
+                    // As on tvOS 26: no names on the glass of the top row; in the grid only the
+                    // focused app shows its name.
+                    alpha = lift * (1f - (onGlass?.invoke() ?: 0f))
                     // Sits just under the lifted tile, and rises into place as it appears.
                     translationY = height.toPx() * (scale - 1f) / 2f - (1f - lift) * 6.dp.toPx() +
-                        ring * (RingGap + RingWidth).toPx() * scale
+                        ring * ringIn * (RingGap + RingWidth).toPx() * scale
                 },
         )
     }
