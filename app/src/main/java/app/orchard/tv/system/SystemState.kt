@@ -206,7 +206,9 @@ object SystemProbe {
      * Physical inputs from the TV input framework, routed through the maker's own player where the
      * generic passthrough intent has no handler (Xiaomi's China firmware).
      */
-    fun sources(context: Context): List<TvSource> = frameworkSources(context).ifEmpty { tclSources(context) }
+    fun sources(context: Context): List<TvSource> = frameworkSources(context)
+        .ifEmpty { KonkaSources.load(context) }
+        .ifEmpty { tclSources(context) }
 
     private fun frameworkSources(context: Context): List<TvSource> {
         val tim = context.getSystemService<TvInputManager>() ?: return emptyList()

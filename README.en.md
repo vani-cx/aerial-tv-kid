@@ -135,6 +135,7 @@ Most TVs sold in China only accept their own home screen and clear third-party a
 | TCL MT5879 (China) | Android 11 | In daily use ([notes](docs/devices/tcl-mt5879-cn.md)) |
 | Sony A80J (China) / BRAVIA VH1 | Android 10 / 12 | User-verified ([#16](https://github.com/pengchujin/aerial-tv/issues/16), [#2](https://github.com/pengchujin/aerial-tv/issues/2)) |
 | Skyworth Coocaa K3 Pro | Android 11 | User-verified ([#43](https://github.com/pengchujin/aerial-tv/issues/43)) |
+| Konka KKTV U86V9 | Android 9 | User-verified: Home, start at boot, inputs; brightness does not work ([notes](docs/devices/konka-kktv-u86v9.md), Chinese) |
 | OPPO K9 | Android 9 | Needs a renamed package ([notes](docs/devices/oppo-coloros-tv.md)) |
 | Konka 2861, PPTV K55U27, XGIMI m7642, Tencent Aurora box 7S | Android 5–9 | User-verified with small issues, see [Issues](https://github.com/pengchujin/aerial-tv/issues) |
 | FFALCON 55S595C Ultra | Android 11 | Installs, but can't take over Home ([#52](https://github.com/pengchujin/aerial-tv/issues/52)) |
