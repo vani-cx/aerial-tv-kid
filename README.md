@@ -11,6 +11,8 @@
 
 **中文** · [English](README.en.md)
 
+**这个仓库是 [vani-cx](https://github.com/vani-cx) 的个人分支**：在 1.35 的基础上加了儿童模式与时间管理（应用锁定、每日时长/允许时段/间隔休息、分龄数学题），删掉了原版的 4 位家长密码和应用内更新。多了什么、怎么装，见 **[PROJECT.md](PROJECT.md)**。
+
 <a href="https://aerial.qust.me"><img alt="官网" src="https://img.shields.io/badge/%E5%AE%98%E7%BD%91-1f6feb?style=for-the-badge&logo=safari&logoColor=white"></a>
 <a href="https://github.com/pengchujin/aerial-tv/releases/latest"><img alt="下载 APK" src="https://img.shields.io/badge/%E4%B8%8B%E8%BD%BD%20APK-34a853?style=for-the-badge&logo=android&logoColor=white"></a>
 <a href="#安装"><img alt="安装" src="https://img.shields.io/badge/%E5%AE%89%E8%A3%85-d97757?style=for-the-badge&logo=gnubash&logoColor=white"></a>
