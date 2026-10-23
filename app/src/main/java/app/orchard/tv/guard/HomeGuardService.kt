@@ -390,6 +390,13 @@ class HomeGuardService : AccessibilityService() {
             Log.i(TAG, "screen off; leaving Home to the screen-on check")
             return
         }
+        // ColorOS TV's quick standby keeps Android awake behind a black screen and shows the stock
+        // launcher on the way down; starting Aerial then lit the TV again (OPPO S1 OPPOCNM950,
+        // Android 9, found by a user in issue #22). Only that setting tells.
+        if (runCatching { Settings.Global.getString(contentResolver, "tv_power_mode") }.getOrNull() == "QUICK") {
+            Log.i(TAG, "quick standby; leaving Home alone")
+            return
+        }
         runCatching {
             startActivity(MainActivity.bringBackIntent(this).putExtra(MainActivity.EXTRA_WOKE, woke))
         }.onFailure { Log.w(TAG, "could not bring Aerial Home to the front", it) }

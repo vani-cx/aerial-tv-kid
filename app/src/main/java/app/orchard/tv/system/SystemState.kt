@@ -94,19 +94,33 @@ object SystemProbe {
     private fun volumeFlags(context: Context) =
         if (isInstalled(context, "com.tcl.settings")) AudioManager.FLAG_SHOW_UI else 0
 
+    /**
+     * TCL tcl_m7642 (雷鸟 65S515D, Android 9) has adjustStreamVolume note the change in battery stats,
+     * which needs a system permission: it threw and Control Center crashed at the first step (issue
+     * #15). Setting the level is the way left there.
+     */
     fun adjustVolume(context: Context, direction: Int) {
         val am = context.getSystemService<AudioManager>() ?: return
-        am.adjustStreamVolume(
-            AudioManager.STREAM_MUSIC,
-            if (direction > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
-            volumeFlags(context),
-        )
+        val flags = volumeFlags(context)
+        try {
+            am.adjustStreamVolume(
+                AudioManager.STREAM_MUSIC,
+                if (direction > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
+                flags,
+            )
+        } catch (e: SecurityException) {
+            runCatching {
+                val level = am.getStreamVolume(AudioManager.STREAM_MUSIC) + if (direction > 0) 1 else -1
+                am.setStreamVolume(AudioManager.STREAM_MUSIC, level.coerceIn(0, am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)), flags)
+            }
+        }
     }
 
     fun toggleMute(context: Context) {
         val am = context.getSystemService<AudioManager>() ?: return
         if (Build.VERSION.SDK_INT >= 23) {
-            am.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_TOGGLE_MUTE, volumeFlags(context))
+            // See adjustVolume: no other way to mute there.
+            runCatching { am.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_TOGGLE_MUTE, volumeFlags(context)) }
         } else {
             legacyMuted = !legacyMuted
             @Suppress("DEPRECATION")
