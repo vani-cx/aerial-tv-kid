@@ -178,7 +178,7 @@ adb shell settings put secure enabled_accessibility_services \
   "com.example.other/com.example.other.Service:app.orchard.tv/app.orchard.tv.parental.WatchService"
 ```
 
-> **有的固件把这条路封死了。** 坚果 N1（S700）的 `SettingsProvider` 直接拒绝第三方写 `enabled_accessibility_services`（连写回原值都拒），系统里也没有无障碍设置页，`adb root` 也不可用——那台机器上只能用降级计时，细节见 [docs/devices/jmgo-n1.md](devices/jmgo-n1.md)。
+> **有的固件把这条路封死了。** 坚果 N1（S700）的 `SettingsProvider` 直接拒绝第三方写 `enabled_accessibility_services`（连写回原值都拒），系统里也没有无障碍设置页，`adb root` 也不可用——那台机器上只能用降级计时。它唯一还拿得到的相关权限是 `appops set app.orchard.tv GET_USAGE_STATS allow`（系统自己记着哪个 App 何时在前台、屏幕何时亮着），细节见 [docs/devices/jmgo-n1.md](devices/jmgo-n1.md)。
 
 改完回设置面板看「计时服务」是不是「已开启」。**这一步只做一次**：写进的是系统的 `secure` 设置，重启、待机都不会自己丢。丢的情况只有三种——卸载重装（设置跟着包走）、恢复出厂，以及被固件「强行停止」（见下）。
 
