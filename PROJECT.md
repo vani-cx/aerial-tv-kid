@@ -222,13 +222,14 @@ adb shell settings put secure accessibility_enabled 1
 
 ## 七、参考项目
 
-本分支大量读过、并对齐了实现思路的项目（两个参考实现已 fork 到本账号下，方便对照）：
+本分支大量读过、并对齐了实现思路的项目（参考实现都已 fork 到本账号下，方便对照）：
 
 | 项目 | 用途 | 本账号 |
 |---|---|---|
 | [pengchujin/aerial-tv](https://github.com/pengchujin/aerial-tv) | 上游本体：桌面、信号源、屏保、无障碍接管 Home 的底座 | 用 `upstream` 远程跟踪（同名仓库已是本项目，不再另开 fork） |
 | [iBala/tvwall](https://github.com/iBala/tvwall) | 儿童时间限制的参考实现，`WatchService` 的 tick 与亮屏门控思路来自这里 | [vani-cx/tvwall](https://github.com/vani-cx/tvwall) |
 | [spocky/miproja1](https://github.com/spocky/miproja1) | 小米电视 Projectivy 配置，机型适配与系统设置写法参考 | [vani-cx/miproja1](https://github.com/vani-cx/miproja1) |
+| [Gathin23/cleanyourtv](https://github.com/Gathin23/cleanyourtv)（原 tv-vibehack） | 各机型去广告清单与小米 MFTR0 的信号源笔记，`docs/devices` 里的机型差异参考过它 | [vani-cx/cleanyourtv](https://github.com/vani-cx/cleanyourtv) |
 
 ---
 

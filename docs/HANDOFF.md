@@ -167,5 +167,5 @@ plutil -convert json -o en.json TVIdleScreenStrings.bundle/en.lproj/Localizable.
 
 ## 参考
 
-- tv-vibehack / CleanYourTV（https://github.com/Gathin23/tv-vibehack）：有很多机型的去广告列表，以及 MFTR0 的信号源笔记，Aerial 的小米信号源路由就参考了它。
+- tv-vibehack / CleanYourTV（https://github.com/Gathin23/cleanyourtv）：有很多机型的去广告列表，以及 MFTR0 的信号源笔记，Aerial 的小米信号源路由就参考了它。
 - Apple 航拍资源：`https://sylvan.apple.com/Aerials/resources-16.tar`。
