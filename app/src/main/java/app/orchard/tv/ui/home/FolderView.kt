@@ -103,7 +103,6 @@ fun FolderView(
                                 enabled = enabled,
                                 moving = false,
                                 appearDelayMs = (i * 28).coerceAtMost(200),
-                                onGlass = null,
                                 onFocused = { focusedKey = app.key },
                                 onClick = { bounds -> onLaunch(app, bounds) },
                                 onLongPress = { bounds -> menuKey = app.key; onLongPress(app, bounds) },

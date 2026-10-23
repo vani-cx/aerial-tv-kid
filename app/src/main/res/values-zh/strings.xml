@@ -16,6 +16,15 @@
     <string name="cc_home_default">Aerial 是默认桌面</string>
     <string name="cc_home_guarded">桌面守护已开启</string>
     <string name="cc_home_not_default">尚未设为默认桌面</string>
+    <string name="cc_setup_title">设为主屏幕</string>
+    <string name="cc_setup_body">只装了 APK 时，Aerial 能打开，但按主页键、开机和待机后还是原来的桌面。</string>
+    <string name="cc_setup_guard">打开桌面守护</string>
+    <string name="cc_setup_guard_where">无障碍</string>
+    <string name="cc_setup_home">选择默认桌面</string>
+    <string name="cc_setup_revival">待机后自动回来</string>
+    <string name="cc_setup_revival_where">通知使用权</string>
+    <string name="cc_setup_scan">或者用电脑一次设好（推荐）</string>
+    <string name="cc_setup_scan_hint">手机扫码，拿到这台电视的命令和给 Agent 的提示词。</string>
     <string name="cc_back">返回</string>
     <string name="cc_no_inputs">这台电视没有可用的信号源</string>
 
@@ -62,6 +71,7 @@
     <string name="launch_failed">无法打开%1$s</string>
     <string name="unavailable">此电视不支持</string>
     <string name="cc_brightness">亮度</string>
+    <string name="cc_brightness_in_settings">在图像设置里调</string>
     <string name="cc_personalize">个性化</string>
     <string name="wp_title">个性化</string>
     <string name="wp_wallpaper">壁纸</string>
@@ -79,6 +89,7 @@
     <string name="wp_daily">每日精选</string>
     <string name="wp_daily_latest">每日自动更新</string>
     <string name="wp_builtin">内置</string>
+    <string name="wp_live">航拍 · 停在主屏幕 10 秒后播放</string>
     <string name="wp_photos">我的照片</string>
     <string name="wp_photos_rotate">每天换一张</string>
     <string name="wp_screensaver">屏幕保护程序</string>
@@ -96,6 +107,12 @@
     <string name="ss_back_on">开始屏保</string>
     <string name="ss_back_off">不响应</string>
     <string name="ss_back_choice_hint">在主页第一行按返回键时做什么。容易误按的话可以关掉，屏保仍会按时自动开始。</string>
+    <string name="ss_quality">航拍画质</string>
+    <string name="ss_quality_hint">「自动」播放这台电视能显示的最好版本：4K 杜比视界、4K 或 1080p。4K 杜比视界需要约 25 Mbps 的网速，航拍经常跳过时可以选 1080p。</string>
+    <string name="ss_quality_auto">自动</string>
+    <string name="ss_quality_hd">1080p</string>
+    <string name="ss_quality_uhd">4K</string>
+    <string name="ss_quality_dv">4K 杜比视界</string>
     <string name="st_focus_style">焦点样式</string>
     <string name="st_home_layout">主屏幕</string>
     <string name="st_layout">布局</string>
@@ -106,7 +123,7 @@
     <string name="st_clock_size">时钟大小</string>
     <string name="st_clock_small">小</string>
     <string name="st_clock_large">大</string>
-    <string name="st_clock_size_hint">小：时间和天气在角上一行小字。大：第一排上方显示日期、天气和大时钟。</string>
+    <string name="st_clock_size_hint">小：时间和天气在角上一行小字。大：屏幕上方一个大时钟，上面是日期，下面是天气。</string>
     <string name="st_names">App 名称</string>
     <string name="st_names_focused">只显示选中的</string>
     <string name="st_names_all">全部显示</string>
@@ -116,8 +133,15 @@
     <string name="st_home_standard">双排</string>
     <string name="st_home_one_row">单排</string>
     <string name="st_home_layout_hint">单排：只显示第一排，放在屏幕下方，露出更多壁纸，比如家庭合照。双排：下面露出第二排。按下键看其余 App。</string>
+    <string name="st_plate">第一排底板</string>
+    <string name="st_plate_hint">第一排下面垫一块磨砂玻璃，像 Apple TV 一样；或者让 App 直接放在壁纸上。</string>
+    <string name="st_plate_glass">玻璃</string>
+    <string name="st_plate_none">不显示</string>
     <string name="st_sounds">按键声音</string>
-    <string name="st_sounds_hint">移动焦点、确认、返回时播放电视系统自带的按键音，像 Apple TV 一样。电视设置里关了按键音时也不响。</string>
+    <string name="st_sounds_hint">移动焦点、确认、返回时发出声音，像 Apple TV 一样。</string>
+    <string name="st_sounds_tv_hint">用电视系统自带的按键音，和电视菜单里一样。电视设置里关了按键音时不会响，这时请选「Aerial」。</string>
+    <string name="st_sounds_tv">电视</string>
+    <string name="st_sounds_aerial">Aerial</string>
     <string name="st_on">开</string>
     <string name="st_off">关</string>
     <string name="st_hidden_apps">隐藏的 App</string>
@@ -135,12 +159,30 @@
     <string name="cc_inputs_boot_hint">电视开机或从待机唤醒时，直接切到这个信号源。按主页键仍会回到 Aerial。</string>
     <string name="cc_inputs_pin_hint">选中的信号源会作为磁贴出现在主屏幕最前面，按一下直接切换过去。长按磁贴可以移动或移除。</string>
     <string name="menu_unpin_source">从主屏幕移除</string>
+    <string name="menu_source_device">接入的设备</string>
+    <string name="menu_source_plain">默认</string>
+    <string name="device_apple_tv">Apple TV</string>
+    <string name="device_playstation">PlayStation</string>
+    <string name="device_switch">Nintendo Switch</string>
+    <string name="device_xbox">Xbox</string>
+    <string name="device_console">游戏机</string>
+    <string name="device_computer">电脑</string>
+    <string name="device_set_top_box">机顶盒</string>
+    <string name="device_speaker">回音壁</string>
     <string name="cc_update_available">有新版本 %s</string>
     <string name="cc_update_title">Aerial %s</string>
     <string name="cc_update_current">这台电视上是 Aerial %s。</string>
-    <string name="cc_update_command">在同一网络的电脑上再运行一次安装命令就能升级：</string>
-    <string name="cc_update_agent">也可以对 AI 助手说：「按 aerial.qust.me/agent.md，把电视 %s 上的 Aerial 升级到最新版。」</string>
     <string name="cc_update_keeps">App、排列顺序、壁纸和设置都会保留。</string>
+    <string name="cc_update_scan">用手机扫码，看怎么升级（可以复制安装命令，或者发给 AI 助手）。</string>
+    <string name="cc_update_scan_else">装不上？用手机扫码，看别的升级方法。</string>
+    <string name="cc_update_install">下载并安装</string>
+    <string name="cc_update_downloading">正在下载… %d%%</string>
+    <string name="cc_update_opened">已打开安装程序，按提示确认更新（小米上是「继续更新」）。装好后按「完成」，会回到 Aerial，设置都保留。</string>
+    <string name="cc_update_permission">请在刚打开的设置里允许 Aerial 安装应用，然后回来再点一次「下载并安装」。</string>
+    <string name="cc_update_failed_download">下载没有成功（官网和 GitHub 都试过了）。检查网络后再试，或者用下面的命令升级。</string>
+    <string name="cc_update_failed_blocked">这台电视不让 App 安装别的 App，请用下面的命令升级。</string>
+    <string name="cc_update_failed_signature">这台电视上的 Aerial 和官方版本签名不同，不能直接覆盖。</string>
+    <string name="cc_update_failed_older">官网上的版本还不比这台电视上的新，过一会儿再试。</string>
     <string name="st_pin">家长密码</string>
     <string name="st_pin_off">关闭</string>
     <string name="st_pin_on">开启</string>
@@ -273,4 +315,12 @@
     <string-array name="kid_group_names">
         <item>影视</item><item>游戏</item><item>学习</item><item>儿童</item><item>其他</item>
     </string-array>
+    <string name="weather_clear">晴</string>
+    <string name="weather_partly_cloudy">多云</string>
+    <string name="weather_cloudy">阴</string>
+    <string name="weather_fog">雾</string>
+    <string name="weather_rain">雨</string>
+    <string name="weather_snow">雪</string>
+    <string name="weather_thunder">雷雨</string>
+    <string name="weather_high_low">最高 %1$d°  最低 %2$d°</string>
 </resources>

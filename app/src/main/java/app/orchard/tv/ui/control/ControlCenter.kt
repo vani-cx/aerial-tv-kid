@@ -37,8 +37,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.Image
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.withFrameNanos
@@ -63,6 +73,7 @@ import app.orchard.tv.BuildConfig
 import app.orchard.tv.HomeViewModel
 import app.orchard.tv.Overlay
 import app.orchard.tv.R
+import app.orchard.tv.apps.SourceLooks
 import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.system.HomeStatus
 import app.orchard.tv.system.NetKind
@@ -103,7 +114,7 @@ fun ControlCenter(
             CcPage.Main -> onClose()
             CcPage.Inputs -> vm.overlay = Overlay.ControlCenter(CcPage.Main)
             CcPage.InputSettings -> vm.overlay = Overlay.ControlCenter(CcPage.Inputs)
-            CcPage.Update -> vm.overlay = Overlay.ControlCenter(CcPage.Main)
+            CcPage.Update, CcPage.Setup -> vm.overlay = Overlay.ControlCenter(CcPage.Main)
         }
     }
 
@@ -147,6 +158,7 @@ fun ControlCenter(
                         CcPage.Inputs -> InputsPage(vm, visible, onOpen)
                         CcPage.InputSettings -> InputSettingsPage(vm, visible)
                         CcPage.Update -> UpdatePage(vm, visible)
+                        CcPage.Setup -> SetupPage(vm, visible, onOpen)
                     }
                 }
             }
@@ -222,6 +234,11 @@ private fun MainPage(vm: HomeViewModel, now: LocalDateTime, takeFocus: Boolean, 
             )
         }
 
+        // Installed from the APK alone: how to finish, on the TV or with a computer.
+        if (vm.homeStatus == HomeStatus.NotDefault) {
+            MenuRow(Glyph.Shield, stringResource(R.string.cc_setup_title), onClick = { vm.overlay = Overlay.ControlCenter(CcPage.Setup) }, trailing = "›")
+        }
+
         Spacer(Modifier.height(12.dp))
         val (dot, text) = when (vm.homeStatus) {
             HomeStatus.Default -> Palette.Green to stringResource(R.string.cc_home_default)
@@ -238,40 +255,119 @@ private fun MainPage(vm: HomeViewModel, now: LocalDateTime, takeFocus: Boolean, 
 }
 
 /**
- * How to move to the new version. Aerial does not install it itself: TCL only takes installs from
- * its own channels and Xiaomi asks on screen, so the install command (or an AI agent running it)
- * stays the one way that works everywhere, and it keeps every setting.
+ * How to move to the new version: "Download and Install" fetches the APK and opens the system
+ * installer (Updates.install). For TVs whose firmware lets no app install another (see
+ * Updates.Failure), and for copies older than the button, a QR code opens the website's update
+ * page on a phone, with the install command for this TV to copy: typing it off the screen was
+ * too much. The TV's address rides in the fragment, which the browser does not send.
  */
 @Composable
 private fun UpdatePage(vm: HomeViewModel, takeFocus: Boolean) {
     val context = LocalContext.current
-    val back = remember { FocusRequester() }
+    val first = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         if (!takeFocus) return@LaunchedEffect
         withFrameNanos { }
-        runCatching { back.requestFocus() }
+        runCatching { first.requestFocus() }
     }
-    val ip = remember { PhoneServer.lanAddress(context) } ?: "<IP>"
-    val guard = if (BuildConfig.FLAVOR == "guard") " -s guard" else ""
+    DisposableEffect(Unit) { onDispose { Updates.resetInstall() } }
+    val canInstall = remember { Updates.canInstall(context) }
+    var qr by remember { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(Unit) {
+        val ip = PhoneServer.lanAddress(context)
+        val url = "https://aerial.qust.me/update/#v=${Updates.current}&f=${BuildConfig.FLAVOR}" + (ip?.let { "&tv=$it" } ?: "")
+        qr = withContext(Dispatchers.Default) { PhoneServer.qr(url).asImageBitmap() }
+    }
     Column {
-        MenuRow(Glyph.ChevronLeft, stringResource(R.string.cc_update_title, Updates.available ?: Updates.current), focusRequester = back, onClick = {
-            vm.overlay = Overlay.ControlCenter(CcPage.Main)
-        })
+        MenuRow(
+            Glyph.ChevronLeft, stringResource(R.string.cc_update_title, Updates.available ?: Updates.current),
+            focusRequester = if (canInstall) null else first,
+            onClick = { vm.overlay = Overlay.ControlCenter(CcPage.Main) },
+        )
+        if (canInstall) {
+            val state = Updates.install
+            MenuRow(
+                Glyph.Download,
+                when (state) {
+                    is Updates.Install.Downloading -> stringResource(R.string.cc_update_downloading, (state.fraction * 100).toInt())
+                    else -> stringResource(R.string.cc_update_install)
+                },
+                focusRequester = first,
+                onClick = { Updates.install(context) },
+            )
+        }
         Column(Modifier.padding(horizontal = 14.dp)) {
             Spacer(Modifier.height(10.dp))
-            BasicText(stringResource(R.string.cc_update_current, Updates.current), style = Type.Caption)
-            Spacer(Modifier.height(14.dp))
-            BasicText(stringResource(R.string.cc_update_command), style = Type.Body)
-            Spacer(Modifier.height(8.dp))
-            BasicText(
-                "curl -fsSL https://aerial.qust.me/install.sh | KEEP_ADB=1 TV=$ip bash$guard",
-                style = Type.Caption.copy(color = Palette.Label),
-                modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(Palette.Fill).padding(10.dp),
-            )
-            Spacer(Modifier.height(14.dp))
-            BasicText(stringResource(R.string.cc_update_agent, ip), style = Type.Body)
-            Spacer(Modifier.height(10.dp))
-            BasicText(stringResource(R.string.cc_update_keeps), style = Type.Caption)
+            val status = when (val state = Updates.install) {
+                Updates.Install.Opened -> stringResource(R.string.cc_update_opened)
+                Updates.Install.NeedsPermission -> stringResource(R.string.cc_update_permission)
+                is Updates.Install.Failed -> stringResource(
+                    when (state.reason) {
+                        Updates.Failure.Download -> R.string.cc_update_failed_download
+                        Updates.Failure.Blocked -> R.string.cc_update_failed_blocked
+                        Updates.Failure.NotOfficial -> R.string.cc_update_failed_signature
+                        Updates.Failure.NotNewer -> R.string.cc_update_failed_older
+                    },
+                )
+                else -> stringResource(R.string.cc_update_current, Updates.current)
+            }
+            BasicText(status, style = Type.Caption)
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(104.dp).clip(RoundedCornerShape(12.dp)).background(Color.White).padding(8.dp)) {
+                    qr?.let { Image(it, contentDescription = null, contentScale = ContentScale.Fit, filterQuality = FilterQuality.None, modifier = Modifier.fillMaxSize()) }
+                }
+                Spacer(Modifier.width(16.dp))
+                Column(Modifier.weight(1f)) {
+                    BasicText(stringResource(if (canInstall) R.string.cc_update_scan_else else R.string.cc_update_scan), style = Type.Body)
+                    Spacer(Modifier.height(6.dp))
+                    BasicText(stringResource(R.string.cc_update_keeps), style = Type.Caption)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * For a TV where Aerial was installed from the APK alone (a USB stick, an app store): it opens, but
+ * Home, power-on and wake still go to the stock launcher (issue #213). The settings pages that can
+ * fix that on the TV itself, where the TV has them, and a QR code to the website's page with this
+ * TV's install command, which does all of it.
+ */
+@Composable
+private fun SetupPage(vm: HomeViewModel, takeFocus: Boolean, onOpen: (android.content.Intent) -> Unit) {
+    val context = LocalContext.current
+    val first = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        if (!takeFocus) return@LaunchedEffect
+        withFrameNanos { }
+        runCatching { first.requestFocus() }
+    }
+    val guard = remember { SystemProbe.guardSettingsIntent(context) }
+    val home = remember { SystemProbe.homeSettingsIntent(context) }
+    val revival = remember { SystemProbe.revivalSettingsIntent(context) }
+    var qr by remember { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(Unit) {
+        val ip = PhoneServer.lanAddress(context)
+        val url = "https://aerial.qust.me/update/#setup=1&v=${Updates.current}&f=${BuildConfig.FLAVOR}" + (ip?.let { "&tv=$it" } ?: "")
+        qr = withContext(Dispatchers.Default) { PhoneServer.qr(url).asImageBitmap() }
+    }
+    Column {
+        MenuRow(Glyph.ChevronLeft, stringResource(R.string.cc_setup_title), focusRequester = first, onClick = { vm.overlay = Overlay.ControlCenter(CcPage.Main) })
+        BasicText(stringResource(R.string.cc_setup_body), style = Type.Caption, modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp))
+        guard?.let { MenuRow(Glyph.Shield, stringResource(R.string.cc_setup_guard), onClick = { vm.whenUnlocked { onOpen(it) } }, trailing = stringResource(R.string.cc_setup_guard_where) + " ›") }
+        home?.let { MenuRow(Glyph.Check, stringResource(R.string.cc_setup_home), onClick = { vm.whenUnlocked { onOpen(it) } }, trailing = "›") }
+        revival?.let { MenuRow(Glyph.Moon, stringResource(R.string.cc_setup_revival), onClick = { vm.whenUnlocked { onOpen(it) } }, trailing = stringResource(R.string.cc_setup_revival_where) + " ›") }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp)) {
+            Box(Modifier.size(104.dp).clip(RoundedCornerShape(12.dp)).background(Color.White).padding(8.dp)) {
+                qr?.let { Image(it, contentDescription = null, contentScale = ContentScale.Fit, filterQuality = FilterQuality.None, modifier = Modifier.fillMaxSize()) }
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                BasicText(stringResource(R.string.cc_setup_scan), style = Type.Body)
+                Spacer(Modifier.height(6.dp))
+                BasicText(stringResource(R.string.cc_setup_scan_hint), style = Type.Caption)
+            }
         }
     }
 }
@@ -378,7 +474,10 @@ private fun VolumeRow(vm: HomeViewModel) {
     )
 }
 
-/** Brightness where Aerial may change it; otherwise a row that opens the TV's picture settings. */
+/**
+ * Brightness where Aerial may change it; otherwise a row that opens the TV's picture settings, and
+ * says so: a bare "Brightness" with no slider read as broken (Vidda 85V1F-S, FFalcon, issue #130).
+ */
 @Composable
 private fun BrightnessRow(vm: HomeViewModel) {
     val context = LocalContext.current
@@ -387,13 +486,13 @@ private fun BrightnessRow(vm: HomeViewModel) {
         MenuRow(Glyph.Sun, stringResource(R.string.cc_brightness), onClick = {
             vm.overlay = Overlay.None
             SystemProbe.openPictureSettings(context)
-        })
+        }, trailing = stringResource(R.string.cc_brightness_in_settings) + " ›")
     } else {
         SliderRow(
             glyph = Glyph.Sun,
             level = level,
             value = Math.round(level * 100).toString(),
-            // Brightness.adjust moves 5% a step.
+            // Brightness.adjust moves 5% a step, and stops at 1%.
             steps = 20,
             onStep = vm::adjustBrightness,
             onClick = {},
@@ -425,7 +524,9 @@ private fun InputsPage(vm: HomeViewModel, takeFocus: Boolean, onOpen: (android.c
                     SourceKind.Other -> Glyph.Input
                 },
                 text = source.label,
-                trailing = source.deviceName ?: if (source.connected) connected else null,
+                // What the owner named the input on its tile, else what HDMI-CEC reports.
+                trailing = SourceLooks.of(source.id)?.let { it.name ?: it.device?.let { d -> stringResource(d.label) } }
+                    ?: source.deviceName ?: if (source.connected) connected else null,
                 focusRequester = if (i == 0) first else null,
                 onClick = { onOpen(source.intent) },
             )

@@ -19,6 +19,8 @@ Made for the Xiaomi, TCL and other TVs sold in China. It starts at boot and surv
 <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-555555?style=flat-square"></a>
 <img alt="Android TV 5.0+" src="https://img.shields.io/badge/Android%20TV-5.0%2B-3ddc84?style=flat-square&logo=android&logoColor=white">
 
+![Aerial's home screen](site/img/home.jpg)
+
 | The TV's stock home screen | With Aerial |
 |:---:|:---:|
 | <img src="site/img/stock-xiaomi.jpg" alt="The stock home screen, covered in show recommendations and membership badges"> | <img src="site/img/home.jpg" alt="Aerial's home screen"> |
@@ -33,10 +35,10 @@ Made for the Xiaomi, TCL and other TVs sold in China. It starts at boot and surv
 </p>
 
 - **Home**: your favorite apps in one row on a glass shelf at the bottom, every app below it. Hidden system apps like Xiaomi's App Store and Mi Home show up too.
-- **Organize**: hold OK (or press Menu) to move an app, put it in a folder, hide it or uninstall it.
+- **Organize**: hold OK (or press Menu) to move an app, put it in a folder, hide it or uninstall it. An HDMI input pinned to Home can say what is plugged in (Apple TV, PlayStation, Switch, Xbox, a computer...) and take its icon, or a name you type on your phone.
 - **Control Center**: press Up from the top row to the top right. Inputs, network, settings, volume, brightness and Personalize.
-- **Screensaver**: Apple TV's 114 aerial films, or your photos, or a clock.
-- **Wallpaper**: Bing's photo of the day, fourteen built-ins, or photos you upload by scanning a code with your phone.
+- **Screensaver**: Apple TV's 114 aerial films, in 4K or 4K Dolby Vision where the TV supports it, or your photos, or a clock.
+- **Wallpaper**: Bing's photo of the day, fourteen built-ins, photos you upload by scanning a code with your phone, or aerial films that play behind the apps after ten still seconds on Home and stop on the frame showing at any key.
 - **Personalize**: one or two rows, clock size and corner, app names, focus style and key sounds.
 - **Parental controls** (this branch): locked apps need a D-pad combination before they open; a group of apps gets a daily budget, a per-session limit, a rest between sessions and allowed hours, set per weekday. When time runs out a full-screen wall offers a maths question for five more minutes, or a parent's password for ten to fifty. See [docs/PARENTAL.md](docs/PARENTAL.md) and the security review in [docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md).
 
@@ -105,7 +107,7 @@ adb shell am start -n app.orchard.tv/.MainActivity
 
 On Windows, use an agent, or follow the Windows steps in the [install guide](site/en/agent.md).
 
-**Updating**: run the install command again.
+**Updating**: from 1.32, Control Center shows New Version when there is one; choose Download and Install there and confirm in the TV's own installer (checked on Xiaomi and TCL). Aerial comes back afterwards with every setting kept. On TVs that do not let apps install apps, updating means running the install command again: the update page has a QR code that opens this TV's command on a phone, ready to copy or to hand to an agent. 1.31 and earlier have no such button, so this once, run the install command again.
 
 ### Undo
 
@@ -113,9 +115,13 @@ On Windows, use an agent, or follow the Windows steps in the [install guide](sit
 curl -fsSL https://aerial.qust.me/install.sh | TV=192.168.1.20 bash -s restore
 ```
 
+Add `--uninstall` (`bash -s restore --uninstall`) to remove Aerial as well. Without bash (Windows), the adb commands one by one are under [Undo in the install guide](site/en/agent.md#undo).
+
 ### Troubleshooting
 
+- **Installed only the APK from a USB stick**: from 1.32 Aerial has an icon in the TV's app list and, when opened, shows how to make it the Home screen. With the APK alone, Home, power-on and wake still go to the old launcher; run the command above or hand it to an agent once more (it installs over, settings stay).
 - **TCL shows a 多屏互动 prompt**: press Right, then OK, to choose 同意 (Agree).
+- **Skyworth: `adb install` fails with `INSTALL_FAILED_USER_RESTRICTED`**: run `adb shell settings put global verifier_verify_adb_installs 0`, then install again (from a user's report; see the [agent guide](site/en/agent.md#common-cases)).
 - **The firmware won't install home-screen apps**: add `-s guard` to the end of the command, or use [aerial-guard.apk](https://aerial.qust.me/download/aerial-guard.apk).
 - **What `KEEP_ADB=1` does**: Xiaomi turns ADB off after standby; with it, Aerial turns it back on so you can update later.
 - **Do my apps, subscriptions and old home screen stay?** Yes. The old home screen is in the app list. A boot ad comes from the firmware and stays.
@@ -136,11 +142,12 @@ Most TVs sold in China only accept their own home screen and clear third-party a
 | TCL MT5879 (China) | Android 11 | In daily use ([notes](docs/devices/tcl-mt5879-cn.md)) |
 | Sony A80J (China) / BRAVIA VH1 | Android 10 / 12 | User-verified ([#16](https://github.com/pengchujin/aerial-tv/issues/16), [#2](https://github.com/pengchujin/aerial-tv/issues/2)) |
 | Skyworth Coocaa K3 Pro | Android 11 | User-verified ([#43](https://github.com/pengchujin/aerial-tv/issues/43)) |
+| Konka KKTV U86V9 | Android 9 | User-verified: Home, start at boot, inputs; brightness does not work ([notes](docs/devices/konka-kktv-u86v9.md), Chinese) |
 | OPPO K9 | Android 9 | Needs a renamed package ([notes](docs/devices/oppo-coloros-tv.md)) |
 | Konka 2861, PPTV K55U27, XGIMI m7642, Tencent Aurora box 7S | Android 5–9 | User-verified with small issues, see [Issues](https://github.com/pengchujin/aerial-tv/issues) |
 | FFALCON 55S595C Ultra | Android 11 | Installs, but can't take over Home ([#52](https://github.com/pengchujin/aerial-tv/issues/52)) |
 
-Installs but doesn't start at boot: Vidda, Hisense, FFALCON Crane 6 2025 Ultra. If yours works, [open an issue](https://github.com/pengchujin/aerial-tv/issues) and tell us.
+Installs but doesn't start at boot: Vidda, Hisense, FFALCON Crane 6 2025 Ultra. If yours works, or doesn't, tell us with the [device support form](https://github.com/pengchujin/aerial-tv/issues/new?template=device.yml) and its diagnostics: run `curl -fsSL https://aerial.qust.me/tools/report.sh | TV=<tv-ip> bash` on a computer (it only reads), or copy them from 反馈问题 (Report a problem) at the bottom of the phone page. They hold no accounts, addresses, Wi-Fi names or app lists.
 
 ## Development
 
@@ -155,6 +162,6 @@ See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for the code, [HANDOFF.md](docs/HAND
 
 ## License
 
-[MIT](LICENSE). The Inter font is under the [SIL Open Font License](FONT-LICENSE-OFL.txt).
+[MIT](LICENSE). The Inter font is under the [SIL Open Font License](FONT-LICENSE-OFL.txt). The list of Chinese cities for the weather is from [GeoNames](https://www.geonames.org) (CC BY 4.0), the weather from [Open-Meteo](https://open-meteo.com).
 
 Aerial is an independent open-source project, not affiliated with Apple, Xiaomi, TCL or any other company. The aerial films belong to Apple and play from Apple's servers; the photo of the day comes from Bing.

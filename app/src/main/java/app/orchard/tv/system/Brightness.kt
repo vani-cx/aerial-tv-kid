@@ -54,17 +54,23 @@ object Brightness {
         }
     }
 
-    /** Steps brightness one notch up or down and returns the new level. */
+    /**
+     * Steps brightness one notch (5%) up or down and returns the new level. Never to 0: Xiaomi turns
+     * the backlight off at picture_backlight 0 and the screen goes black, with Control Center still
+     * open on it (HyperOS, issue #174); its own slider stops at 1. So the lowest notch is 1, and the
+     * steps stay on multiples of 5 above it (1, 5, 10 ...).
+     */
     fun adjust(context: Context, direction: Int): Float? {
         val current = level(context) ?: return null
-        val next = (current + direction * 0.05f).coerceIn(0f, 1f)
+        val percent = Math.round(current * 100)
+        val next = (if (direction > 0) (percent / 5 + 1) * 5 else ((percent + 4) / 5 - 1) * 5).coerceIn(1, 100)
         val r = context.contentResolver
         runCatching {
             if (usesXiaomiBacklight(context)) {
-                Settings.Global.putInt(r, XIAOMI_BACKLIGHT, Math.round(next * 100))
+                Settings.Global.putInt(r, XIAOMI_BACKLIGHT, next)
             } else {
                 Settings.System.putInt(r, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
-                Settings.System.putInt(r, Settings.System.SCREEN_BRIGHTNESS, Math.round(next * 255))
+                Settings.System.putInt(r, Settings.System.SCREEN_BRIGHTNESS, (next * 255 / 100).coerceAtLeast(1))
             }
         }
         return level(context)

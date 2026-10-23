@@ -31,7 +31,11 @@ object CustomIcons {
         dir = File(context.filesDir, "icons").apply { mkdirs() }
     }
 
-    private fun fileFor(pkg: String) = File(dir, "$pkg.png")
+    /** By package name; a pinned input's key holds slashes, so it goes by a hash of the key. */
+    private fun fileFor(pkg: String) = if (isValidKey(pkg)) File(dir, "$pkg.png") else File(dir, "input-${hash(pkg)}.png")
+
+    private fun hash(key: String): String =
+        java.security.MessageDigest.getInstance("SHA-1").digest(key.toByteArray()).joinToString("") { "%02x".format(it) }
 
     fun has(pkg: String): Boolean = ::dir.isInitialized && fileFor(pkg).exists()
 
@@ -64,6 +68,6 @@ object CustomIcons {
         version++
     }
 
-    /** Only installed apps can have a picture, which also keeps [pkg] a plain file name. */
+    /** A package name, kept as a plain file name. */
     fun isValidKey(pkg: String): Boolean = Regex("^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+$").matches(pkg)
 }

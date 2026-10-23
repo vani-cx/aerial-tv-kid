@@ -69,6 +69,7 @@
     background: rgba(0,0,0,.55); color: #fff; font-size: 15px; line-height: 26px; padding: 0;
     -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
   }
+  .ren { left: auto; right: 8px; }
   .toast {
     position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translate(-50%, 20px);
     background: rgba(30,30,30,.92); color: #fff; padding: 10px 18px; border-radius: 22px; font-size: 15px;
@@ -92,6 +93,13 @@
   }
   .city button:active { transform: scale(.97); }
   .city button[disabled] { opacity: .6; }
+  .diag {
+    display: block; width: 100%; height: 220px; margin-top: 10px; font: 12px/1.4 ui-monospace, Menlo, monospace;
+    color: var(--label); background: var(--card); border: 0; border-radius: 12px; padding: 10px; box-shadow: var(--shadow);
+  }
+  .row { display: flex; gap: 8px; margin-top: 10px; }
+  .row .upload { flex: 1; padding: 13px; }
+  .row .upload.plain { background: var(--fill); color: var(--tint); text-decoration: none; }
   .link { appearance: none; border: 0; background: none; color: var(--tint); font: inherit; font-size: 13px; padding: 0; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -135,9 +143,18 @@
 <div id="sections"></div>
 
 <h2>App 图标</h2>
-<p class="hint" style="margin-top:0;margin-bottom:12px">点一个 App，从手机选一张图片换掉它在电视上的图标。图片会裁成 16:9；横图效果最好。</p>
+<p class="hint" style="margin-top:0;margin-bottom:12px">点一个 App，从手机选一张图片换掉它在电视上的图标。图片会裁成 16:9；横图效果最好。固定到主屏幕的信号源（HDMI 等）也在这里，点右上角的 ✎ 给它起名字，比如「客厅 Apple TV」。</p>
 <div class="grid" id="apps"></div>
 <input id="iconFile" type="file" accept="image/*" hidden>
+
+<h2>反馈问题</h2>
+<p class="hint" style="margin-top:0;margin-bottom:12px">这台电视上 Aerial 有问题，或者想让 Aerial 适配它：复制诊断信息，贴进 GitHub 的「机型适配」反馈里。里面是机型、系统版本、桌面接管状态、信号源和 Aerial 的日志，不含账号、Wi-Fi 名称、IP 地址和照片。</p>
+<button class="upload" id="diagBtn">显示诊断信息</button>
+<textarea class="diag" id="diag" readonly hidden></textarea>
+<div class="row" id="diagActions" hidden>
+  <button class="upload" id="diagCopy">复制</button>
+  <a class="upload plain" href="https://github.com/pengchujin/aerial-tv/issues/new?template=device.yml" target="_blank" rel="noopener">去 GitHub 反馈</a>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -151,6 +168,7 @@ const hints = {
   clock: '大号时钟，配合当前壁纸。'
 };
 const groups = [
+  ['live', '航拍', '停在主屏幕 10 秒后，壁纸播放 Apple TV 的航拍；按任意键停在当前画面'],
   ['daily', '每日精选', '每天自动更新的风景摄影'],
   ['photo', '我的照片', ''],
   ['builtin', '内置', ''],
@@ -220,9 +238,21 @@ function renderApps() {
     const b = document.createElement('button');
     b.className = 'wp';
     b.innerHTML = `<img loading="lazy" alt=""><div class="t"></div><div class="c"></div>`;
-    b.querySelector('img').src = `${base}tile/${encodeURIComponent(a.key)}?v=${a.stamp}`;
+    b.querySelector('img').src = `${base}tile/${encodeURIComponent(a.key)}?v=${a.stamp}-${a.look || 0}`;
     b.querySelector('.t').textContent = a.label;
-    b.querySelector('.c').textContent = a.custom ? '自定义图标' : '';
+    b.querySelector('.c').textContent = a.source ? (a.label === a.port ? '信号源' : a.port) : a.custom ? '自定义图标' : '';
+    if (a.source) {
+      const n = document.createElement('button');
+      n.className = 'del ren'; n.textContent = '✎'; n.setAttribute('aria-label', '起名字');
+      n.onclick = async e => {
+        e.stopPropagation();
+        const name = prompt(`给「${a.port}」起个名字（留空恢复默认）`, a.name || '');
+        if (name === null) return;
+        try { state = await api('api/source/name', { app: a.key, name }); render(); toast(name.trim() ? '电视上已改名' : '已恢复默认名字'); }
+        catch (err) { toast('改名失败，请重试'); }
+      };
+      b.appendChild(n);
+    }
     b.onclick = () => { iconFor = a; $('#iconFile').click(); };
     if (a.custom) {
       const r = document.createElement('button');
@@ -255,6 +285,10 @@ function render() {
     if (kind === 'daily' && list.length) {
       list = [{ id: state.latestDaily, kind: 'daily', title: '每日自动更新', caption: '总是使用当天的照片' }, ...list];
     }
+    // Two or more photos: one a day, as on the TV (#27, #194).
+    if (kind === 'photo' && list.length > 1) {
+      list = [{ id: state.rotatePhotos, kind: 'photos', title: '每天换一张', caption: '每天自动换成下一张照片' }, ...list];
+    }
     if (!list.length && kind !== 'photo') continue;
     const h = document.createElement('h2'); h.textContent = title; root.appendChild(h);
     if (!list.length) {
@@ -264,6 +298,9 @@ function render() {
     const g = document.createElement('div'); g.className = 'grid';
     list.forEach(w => g.appendChild(card(w, w.id === state.selected)));
     root.appendChild(g);
+    if (kind === 'photo' && list.length === 1) {
+      const p = document.createElement('p'); p.className = 'empty'; p.textContent = '再加一张照片，就可以选「每天换一张」。'; root.appendChild(p);
+    }
   }
 }
 
@@ -310,6 +347,24 @@ $('#iconFile').onchange = async e => {
     state = await r.json(); render();
     toast(state.saved ? '电视上已更换' : '这张图片用不了');
   } catch (err) { toast('发送失败，请重试'); }
+};
+
+$('#diagBtn').onclick = async () => {
+  const b = $('#diagBtn'); b.disabled = true; b.textContent = '正在收集…';
+  try {
+    const r = await fetch(base + 'api/diagnostics');
+    if (!r.ok) throw new Error(r.status);
+    $('#diag').value = await r.text();
+    $('#diag').hidden = false; $('#diagActions').hidden = false; b.hidden = true;
+  } catch (e) { toast('没有取到，请重试'); b.textContent = '显示诊断信息'; }
+  b.disabled = false;
+};
+// The page is plain HTTP on the LAN, where browsers offer no navigator.clipboard.
+$('#diagCopy').onclick = () => {
+  const t = $('#diag'); t.focus(); t.select(); t.setSelectionRange(0, t.value.length);
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) {}
+  toast(ok ? '已复制' : '请长按文本框全选后复制');
 };
 
 async function refresh() { try { state = await api('api/state'); render(); } catch (e) {} }

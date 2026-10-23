@@ -17,6 +17,15 @@
     <string name="cc_home_default">Aerial is your home screen</string>
     <string name="cc_home_guarded">Home Guard is on</string>
     <string name="cc_home_not_default">Not the default home screen</string>
+    <string name="cc_setup_title">Make Aerial Your Home Screen</string>
+    <string name="cc_setup_body">Installed from the APK alone, Aerial opens, but Home, power-on and wake still go to the old launcher.</string>
+    <string name="cc_setup_guard">Turn On Home Guard</string>
+    <string name="cc_setup_guard_where">Accessibility</string>
+    <string name="cc_setup_home">Choose the Default Home App</string>
+    <string name="cc_setup_revival">Return After Standby</string>
+    <string name="cc_setup_revival_where">Notification access</string>
+    <string name="cc_setup_scan">Or set it all up with a computer (recommended)</string>
+    <string name="cc_setup_scan_hint">Scan with your phone for this TV\'s command and a prompt for an AI agent.</string>
     <string name="cc_back">Back</string>
     <string name="cc_no_inputs">No inputs found on this TV</string>
 
@@ -63,6 +72,7 @@
     <string name="launch_failed">Couldn\'t open %1$s</string>
     <string name="unavailable">Not available on this TV</string>
     <string name="cc_brightness">Brightness</string>
+    <string name="cc_brightness_in_settings">Picture Settings</string>
     <string name="cc_personalize">Personalize</string>
     <string name="wp_title">Personalize</string>
     <string name="wp_wallpaper">Wallpaper</string>
@@ -80,6 +90,7 @@
     <string name="wp_daily">Daily Photos</string>
     <string name="wp_daily_latest">Always Today\'s</string>
     <string name="wp_builtin">Built-in</string>
+    <string name="wp_live">Aerial · plays after 10 seconds on Home</string>
     <string name="wp_photos">My Photos</string>
     <string name="wp_photos_rotate">One a Day</string>
     <string name="wp_screensaver">Screensaver</string>
@@ -97,6 +108,12 @@
     <string name="ss_back_on">Starts It</string>
     <string name="ss_back_off">Does Nothing</string>
     <string name="ss_back_choice_hint">What Back does on the top row of Home. Turn it off if it gets pressed by accident; the screensaver still starts on its own.</string>
+    <string name="ss_quality">Aerial Quality</string>
+    <string name="ss_quality_hint">Auto plays the best this TV can show: 4K Dolby Vision, 4K or 1080p. 4K Dolby Vision needs about 25 Mbps; choose 1080p if films often skip.</string>
+    <string name="ss_quality_auto">Auto</string>
+    <string name="ss_quality_hd">1080p</string>
+    <string name="ss_quality_uhd">4K</string>
+    <string name="ss_quality_dv">4K Dolby Vision</string>
     <string name="st_focus_style">Focus Style</string>
     <string name="st_home_layout">Home Screen</string>
     <string name="st_layout">Layout</string>
@@ -107,7 +124,7 @@
     <string name="st_clock_size">Clock Size</string>
     <string name="st_clock_small">Small</string>
     <string name="st_clock_large">Large</string>
-    <string name="st_clock_size_hint">Small puts the time and weather in one line in the corner. Large puts the date and weather over a big clock above the top row.</string>
+    <string name="st_clock_size_hint">Small puts the time and weather in one line in the corner. Large puts a big clock at the top of the screen, the date over it and the weather under it.</string>
     <string name="st_names">App Names</string>
     <string name="st_names_focused">Selected App</string>
     <string name="st_names_all">All Apps</string>
@@ -117,8 +134,15 @@
     <string name="st_home_standard">Two Rows</string>
     <string name="st_home_one_row">One Row</string>
     <string name="st_home_layout_hint">One Row puts only the top row on screen, low down, so more of the wallpaper shows, a family photo say. Two Rows shows the top of the second row too. Press down for the rest.</string>
+    <string name="st_plate">Top Row</string>
+    <string name="st_plate_hint">A plate of frosted glass under the top row, as on Apple TV, or the apps straight on the wallpaper.</string>
+    <string name="st_plate_glass">Glass</string>
+    <string name="st_plate_none">None</string>
     <string name="st_sounds">Sounds</string>
-    <string name="st_sounds_hint">The TV\'s own key sounds as focus moves, and on select and Back, as on Apple TV. They follow the TV\'s key sound setting.</string>
+    <string name="st_sounds_hint">A sound as focus moves, and on select and Back, as on Apple TV.</string>
+    <string name="st_sounds_tv_hint">The TV\'s own key sounds, as in its menus. Silent if key sounds are off in the TV\'s settings: choose Aerial then.</string>
+    <string name="st_sounds_tv">TV</string>
+    <string name="st_sounds_aerial">Aerial</string>
     <string name="st_on">On</string>
     <string name="st_off">Off</string>
     <string name="st_hidden_apps">Hidden Apps</string>
@@ -136,12 +160,30 @@
     <string name="cc_inputs_boot_hint">Switch to this input when the TV is turned on or wakes from standby. Home still comes back to Aerial.</string>
     <string name="cc_inputs_pin_hint">Pinned inputs appear as tiles at the front of Home; select one to switch straight to it. Long-press a tile to move or remove it.</string>
     <string name="menu_unpin_source">Remove from Home</string>
+    <string name="menu_source_device">Connected Device</string>
+    <string name="menu_source_plain">Default</string>
+    <string name="device_apple_tv">Apple TV</string>
+    <string name="device_playstation">PlayStation</string>
+    <string name="device_switch">Nintendo Switch</string>
+    <string name="device_xbox">Xbox</string>
+    <string name="device_console">Game Console</string>
+    <string name="device_computer">Computer</string>
+    <string name="device_set_top_box">Set-top Box</string>
+    <string name="device_speaker">Soundbar</string>
     <string name="cc_update_available">New Version: %s</string>
     <string name="cc_update_title">Aerial %s</string>
     <string name="cc_update_current">This TV has Aerial %s.</string>
-    <string name="cc_update_command">To update, run the install command again on a computer on the same network:</string>
-    <string name="cc_update_agent">Or ask an AI agent: “Update Aerial on the TV at %s, following aerial.qust.me/agent.md.”</string>
     <string name="cc_update_keeps">Your apps, layout, wallpaper and settings stay as they are.</string>
+    <string name="cc_update_scan">Scan with a phone to see how to update (copy the install command, or hand it to an AI agent).</string>
+    <string name="cc_update_scan_else">Cannot install? Scan with a phone for other ways to update.</string>
+    <string name="cc_update_install">Download and Install</string>
+    <string name="cc_update_downloading">Downloading… %d%%</string>
+    <string name="cc_update_opened">The installer is open: confirm the update there. When it is done, choose Done to come back to Aerial, with every setting kept.</string>
+    <string name="cc_update_permission">Allow Aerial to install apps in the settings that just opened, then come back and choose Download and Install again.</string>
+    <string name="cc_update_failed_download">The download did not finish (both the website and GitHub were tried). Check the network and try again, or update with the command below.</string>
+    <string name="cc_update_failed_blocked">This TV does not let apps install other apps. Update with the command below.</string>
+    <string name="cc_update_failed_signature">The Aerial on this TV is signed differently from the official one, so it cannot be updated over.</string>
+    <string name="cc_update_failed_older">The website does not have a newer version yet. Try again in a while.</string>
     <string name="st_pin">Parental PIN</string>
     <string name="st_pin_off">Off</string>
     <string name="st_pin_on">On</string>
@@ -274,4 +316,12 @@
     <string-array name="kid_group_names">
         <item>Video</item><item>Games</item><item>Study</item><item>Kids</item><item>Other</item>
     </string-array>
+    <string name="weather_clear">Clear</string>
+    <string name="weather_partly_cloudy">Partly Cloudy</string>
+    <string name="weather_cloudy">Cloudy</string>
+    <string name="weather_fog">Fog</string>
+    <string name="weather_rain">Rain</string>
+    <string name="weather_snow">Snow</string>
+    <string name="weather_thunder">Thunderstorms</string>
+    <string name="weather_high_low">H:%1$d°  L:%2$d°</string>
 </resources>

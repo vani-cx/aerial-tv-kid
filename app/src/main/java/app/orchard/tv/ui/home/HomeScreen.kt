@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import app.orchard.tv.CcPage
+import app.orchard.tv.apps.SourceLooks
 import app.orchard.tv.HomeViewModel
 import app.orchard.tv.Overlay
 import app.orchard.tv.R
@@ -104,8 +105,12 @@ private class GridMetrics(screenW: Dp, screenH: Dp, oneRow: Boolean, val nameRoo
      */
     val topRowY = if (oneRow) screenH - pitchY - 12.dp - nameRoom else screenH * 0.555f
 
-    /** Top of the large clock, just above the top row's plate. */
-    val clockY = topRowY - 196.dp
+    /**
+     * Top of the large clock: just under the status pill, left or right, in both layouts, as on the
+     * lock screen. Hung from the row it floated mid-screen in one-row mode and pressed on the plate
+     * in two-row mode; up here the middle of the screen stays the wallpaper's.
+     */
+    val clockY = 74.dp
 
     /** Where a row rests once you go down into the grid: the row above stays in view. */
     val restY = screenH * 0.37f
@@ -316,12 +321,23 @@ fun HomeScreen(
         ) {
             // The glass plate under the top row, as wide as the apps in it (tvOS 26).
             val topCount = apps.size.coerceAtMost(COLUMNS)
-            val plate = if (topCount == 0) null else with(density) {
+            val plate = if (topCount == 0 || !AerialSettings.homePlate) null else with(density) {
                 Rect(
                     (metrics.margin - PlatePadH).toPx(),
                     (metrics.topRowY - PlatePadV).toPx(),
                     (metrics.margin + metrics.pitchX * (topCount - 1) + metrics.tileW + PlatePadH).toPx(),
-                    (metrics.topRowY + metrics.tileH + PlatePadV + metrics.nameRoom).toPx(),
+                    (metrics.topRowY + metrics.tileH + PlatePadV).toPx(),
+                )
+            }
+            // The aerial wallpaper's film, under everything; it moves only on a still top row.
+            val filmCover = remember { Animatable(0f) }
+            if (Wallpapers.selectedId == Wallpapers.LIVE) {
+                LiveWallpaper(
+                    moving = vm.resumed && overlay == Overlay.None && !vm.screensaverVisible && !pastShelf &&
+                        focusedRow == 0 && moving == null,
+                    keep = vm.resumed && !vm.screensaverVisible,
+                    lastInputAt = vm.lastInputAt,
+                    cover = filmCover,
                 )
             }
             HomeBackground(
@@ -331,6 +347,7 @@ fun HomeScreen(
                 plate = plate,
                 scroll = { scroll.value },
                 collapse = collapsePx,
+                cover = { filmCover.value },
             )
 
             Box(Modifier.fillMaxSize().offset { IntOffset(0, -scroll.value.roundToInt()) }) {
@@ -373,10 +390,6 @@ fun HomeScreen(
                             enabled = gridEnabled,
                             moving = moving == app.key,
                             appearDelayMs = (index * 28).coerceAtMost(320),
-                            // The top row sits on the glass until the grid comes in.
-                            onGlass = if (index < COLUMNS) {
-                                { (1f - scroll.value / collapsePx * 2f).coerceIn(0f, 1f) }
-                            } else null,
                             onFocused = {
                                 focusedKey = app.key
                                 lastFocusedIndex = index
@@ -410,6 +423,10 @@ fun HomeScreen(
                                 }
                             },
                             modifier = Modifier.offset { slot.value },
+                            rowEnd = index % COLUMNS == COLUMNS - 1 || index == apps.lastIndex,
+                            // No names on the glass plate (an earlier build showed the focused one
+                            // there, but it sat oddly on the glass).
+                            showName = plate == null || index >= COLUMNS,
                         )
                     }
                 }
@@ -539,6 +556,10 @@ fun HomeScreen(
             onResetIcon = { key ->
                 closeMenu()
                 vm.resetIcon(key)
+            },
+            onSourceDevice = { id, device ->
+                closeMenu()
+                SourceLooks.chooseDevice(id, device)
             },
             onToFolder = { key, id ->
                 val folderKey = vm.putInFolder(key, id)

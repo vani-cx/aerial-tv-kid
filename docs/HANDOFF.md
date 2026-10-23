@@ -5,7 +5,15 @@
 ## 现状（2026-10-22）
 
 - **本分支新增：儿童模式与时间管理**（`parental/`、`ui/parental/`）。两个密码（8 位字母数字的管理员密码 + 遥控器方向组合的使用密码）、锁定 App、按天分组的时间限制（每日总时长 / 每次时长 / 间隔休息 / 允许时段）、到点的全屏拦截页（数学题 +5 分钟、方向密码、管理员密码换 10–50 分钟）。计时照 tvwall 用无障碍服务（`WatchService`，5 秒 tick、只看亮屏、待机不算、跨零点归零），无障碍没开时有一层只覆盖"从 Aerial 启动"的降级计时。**代码已用 Gradle 8.14.3 + JDK 17 + SDK 36 编译通过（`compileStandardDebugKotlin`），但一次都没在真机上跑过**——[PARENTAL.md](PARENTAL.md) 末尾有 14 条该在电视上走的清单。安全性审查见 [SECURITY-REVIEW.md](SECURITY-REVIEW.md)（结论：能挡住拿遥控器的孩子，挡不住有 ADB 的人）。忘了两个密码时用 `adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver --ez clear_kid true` 清掉整个功能。
-- 版本 **1.27（versionCode 29）**，2026-10-22 发布（[v1.27](https://github.com/pengchujin/aerial-tv/releases/tag/v1.27)）：磁贴、Dock 底板、玻璃面板和高对比度白框改成连续曲率圆角，形状在 CPU 上按尺寸烘焙成位图，GPU 只画矩形和贴图（直接让 GPU 画路径在小米上从 11ms 涨到 57–72ms，见 `ui/components/SmoothCorners.kt`）；修好白框淡入时四角的小点；个性化加「时钟大小」（默认小）和「App 名称」（1.23 去掉的，沿用原设置）；所有 App 都在第一排时放低；选中磁贴有烘焙的阴影；按键音改用电视系统自带的；文件夹（长按菜单「移到文件夹」）。小米 MiTV-MFTR0（`standard`）逐项验证过，导航时 GPU 中位约 9ms（1.26 约 10.5ms）；TCL MT5879 国行（`guard`，多屏互动推送，ADB 点「同意」）装的是 1.27，首页、底板、控制中心回归通过。「所有 App 都在第一排」、文件夹之间移动、在文件夹里打开 App 还没在真机上试过。TvProvider 的「继续观看」查过做不了：读别的 App 的频道要 `ACCESS_ALL_EPG_DATA`（signature|privileged），两台电视上都只有 TvProvider 自己有；奇异果、极光自己的播放记录接口只对合作厂商开放（开关、appid、加密）。
+- 版本 **1.35（versionCode 37）**，2026-10-23 发布（[v1.35](https://github.com/pengchujin/aerial-tv/releases/tag/v1.35)），两台都装了：Aerial 是默认桌面时守护不再过滤按键（小米 ASTP0 上过滤后的音量键让 MitvFreezer 在 system_server 里空指针、整机重启，#249；#115 #268 也可能受益）；复活次数只算本次开机以来的（#154 #261）；航拍壁纸停下时 PixelCopy 拷出绿色或纯色也改为解码（#256）；腾讯极光盒子 `com.ktcp.launcher` 的 `LauncherHomeSingleTaskActivity` 当原桌面（#269 #270）；海信语音桌面 `com.ju.secondscreen.HomeActivity`（优先级 -150）当原桌面、没有输入时控制中心打开海信信号源面板（#261）；「电视」按键音改用 `playSoundEffect(effect, -1f)` 并自己检查按键音开关（海信单参数版只收 10–18，#262）；`adjustStreamVolume` 抛 SecurityException 时改用 `setStreamVolume`（TCL m7642，#15）；ColorOS TV `tv_power_mode=QUICK` 时守护不拉回（OPPO S1，#22）；PPTV、极米的设置/网络/图像入口，网络按钮最后退到 TCL 设置（#264 #241 #15）。小米 MFTR0（standard）和 TCL MT5879（guard，多屏互动推送，ADB 点「同意」）回归过首页、HOME 拉回、控制中心音量（13→14→13 已复原）；TCL 刚装完时 `input keyevent HOME` 有一次要 5 秒才回到 Aerial（守护过滤还没生效），强停重启后日志有 `filtering keys`，HOME 立刻回来，原因没查清；涉及的机型都没有真机，按键过滤那条在两台上都走不到（MFTR0 是 Android 14、TCL guard 不是默认桌面），模拟器守护绑不上。
+- 1.34（versionCode 36），2026-10-23 发布（[v1.34](https://github.com/pengchujin/aerial-tv/releases/tag/v1.34)）：第一排玻璃底板上不显示 App 名称（和 tvOS 26 一样，下面几排和不显示底板时照旧）；信号源磁贴的图标换成 Material Symbols Rounded 实心图标（和系统磁贴同一套，Switch 按同样风格手画），选了「接入的设备」的磁贴只显示设备图标、不写名字和端口，默认 HDMI 磁贴保留图标和「HDMI 1」。小米 MFTR0（standard）上看过默认 HDMI、Apple TV、电脑、PlayStation，测完 HDMI 1 改回默认；TCL 没装 1.34。
+- 1.33（versionCode 35），2026-10-22 发布（[v1.33](https://github.com/pengchujin/aerial-tv/releases/tag/v1.33)）：选了航拍壁纸时，屏保出现前立刻释放壁纸的播放器（1.32 上它占着解码器，小米 MFTR0 的杜比视界屏保报 `vdec resource lost`，降成 1080p）。两台都装了。
+- 1.32（versionCode 34），2026-10-22 发布（[v1.32](https://github.com/pengchujin/aerial-tv/releases/tag/v1.32)），小米 MFTR0（standard）和 TCL MT5879（guard，多屏互动推送，ADB 点「同意」）都装了：航拍壁纸（壁纸选「航拍」，停在主屏幕 10 秒后播放，按键停在当前帧并成为壁纸，#216，小米 MFTR0 验证过，测完改回户主的「山丘 · 黎明」；`files/live-frame.jpg` 是测试留下的暂停帧，只有选「航拍」时用到）。（2026-10-22 晚）第一排选中的 App 也显示名称（#196 #199 #219）；每行最右一格按右键不再跳到右上角（#211）；守护不把电视播放器（`com.tcl.tv` 等）当原桌面（TCL 85G60E 切信号源被拉回，#223，没有真机验证）；`CATEGORY_LAUNCHER` 入口，只装 APK 时首次打开弹「设为主屏幕」引导（#207 #213）；信号源磁贴选接入的设备（8 种图标）、手机页起名字和传图（#172 #210）；航拍画质 自动/1080p/4K/4K 杜比视界（#198 #217）；Issue 模板改成问题反馈 / 机型适配 / 功能建议 / 实测可用四种，关掉空白 issue。这批在小米 MFTR0（standard）上逐项验证过，测完 HDMI 磁贴改回默认、画质改回自动；TCL 没装。此前：控制中心升级页加「下载并安装」（下载官网 APK，交给系统安装器；装不上的电视显示二维码，打开 `site/update/` 的升级说明页），诊断报告（手机页「反馈问题」、`tools/report.sh`、`.github/ISSUE_TEMPLATE/device.yml`）。小米 MFTR0 和 TCL MT5879 上用测试包验证过，细节见 ARCHITECTURE.md「升级」「诊断报告」。发版时要跑 `tools/deploy-site.sh`，否则二维码打开的 `aerial.qust.me/update/` 和 `tools/report.sh` 都还不存在。文案里写的是「1.32 起」，版本号不是 1.32 时要改 README、官网、`agent.md`、`site/update/`。
+- 1.31（versionCode 33），2026-10-22 发布（[v1.31](https://github.com/pengchujin/aerial-tv/releases/tag/v1.31)）：玻璃面板（控制中心、个性化、长按菜单等）改成在面板大小的图层里先画连续曲率形状、再用 SrcIn 叠毛玻璃，一次只用一个位图 shader；1.27–1.30 用玻璃和形状遮罩的 ComposeShader，在 Redmi A65 2025（MiTV-ASTP0，Android 9，Mali-G31）上画成不透明的深色块（用户私信反馈），Android 9 以前的面板现在也有连续圆角；个性化选「时钟大小：大」时，日期、大时钟和天气（加天气状况和今天最高最低温）放在状态栏下面左上或右上，单排双排都一样（以前挂在第一排上方）；`ConfigReceiver` 可以用 `large_clock`、`clock_right`、`one_row_home` 切首页布局方便截图。小米 MiTV-MFTR0（`standard`）验证了控制中心、个性化面板和大时钟三种布局，控制中心里导航 GPU 中位 10.8ms（1.30 是 11.1ms），户主设置测完改回（小时钟、左上、单排）；TCL MT5879（`guard`，多屏互动推送，ADB 点「同意」）装的是 1.31，首页、控制中心回归通过。ASTP0 没有真机，深色块的修复还没在它上面确认。
+- 1.30（versionCode 32），2026-10-22 发布（[v1.30](https://github.com/pengchujin/aerial-tv/releases/tag/v1.30)）：手机页「我的照片」加「每天换一张」（电视上 #27 就有，手机页没有，#194）；启动时清理上传中断留下的临时文件（#193，其余缓存是航拍开场预取，上限 48MB）；调不了背光的小米电视上「亮度」发广播弹出小米设置自己的背光条（`com.xiaomi.mitv.settings.BACKLIGHT_POPUP`，按接收器是否存在检测，PR #85 的发现；MFTR0 上收回写设置权限模拟验证过）；小米电视 4（MiTV4-ANSM0）HDMI HW7 → tvplayer 23（#191，没有真机）。小米 MiTV-MFTR0（`standard`）、TCL MT5879（`guard`）装的是 1.30。小米上 `files/tiles/` 里的 743MB 是调磁贴用的样本 APK 和对比图，等户主说调完再删。
+- 1.29（versionCode 31），2026-10-22 发布（[v1.29](https://github.com/pengchujin/aerial-tv/releases/tag/v1.29)）：第一排玻璃底板改成 CPU 烘焙成一张位图再画（1.27 的嵌套 ComposeShader 在小米 ASTP0 / Mali-G31 等老 GPU 上画成纯白，#183 #181 #176），Android 9 以前的面板不再用两个位图 shader 合成；天气先查内置的国内城市表（`assets/cities-cn.tsv`，GeoNames，`tools/make-cities.py`），Open-Meteo 搜不到商丘、把安庆定到江苏（#187），以前选错的自动纠正；守护拦主页键时长按打开最近任务（#185，没用实体遥控器验证）；安装脚本判断守护绑定也认类名（ASTP0 上标签显示成类名）。小米 MiTV-MFTR0（`standard`）回归、底板和 1.28 逐像素对比、导航 GPU 中位 8ms；TCL MT5879（`guard`）装的是 1.29。白底板在模拟器上复现不了，没有 ASTP0 真机。
+- 1.28（versionCode 30），2026-10-22 发布（[v1.28](https://github.com/pengchujin/aerial-tv/releases/tag/v1.28)）：亮度最低一档是 1（小米写 0 会关背光黑屏，#174）；按键声音「电视 / Aerial / 关」三选一，系统按键音关着的电视默认用 Aerial 自己的声音（`res/raw/ui_*` 加回来了，#169）；个性化加「第一排底板：玻璃 / 不显示」（#151）；首页壁纸烘焙的黑色渐变减轻（`Images.shadeForHome`，#157）；BOOT_COMPLETED 时守护已在跑也再看一次前台（MTEQ0，#154）；创维切信号源经过原桌面时守护延后再看（#155）；康佳原生信号源（PR #125）；调不了亮度时那一行写「在图像设置里调 ›」（#130）。小米 MiTV-MFTR0（`standard`）逐项验证过，户主设置测完都改回（亮度 21、底板玻璃、按键音电视、屏保时钟）；TCL MT5879（`guard`，多屏互动推送，ADB 点「同意」）装的是 1.28，首页、控制中心回归通过。MTEQ0、创维、康佳没有真机。
+- 1.27（versionCode 29），2026-10-22 发布（[v1.27](https://github.com/pengchujin/aerial-tv/releases/tag/v1.27)）：磁贴、Dock 底板、玻璃面板和高对比度白框改成连续曲率圆角，形状在 CPU 上按尺寸烘焙成位图，GPU 只画矩形和贴图（直接让 GPU 画路径在小米上从 11ms 涨到 57–72ms，见 `ui/components/SmoothCorners.kt`）；修好白框淡入时四角的小点；个性化加「时钟大小」（默认小）和「App 名称」（1.23 去掉的，沿用原设置）；所有 App 都在第一排时放低；选中磁贴有烘焙的阴影；按键音改用电视系统自带的；文件夹（长按菜单「移到文件夹」）。小米 MiTV-MFTR0（`standard`）逐项验证过，导航时 GPU 中位约 9ms（1.26 约 10.5ms）；TCL MT5879 国行（`guard`，多屏互动推送，ADB 点「同意」）装的是 1.27，首页、底板、控制中心回归通过。「所有 App 都在第一排」、文件夹之间移动、在文件夹里打开 App 还没在真机上试过。TvProvider 的「继续观看」查过做不了：读别的 App 的频道要 `ACCESS_ALL_EPG_DATA`（signature|privileged），两台电视上都只有 TvProvider 自己有；奇异果、极光自己的播放记录接口只对合作厂商开放（开关、appid、加密）。
 - 1.26（versionCode 28），2026-10-22 发布（[v1.26](https://github.com/pengchujin/aerial-tv/releases/tag/v1.26)）：检查新版本从每天一次改成每 3 小时一次，联网时也查（一天发了 1.22–1.25 四个版，早上查过的电视当天看不到后面的版本）。在小米上用一个自称 1.24 的临时包确认过控制中心会提示「有新版本 1.25」。
 - 1.25（versionCode 27），2026-10-22 发布（[v1.25](https://github.com/pengchujin/aerial-tv/releases/tag/v1.25)）：守护认得酷开用 `smartdevice.intent.category.LITE_HOME` 的原桌面（#122）和乐视 `ExternalJumpActivity` 背后真正显示的 `ui.activity.Launcher`（#121）；每日精选和天气在开机没网时取不到的，联网后立刻重试（以前要等 6 小时，#129）；`restore.sh` 在海信上能还原 1.15 以前手动改的 `persist.vt.use_home_pkg`（#40）。两台当时装的是 1.25，回归都过；酷开、乐视、海信没有真机，联网重试没有在真机上断网验证。
 - 1.24（versionCode 26），2026-10-22 发布（[v1.24](https://github.com/pengchujin/aerial-tv/releases/tag/v1.24)）：内置壁纸换成 14 张 Mac 风格的原创图（山丘、沙丘、海、波浪、光晕，在电视上按实际分辨率画），选过旧光场的自动换成颜色最接近的新图。壁纸在小米上逐张看过。官网和 README 的首页、聚焦、网格、长按菜单、控制中心、个性化截图换成了 1.24 在小米上拍的（每张换了一张壁纸，拍完改回户主选的「山丘 · 黎明」），个性化截图里的二维码、局域网地址和「我的照片」已模糊。
@@ -38,6 +46,7 @@
 | 系统级屏保（Dream） | 不适用（小米不用 Dream） | ✅ |
 | 返回键进入屏保 | ✅ | ✅ |
 | 焦点样式（高对比度白边 / 标准，控制中心与手机页切换） | ✅ 1.9 | 未装 1.9 |
+| 控制中心「下载并安装」（应用内升级） | ✅（未发版代码，2026-10-22：下载、「继续更新」、「完成」后回到 Aerial；取消、没开安装权限、签名不同都测过） | ✅（同日，1.30→官方 1.31：TCL 校验放行，系统安装器点「安装」，「暂不体验」后守护拉回） |
 | 覆盖安装时不打断正在看的信号源 / App | ✅ 1.9（装在 HDMI 播放中） | 未装 1.9 |
 | 屏保里左右键切换上一段/下一段（时钟模式除外，其他键退出） | ✅ 航拍（1.7） | 未测 |
 | 帧率 | 导航时中位数约 18ms | 未测 |
@@ -94,8 +103,11 @@ adb -s $XIAOMI_TV:5555 shell cmd package compile -m speed -f app.orchard.tv
 
 - **截图**：`adb shell screencap -p /data/local/tmp/x.png && adb pull ...`（小米用 `/data/local/tmp`，TCL 用 `/sdcard`）。用完要删掉。
 - **帧率**：`adb shell dumpsys gfxinfo app.orchard.tv reset`，操作几下，再执行 `... framestats`，看 `SwapBuffers→GpuCompleted` 这一段的耗时。
-- **守护状态**：`dumpsys accessibility | grep "label=Aerial"`（有输出就是已绑定）；日志 tag 是 `AerialGuard`。
+- **守护状态**：`dumpsys accessibility | grep -E "label=(Aerial|app.orchard.tv)"`（有输出就是已绑定；小米 ASTP0 上标签显示成类名）；日志 tag 是 `AerialGuard`。
 - **壁纸**：日志 tag 是 `AerialWallpaper`。
+- **logcat 看不到 App 日志的电视**（创维 7T631_T60）：`adb shell dumpsys activity app.orchard.tv/.MainActivity` 末尾打印 `DiagLog` 最近的记录（启动、显示模式、绘制、按键、焦点、屏保、加载耗时）；诊断版（`./gradlew -Pdiag ...`，版本名带 `-diag`）或 `ConfigReceiver --ez diag true` 之后还写进 `/sdcard/Android/data/app.orchard.tv/files/aerial-diag.log`，可以 `adb pull`。试验开关（下次启动生效）：`--ez mode_switch false` 不切刷新率（诊断版默认就不切），`--ez soft_layer true` 用软件绘制首页。
+- **机型适配信息**：`TV=<ip> tools/report.sh`（只读）生成可以贴进 issue 的 `aerial-report-<机型>.md`，macOS 上顺便复制到剪贴板；用户也可以在手机页最下面「反馈问题」里复制。issue 表单是 `.github/ISSUE_TEMPLATE/device.yml`。内容和隐私边界见 ARCHITECTURE.md「诊断报告」。
+- **测应用内升级**：`ConfigReceiver --ez check_update true` 立刻检查；`--ez update_test true` 让「下载并安装」用推到 `Android/data/app.orchard.tv/files/update-test.apk` 的包（测完删掉这个文件）。见 ARCHITECTURE.md「升级」。
 - **手机配置页**：令牌不写日志，从电视截图里识别二维码即可：`swift tools/qr-from-screenshot.swift shot.png`。
 - **立即预览屏保**：`adb shell am start -a app.orchard.tv.PREVIEW_SCREENSAVER -n app.orchard.tv/.MainActivity`；TCL 上测系统屏保：`am start -n com.android.systemui/.Somnambulator`。
 - **模拟小米的待机清理**：`adb shell am force-stop app.orchard.tv`，然后看日志里出现 `revived by the notification listener binding`。
@@ -123,7 +135,7 @@ plutil -convert json -o zh.json TVIdleScreenStrings.bundle/zh_CN.lproj/Localizab
 plutil -convert json -o en.json TVIdleScreenStrings.bundle/en.lproj/Localizable.nocache.strings
 ```
 
-然后把每个 asset 转成 `{id,label,category,url(=url-1080-H264),hevc(=url-1080-SDR),captions:[[秒,中文,英文],...]}` 写进 `app/src/main/assets/aerials.json`。captions 由 `pointsOfInterest` 的 key 去两个 strings 文件里查出来；category 由 `categories[0]` 对应 `localizedNameKey` 去掉 `AerialCategory` 前缀再转小写得到。
+然后把每个 asset 转成 `{id,label,category,url(=url-1080-H264),hevc(=url-1080-SDR),uhd(=url-4K-SDR),dv(=url-4K-HDR),captions:[[秒,中文,英文],...]}` 写进 `app/src/main/assets/aerials.json`。captions 由 `pointsOfInterest` 的 key 去两个 strings 文件里查出来；category 由 `categories[0]` 对应 `localizedNameKey` 去掉 `AerialCategory` 前缀再转小写得到。
 
 ## 已知问题与限制
 
@@ -131,7 +143,7 @@ plutil -convert json -o en.json TVIdleScreenStrings.bundle/en.lproj/Localizable.
 - 小米只有停在桌面上时才由 Aerial 接管屏保；在别的 App 里空闲，小米自己的屏保仍会出现。
 - TCL 调音量时会同时弹出 TCL 自己的音量条。
 - HDMI 设备名只能显示「已连接」，读真实 CEC 名称需要系统权限。
-- 航拍和每日精选都需要联网，航拍视频没有本地缓存。
+- 航拍和每日精选都需要联网，航拍视频没有本地缓存。4K 杜比视界约 24 Mbps，网慢的家里会频繁跳段，要在个性化里改成 1080p。
 - 手机配置页是局域网 HTTP，只靠随机令牌保护。
 - 签名用的是 debug key。想换成正式密钥，必须先在两台电视上卸载重装（会丢掉壁纸、照片和图标排序），TCL 还要走一遍当贝流程。
 - 海信等其他品牌没有在真机上验证过。

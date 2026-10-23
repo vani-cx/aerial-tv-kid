@@ -2,8 +2,8 @@ package app.orchard.tv.ui.home
 
 import android.os.Build
 import android.os.SystemClock
-import android.util.Log
 import android.view.KeyEvent
+import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -47,10 +47,14 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import app.orchard.tv.apps.AppEntry
+import app.orchard.tv.system.DiagLog
 import app.orchard.tv.ui.theme.LocalReducedMotion
 import app.orchard.tv.ui.theme.Motion
 import app.orchard.tv.ui.theme.Type
 import app.orchard.tv.wallpaper.AerialStream
+import app.orchard.tv.settings.AerialSettings
+import app.orchard.tv.wallpaper.AerialFormats
+import app.orchard.tv.wallpaper.AerialQuality
 import app.orchard.tv.wallpaper.Aerials
 import app.orchard.tv.wallpaper.ScreensaverMode
 import app.orchard.tv.wallpaper.WallpaperKind
@@ -149,8 +153,6 @@ private fun Labels(caption: String?, now: LocalDateTime) {
     }
 }
 
-private const val TAG = "AerialScreensaver"
-
 /**
  * Before Android 7.0 network_security_config is ignored, so Apple Root CA is never trusted and
  * HTTPS to Apple's video host always fails, but only after the player has retried for about half a
@@ -159,11 +161,21 @@ private const val TAG = "AerialScreensaver"
  */
 private var aerialsOverHttp by mutableStateOf(Build.VERSION.SDK_INT < Build.VERSION_CODES.N)
 
+/**
+ * The quality a decoder gave up on, for the rest of the process: the screensaver then starts one
+ * step lower. A TV can list a decoder it cannot drive at that size or profile.
+ */
+private var aerialQualityCap: AerialQuality? = null
+
 @Composable
 private fun AerialSaver(now: LocalDateTime, steps: SharedFlow<Int>, onUnavailable: () -> Unit) {
     val context = LocalContext.current
-    val films = remember { AerialStream.withOpenerFirst(context, Aerials.all(context).shuffled()) }
-    val player = remember { AerialStream.player(context) }
+    var quality by remember {
+        val wanted = AerialFormats.resolve(context, AerialSettings.aerialQuality)
+        mutableStateOf(aerialQualityCap?.takeIf { it.ordinal < wanted.ordinal } ?: wanted)
+    }
+    val films = remember { AerialStream.withOpenerFirst(context, Aerials.all(context).shuffled(), quality) }
+    val player = remember { AerialStream.player(context, quality) }
     var index by remember { mutableIntStateOf(0) }
     var failures by remember { mutableIntStateOf(0) }
     var playing by remember { mutableStateOf(false) }
@@ -177,7 +189,7 @@ private fun AerialSaver(now: LocalDateTime, steps: SharedFlow<Int>, onUnavailabl
     val veil by animateFloatAsState(if (playing) 0f else 1f, tween(if (playing) 1500 else 400), label = "veil")
 
     fun load(at: Int) {
-        player.setMediaItems(films.map { AerialStream.mediaItem(it, aerialsOverHttp) }, at, 0)
+        player.setMediaItems(films.map { AerialStream.mediaItem(it, quality, aerialsOverHttp) }, at, 0)
         player.prepare()
         player.playWhenReady = true
     }
@@ -192,7 +204,7 @@ private fun AerialSaver(now: LocalDateTime, steps: SharedFlow<Int>, onUnavailabl
         val opened = SystemClock.elapsedRealtime()
         val listener = object : Player.Listener {
             override fun onRenderedFirstFrame() {
-                if (!playing) Log.i(TAG, "first frame of ${player.currentMediaItem?.mediaId} after ${SystemClock.elapsedRealtime() - opened} ms")
+                if (!playing) DiagLog.i("first frame of ${player.currentMediaItem?.mediaId} after ${SystemClock.elapsedRealtime() - opened} ms")
                 playing = true
                 shownAny = true
                 failures = 0
@@ -206,8 +218,16 @@ private fun AerialSaver(now: LocalDateTime, steps: SharedFlow<Int>, onUnavailabl
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                Log.w(TAG, "aerial film failed (${error.errorCodeName}): ${player.currentMediaItem?.localConfiguration?.uri}")
+                DiagLog.i("aerial film failed (${error.errorCodeName}): ${player.currentMediaItem?.localConfiguration?.uri}")
                 playing = false
+                // The decoder could not play this quality: the same film one step lower.
+                if (quality != AerialQuality.Hd && error.errorCode in DECODER_ERRORS) {
+                    aerialQualityCap = AerialFormats.lower(quality)
+                    quality = AerialFormats.lower(quality)
+                    load(player.currentMediaItemIndex)
+                    attempt++
+                    return
+                }
                 // Apple's video host chains to Apple Root CA, which Android does not ship. From 7.0 on
                 // network_security_config trusts it for this host; 5.0 and 6.0 ignore that file and
                 // start on HTTP. The same files are served over plain HTTP; try that before giving up.
@@ -246,7 +266,7 @@ private fun AerialSaver(now: LocalDateTime, steps: SharedFlow<Int>, onUnavailabl
     LaunchedEffect(attempt, playing) {
         if (playing) return@LaunchedEffect
         delay(STALL_MS)
-        Log.w(TAG, "no picture from ${player.currentMediaItem?.mediaId} after $STALL_MS ms; next film")
+        DiagLog.i("no picture from ${player.currentMediaItem?.mediaId} after $STALL_MS ms; next film")
         failures++
         // Nothing has played at all this time: Apple's CDN is out of reach. Hand over to the photo
         // screensaver after two films rather than three, so the screen is not black for long
@@ -258,12 +278,21 @@ private fun AerialSaver(now: LocalDateTime, steps: SharedFlow<Int>, onUnavailabl
     }
     // While a film plays, get the next screensaver's first film ready on disk.
     LaunchedEffect(playing) {
-        if (playing) AerialStream.prepareOpener(context, films, film, aerialsOverHttp)
+        if (playing) AerialStream.prepareOpener(context, films, film, quality, aerialsOverHttp)
     }
 
     AndroidView(
         modifier = Modifier.fillMaxSize(),
-        factory = { ctx -> SurfaceView(ctx).also { player.setVideoSurfaceView(it) } },
+        factory = { ctx ->
+            SurfaceView(ctx).also {
+                it.holder.addCallback(object : SurfaceHolder.Callback {
+                    override fun surfaceCreated(holder: SurfaceHolder) = DiagLog.i("film surface created")
+                    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) = Unit
+                    override fun surfaceDestroyed(holder: SurfaceHolder) = DiagLog.i("film surface destroyed")
+                })
+                player.setVideoSurfaceView(it)
+            }
+        },
         onRelease = { player.clearVideoSurfaceView(it) },
     )
     Box(Modifier.fillMaxSize().graphicsLayer { alpha = veil }.background(Color.Black))
@@ -272,6 +301,8 @@ private fun AerialSaver(now: LocalDateTime, steps: SharedFlow<Int>, onUnavailabl
 
 /** How long a film may take to show its first frame before the next one is tried. */
 private const val STALL_MS = 8_000L
+
+private val DECODER_ERRORS = PlaybackException.ERROR_CODE_DECODER_INIT_FAILED..PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED
 
 @Composable
 private fun PhotoSaver(now: LocalDateTime, steps: SharedFlow<Int>) {

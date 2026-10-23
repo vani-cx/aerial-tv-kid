@@ -62,6 +62,8 @@ import app.orchard.tv.R
 import app.orchard.tv.parental.Parental
 import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.settings.FocusStyle
+import app.orchard.tv.settings.UiSounds
+import app.orchard.tv.system.Sounds
 import app.orchard.tv.ui.components.Pressable
 import app.orchard.tv.ui.components.consumeTaps
 import app.orchard.tv.ui.components.dismissOnTap
@@ -72,6 +74,8 @@ import app.orchard.tv.ui.theme.Motion
 import app.orchard.tv.ui.theme.Palette
 import app.orchard.tv.ui.theme.Type
 import app.orchard.tv.wallpaper.PhoneServer
+import app.orchard.tv.wallpaper.AerialFormats
+import app.orchard.tv.wallpaper.AerialQuality
 import app.orchard.tv.wallpaper.ScreensaverMode
 import app.orchard.tv.wallpaper.Wallpaper
 import app.orchard.tv.wallpaper.WallpaperKind
@@ -160,6 +164,11 @@ fun WallpaperSheet(
                             AerialSettings.oneRowHome, AerialSettings::chooseOneRowHome, first = true,
                         )
                         Choices(
+                            R.string.st_plate, stringResource(R.string.st_plate_hint), note,
+                            listOf(true to R.string.st_plate_glass, false to R.string.st_plate_none),
+                            AerialSettings.homePlate, AerialSettings::chooseHomePlate,
+                        )
+                        Choices(
                             R.string.st_clock, stringResource(R.string.st_clock_hint), note,
                             listOf(false to R.string.st_clock_left, true to R.string.st_clock_right),
                             AerialSettings.clockRight, AerialSettings::chooseClockRight,
@@ -182,9 +191,11 @@ fun WallpaperSheet(
                             AerialSettings.focusStyle, AerialSettings::chooseFocusStyle,
                         )
                         Choices(
-                            R.string.st_sounds, stringResource(R.string.st_sounds_hint), note,
-                            listOf(true to R.string.st_on, false to R.string.st_off),
-                            AerialSettings.uiSounds, AerialSettings::chooseUiSounds,
+                            R.string.st_sounds,
+                            stringResource(if (AerialSettings.uiSounds == UiSounds.Tv) R.string.st_sounds_tv_hint else R.string.st_sounds_hint),
+                            note,
+                            listOf(UiSounds.Tv to R.string.st_sounds_tv, UiSounds.Aerial to R.string.st_sounds_aerial, UiSounds.Off to R.string.st_off),
+                            AerialSettings.uiSounds, { AerialSettings.chooseUiSounds(it); Sounds.prepare() },
                         )
                         // Apps taken off Home are kept with the rest of how Home looks.
                         SettingRow(R.string.st_hidden_apps, stringResource(R.string.st_hidden_apps_hint), note) {
@@ -204,6 +215,17 @@ fun WallpaperSheet(
                             if (AerialSettings.backStartsScreensaver) stringResource(R.string.ss_back_hint) else null,
                             note, first = true,
                         ) { ScreensaverChoice(onStartScreensaver) }
+                        // Only the qualities this TV can play; a 1080p-only TV has nothing to choose.
+                        val qualities = remember { AerialFormats.supported(context) }
+                        if (qualities.size > 1) {
+                            Choices(
+                                R.string.ss_quality, stringResource(R.string.ss_quality_hint), note,
+                                listOf(AerialQuality.Auto to R.string.ss_quality_auto, AerialQuality.Hd to R.string.ss_quality_hd) +
+                                    listOf(AerialQuality.Uhd to R.string.ss_quality_uhd, AerialQuality.DolbyVision to R.string.ss_quality_dv)
+                                        .filter { it.first in qualities },
+                                AerialSettings.aerialQuality, AerialSettings::chooseAerialQuality,
+                            )
+                        }
                         Choices(
                             R.string.ss_delay, null, note,
                             AerialSettings.screensaverChoices.map { it to stringResource(R.string.ss_minutes, it) },
@@ -267,6 +289,7 @@ private fun WallpaperRows() {
     }
     val daily = items.filter { it.kind == WallpaperKind.Daily }
     val rows = buildList {
+        add(R.string.wp_live to items.filter { it.kind == WallpaperKind.Live })
         if (daily.isNotEmpty()) {
             add(R.string.wp_daily to listOf(Wallpaper(Wallpapers.LATEST_DAILY, WallpaperKind.Daily, stringResource(R.string.wp_daily_latest))) + daily)
         }
@@ -328,6 +351,10 @@ private fun WallpaperCard(wp: Wallpaper, focusRequester: FocusRequester?) {
                         Modifier.align(Alignment.TopEnd).padding(7.dp).size(22.dp).clip(CircleShape).background(Palette.Focus),
                         contentAlignment = Alignment.Center,
                     ) { GlyphIcon(Glyph.Check, Palette.OnFocus, 13.dp) }
+                }
+                // The aerial wallpaper moves; its card shows the last frame it stopped on.
+                if (wp.kind == WallpaperKind.Live) {
+                    GlyphIcon(Glyph.Play, Color.White, 22.dp, Modifier.align(Alignment.BottomStart).padding(7.dp))
                 }
             }
             Spacer(Modifier.height(6.dp))

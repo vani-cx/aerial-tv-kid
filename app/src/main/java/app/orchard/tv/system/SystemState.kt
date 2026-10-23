@@ -11,10 +11,12 @@ import android.media.tv.TvInputManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.Uri
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.getSystemService
+import app.orchard.tv.BuildConfig
 import app.orchard.tv.R
 import app.orchard.tv.guard.HomeGuardService
 
@@ -92,19 +94,33 @@ object SystemProbe {
     private fun volumeFlags(context: Context) =
         if (isInstalled(context, "com.tcl.settings")) AudioManager.FLAG_SHOW_UI else 0
 
+    /**
+     * TCL tcl_m7642 (雷鸟 65S515D, Android 9) has adjustStreamVolume note the change in battery stats,
+     * which needs a system permission: it threw and Control Center crashed at the first step (issue
+     * #15). Setting the level is the way left there.
+     */
     fun adjustVolume(context: Context, direction: Int) {
         val am = context.getSystemService<AudioManager>() ?: return
-        am.adjustStreamVolume(
-            AudioManager.STREAM_MUSIC,
-            if (direction > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
-            volumeFlags(context),
-        )
+        val flags = volumeFlags(context)
+        try {
+            am.adjustStreamVolume(
+                AudioManager.STREAM_MUSIC,
+                if (direction > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
+                flags,
+            )
+        } catch (e: SecurityException) {
+            runCatching {
+                val level = am.getStreamVolume(AudioManager.STREAM_MUSIC) + if (direction > 0) 1 else -1
+                am.setStreamVolume(AudioManager.STREAM_MUSIC, level.coerceIn(0, am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)), flags)
+            }
+        }
     }
 
     fun toggleMute(context: Context) {
         val am = context.getSystemService<AudioManager>() ?: return
         if (Build.VERSION.SDK_INT >= 23) {
-            am.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_TOGGLE_MUTE, volumeFlags(context))
+            // See adjustVolume: no other way to mute there.
+            runCatching { am.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_TOGGLE_MUTE, volumeFlags(context)) }
         } else {
             legacyMuted = !legacyMuted
             @Suppress("DEPRECATION")
@@ -140,22 +156,58 @@ object SystemProbe {
             Intent(Settings.ACTION_SETTINGS),
             // TCL MT5879 (China): nothing answers ACTION_SETTINGS; MAIN opens TCL's full settings panel.
             Intent(Intent.ACTION_MAIN).setComponent(ComponentName("com.tcl.settings", "com.tcl.settings.ui.MainActivity")),
+            // PPTV K55U27 (MStar, Android 6): its settings app answers no standard action (issue #264).
+            Intent(Intent.ACTION_MAIN).setComponent(ComponentName("com.pptv.setting", "com.pptv.setting.root.SettingsActivity")),
+            // XGIMI GMUI (Z7X, Android 9) neither; its settings open by link (issue #241).
+            Intent(Intent.ACTION_VIEW, Uri.parse("Settings://com.xgimi.misckey.main/mainPage")),
         )
 
     // TCL MT5879 answers ACTION_WIFI_SETTINGS with its Wi-Fi side panel.
+    /**
+     * Where a viewer who installed only the APK (from a USB stick, issue #213) can make Aerial Home
+     * without a computer, or null where the TV has no such page: Accessibility for Home Guard
+     * (Xiaomi MiTV-MFTR0 has it, TCL MT5879 not), the Home picker (only the standard build is a
+     * Home; Xiaomi's firmware ignores the choice), and notification access, which brings Aerial
+     * back after a standby kill.
+     */
+    fun guardSettingsIntent(context: Context): Intent? = resolvable(context, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+
+    fun homeSettingsIntent(context: Context): Intent? =
+        if (BuildConfig.FLAVOR == "standard") resolvable(context, Intent(Settings.ACTION_HOME_SETTINGS)) else null
+
+    fun revivalSettingsIntent(context: Context): Intent? =
+        resolvable(context, Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"))
+
+    private fun resolvable(context: Context, intent: Intent): Intent? =
+        intent.takeIf { context.packageManager.resolveActivity(it, 0) != null }?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
     fun networkSettingsIntent(context: Context): Intent =
         firstResolvable(
             context,
             Intent("com.xiaomi.mitv.settings.WIFI_SETTINGS").setComponent(ComponentName("com.xiaomi.mitv.settings", "com.xiaomi.mitv.settings.wifi.MitvWifiActivity")),
             Intent(Settings.ACTION_WIFI_SETTINGS),
+            // PPTV K55U27 and XGIMI Z7X answer no standard Wi-Fi action (issues #264, #241).
+            Intent("com.pptv.intent.action.WIFI_ACTIVITY").setComponent(ComponentName("com.pptv.setting", "com.pptv.setting.wifi.WifiWorkActivity")),
+            Intent(Intent.ACTION_VIEW, Uri.parse("Settings://com.xgimi.settings.net/wifi_misckey")),
             Intent(Settings.ACTION_SETTINGS),
+            // TCL tcl_m7642 (Android 9) answers neither Wi-Fi nor settings actions (issue #15).
+            Intent(Intent.ACTION_MAIN).setComponent(ComponentName("com.tcl.settings", "com.tcl.settings.ui.MainActivity")),
         )
 
     /**
      * Opens the TV's own picture settings where brightness lives, for TVs whose backlight Aerial
      * cannot set itself. TCL keeps it in a side panel that its settings app shows as a service.
+     * Xiaomi's settings app shows its backlight slider on a broadcast: older Xiaomi TVs have no
+     * picture_backlight setting and no display settings screen to open (MiTV-ASTP0, Android 9,
+     * found in PR #85; MiTV-MFTP0, Mi TV 4A, #23, #130, #185), and MiTV-MFTR0 has the receiver too.
      */
     fun openPictureSettings(context: Context): Boolean {
+        val backlight = Intent("com.xiaomi.mitv.settings.BACKLIGHT_POPUP")
+            .setComponent(ComponentName("com.xiaomi.mitv.settings", "com.xiaomi.mitv.settings.SettingsBroadcastReceiver"))
+        if (context.packageManager.queryBroadcastReceivers(backlight, 0).any { it.activityInfo.exported }) {
+            val shown = runCatching { context.sendBroadcast(backlight) }.isSuccess
+            if (shown) return true
+        }
         if (isInstalled(context, "com.tcl.settings")) {
             val shown = runCatching {
                 context.startService(Intent("com.tcl.settings.SHOW_WINDOW").setPackage("com.tcl.settings"))
@@ -163,7 +215,16 @@ object SystemProbe {
             if (shown) return true
         }
         return runCatching {
-            context.startActivity(firstResolvable(context, Intent(Settings.ACTION_DISPLAY_SETTINGS), Intent(Settings.ACTION_SETTINGS)))
+            context.startActivity(
+                firstResolvable(
+                    context,
+                    Intent(Settings.ACTION_DISPLAY_SETTINGS),
+                    // PPTV K55U27: picture and sound, where its brightness is (issue #264).
+                    Intent("com.pptv.intent.action.PICTUREAUDIO_ACTIVITY")
+                        .setComponent(ComponentName("com.pptv.setting", "com.pptv.setting.media.PictureAudioSettingActivity")),
+                    settingsIntent(context),
+                ),
+            )
         }.isSuccess
     }
 
@@ -175,6 +236,16 @@ object SystemProbe {
      */
     fun openInputPicker(context: Context): Boolean {
         val pm = context.packageManager
+        // Hisense VIDAA_TV (MT9653, Android 11) lists no inputs either; its input panel is a
+        // foreground service (issue #261, tried on the reporter's TV).
+        val hisense = Intent("com.hisense.tv.start_inputs")
+            .setComponent(ComponentName("com.hisense.tv.inputs", "com.hisense.tv.InputsUIService"))
+        if (pm.resolveService(hisense, 0) != null) {
+            val shown = runCatching {
+                if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(hisense) else context.startService(hisense)
+            }.getOrNull() != null
+            if (shown) return true
+        }
         val intent = if (pm.hasSystemFeature("com.tcl.software.systemui_custom_tv_source")) {
             Intent("com.tcl.tvstatusbar.action.SHOW_WINDOW").setPackage("com.android.systemui")
                 .putExtra("TvStatusBar_Type", "Source")
@@ -206,7 +277,9 @@ object SystemProbe {
      * Physical inputs from the TV input framework, routed through the maker's own player where the
      * generic passthrough intent has no handler (Xiaomi's China firmware).
      */
-    fun sources(context: Context): List<TvSource> = frameworkSources(context).ifEmpty { tclSources(context) }
+    fun sources(context: Context): List<TvSource> = frameworkSources(context)
+        .ifEmpty { KonkaSources.load(context) }
+        .ifEmpty { tclSources(context) }
 
     private fun frameworkSources(context: Context): List<TvSource> {
         val tim = context.getSystemService<TvInputManager>() ?: return emptyList()
@@ -325,6 +398,8 @@ object SystemProbe {
  * as DisplayPort; its tvplayer knows them as source 29 and 30 (#62, found in its MonitorUtils).
  * MiTV-ANTL0 (L42R7-RA, Amlogic, Android 5.1) registers only one HDMI input, HW6, labelled
  * HDMI2, but it is the HDMI 1 port and source 23 (#64, from the reporter's logcat).
+ * MiTV4-ANSM0 (Mi TV 4, Amlogic, Android 6.0.1) registers an HDMI input only for a port with a
+ * device in it; HW7 is source 23, not 25 (#191, the reporter scanned sources 1–32).
  */
 private class DeviceProfile(
     val hiddenHardware: Set<Int?> = emptySet(),
@@ -345,6 +420,9 @@ private class DeviceProfile(
             "MiTV_ANTL0", "MiTV-ANTL0" -> DeviceProfile(
                 labels = mapOf(6 to "HDMI 1"),
                 xiaomiSourceIds = mapOf(6 to 23),
+            )
+            "MiTV4-ANSM0", "MiTV4_ANSM0" -> DeviceProfile(
+                xiaomiSourceIds = mapOf(7 to 23),
             )
             else -> DeviceProfile()
         }

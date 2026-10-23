@@ -16,8 +16,13 @@ android {
         // Android 5.0. Compose 1.10 and later need 6.0, so the Compose BOM below stays on 1.9.
         minSdk = 21
         targetSdk = 34
-        versionCode = 29
-        versionName = "1.27"
+        versionCode = 37
+        versionName = "1.35"
+        // `./gradlew -Pdiag ...`: a build for one reporter's TV whose logcat shows no app lines;
+        // see system/DiagLog.kt.
+        val diag = project.hasProperty("diag")
+        buildConfigField("boolean", "DIAG", diag.toString())
+        if (diag) versionNameSuffix = "-diag"
     }
 
     // standard: a normal HOME app. guard: no HOME intent filter at all, for China-market firmwares

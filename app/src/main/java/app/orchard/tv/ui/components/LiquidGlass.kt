@@ -1,11 +1,9 @@
 package app.orchard.tv.ui.components
 
 import android.graphics.BitmapShader
-import android.graphics.ComposeShader
 import android.graphics.LinearGradient
 import android.graphics.Matrix
 import android.graphics.Paint
-import android.graphics.PorterDuff
 import android.graphics.Shader
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.getValue
@@ -19,10 +17,12 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Paint as ComposePaint
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asAndroidPath
@@ -70,9 +70,7 @@ fun Modifier.liquidGlass(corner: Dp, bottomCorners: Boolean = true): Modifier = 
             val w = size.width.roundToInt().coerceAtLeast(1)
             val h = size.height.roundToInt().coerceAtLeast(1)
             val mask = smoothMask(w, h, radius, if (bottomCorners) radius else 0f)
-            val shape = BitmapShader(mask, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
-                .apply { setLocalMatrix(Matrix().apply { setScale(size.width / w, size.height / h) }) }
-            val brush = shader?.let { ShaderBrush(ComposeShader(it, shape, PorterDuff.Mode.DST_IN)) }
+            val brush = shader?.let { ShaderBrush(it) }
             val flat = mask.asImageBitmap()
             onDrawBehind {
                 if (shader == null || brush == null || root == IntSize.Zero) {
@@ -82,7 +80,14 @@ fun Modifier.liquidGlass(corner: Dp, bottomCorners: Boolean = true): Modifier = 
                         setScale(root.width.toFloat() / frost.width, root.height.toFloat() / frost.height)
                         postTranslate(-at.x, -at.y)
                     })
-                    drawRect(brush, colorFilter = PanelTint)
+                    // The outline is drawn first in a layer of the panel's size and the glass kept
+                    // where it lies. One shader per draw: a ComposeShader of the glass and the mask
+                    // (1.27-1.30) came out an opaque dark slab on Xiaomi MiTV-ASTP0 (Android 9,
+                    // Mali-G31), and before Android 9 hardware drawing cannot compose two bitmaps.
+                    drawContext.canvas.saveLayer(Rect(Offset.Zero, size), ComposePaint())
+                    drawImage(flat, dstSize = IntSize(w, h))
+                    drawRect(brush, colorFilter = PanelTint, blendMode = BlendMode.SrcIn)
+                    drawContext.canvas.restore()
                 }
                 drawGlassEdge(size, radius, bottomCorners)
             }
