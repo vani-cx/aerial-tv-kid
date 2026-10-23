@@ -6,6 +6,7 @@ import android.media.AudioManager
 import android.media.SoundPool
 import android.os.Build
 import android.os.SystemClock
+import android.provider.Settings
 import android.view.KeyEvent
 import app.orchard.tv.R
 import app.orchard.tv.settings.AerialSettings
@@ -103,10 +104,22 @@ object Sounds {
 
     private enum class Kind { Move, Select, Back, Limit }
 
+    /**
+     * The volume form, with the key sound switch checked here as the one-argument form does: Hisense
+     * VIDAA_TV (MT9653, Android 11) changed that one to take only its own effects (10 to 18), so the
+     * standard ones played nothing (issue #262). -1 is the volume the one-argument form uses.
+     */
+    private fun playTvEffect(effect: Int) {
+        val context = app ?: return
+        val on = runCatching { Settings.System.getInt(context.contentResolver, Settings.System.SOUND_EFFECTS_ENABLED, 1) != 0 }
+            .getOrDefault(true)
+        if (on) audio?.playSoundEffect(effect, -1f)
+    }
+
     private fun play(effect: Int, kind: Kind) {
         when (AerialSettings.uiSounds) {
             UiSounds.Off -> Unit
-            UiSounds.Tv -> audio?.playSoundEffect(effect)
+            UiSounds.Tv -> playTvEffect(effect)
             UiSounds.Aerial -> {
                 val p = ownPool() ?: return
                 val (id, volume) = when (kind) {

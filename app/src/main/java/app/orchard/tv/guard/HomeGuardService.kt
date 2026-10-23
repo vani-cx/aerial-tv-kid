@@ -222,11 +222,17 @@ class HomeGuardService : AccessibilityService() {
      * Up to Android 11 always: there, once Home reaches the system, it holds every background
      * activity start for five seconds, so Aerial came back only after five seconds of the TCL
      * launcher (TCL MT5879, since 1.11 stopped filtering by default).
+     *
+     * Never while Aerial is the default Home: onKeyEvent leaves Home to the system then, so the
+     * filter only costs. On Xiaomi MiTV-ASTP0 (Android 9) it crashed the system: every filtered
+     * volume key reached Xiaomi's MitvFreezer with no window, which threw in system_server and
+     * restarted the TV (issue #249).
      */
     private fun filterKeys(on: Boolean) {
         val info = serviceInfo ?: return
         val flag = AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
-        val want = if (!keysPassThrough && (on || Build.VERSION.SDK_INT <= Build.VERSION_CODES.R)) info.flags or flag else info.flags and flag.inv()
+        val wanted = !keysPassThrough && (on || Build.VERSION.SDK_INT <= Build.VERSION_CODES.R)
+        val want = if (wanted && !isDefaultHome()) info.flags or flag else info.flags and flag.inv()
         if (want == info.flags) return
         info.flags = want
         serviceInfo = info
@@ -351,8 +357,10 @@ class HomeGuardService : AccessibilityService() {
         // only where it is the Home the system resolves.
         val resolved = resolvedHome()
         val homes = (standard + vendor)
-            // Negative priority entries are fallbacks shown only while nothing else can be Home.
-            .filter { it.activityInfo.packageName != packageName && it.priority >= 0 }
+            // Negative priority entries are fallbacks shown only while nothing else can be Home,
+            // except the ones a firmware does start.
+            .filter { it.activityInfo.packageName != packageName }
+            .filter { it.priority >= 0 || it.activityInfo.name == LOW_PRIORITY_HOMES[it.activityInfo.packageName] }
             .filter { it.activityInfo.packageName !in INPUT_PLAYERS || it.activityInfo.packageName == resolved }
             .groupBy({ it.activityInfo.packageName }, { it.activityInfo.name })
             .mapValues { it.value.toSet() }
@@ -405,6 +413,18 @@ class HomeGuardService : AccessibilityService() {
         /** Launcher package to the screens its Home trampoline opens; see refreshStockHomes. */
         private val HOME_SCREENS_BEHIND_TRAMPOLINES = mapOf(
             "com.stv.deskplatform" to listOf("com.stv.deskplatform.ui.activity.Launcher"),
+            // Tencent 极光 boxes: Home is LauncherMainActivity, the screen shown is this one
+            // (极光盒子 6SE Q0102, Android 10, issue #270; 7S, Android 14, #269).
+            "com.ktcp.launcher" to listOf("com.ktcp.launcher.activity.LauncherHomeSingleTaskActivity"),
+        )
+
+        /**
+         * Home activities with a negative priority that a firmware really starts, by package. Hisense
+         * VIDAA_TV (MT9653, Android 11) brings up its voice launcher's HomeActivity (priority -150)
+         * at Home and on wake; reported with a local build in issue #261.
+         */
+        private val LOW_PRIORITY_HOMES = mapOf(
+            "com.keylab.speech.view.vidaa" to "com.ju.secondscreen.HomeActivity",
         )
 
         @Volatile

@@ -94,9 +94,16 @@ object GuardSetup {
     /** Whether the firmware has stopped Aerial three times or more in the last ten minutes. */
     fun revivedOften(context: Context): Boolean = recentRevivals(context, System.currentTimeMillis()).size >= 3
 
-    private fun recentRevivals(context: Context, now: Long): List<Long> =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_REVIVALS, null).orEmpty()
-            .split(',').mapNotNull { it.toLongOrNull() }.filter { now - it in 0..REVIVAL_WINDOW_MS }
+    /**
+     * Only since this boot: stops before a restart say nothing about the firmware now. A few
+     * reinstalls just before rebooting left the guard leaving the stock launcher in front at boot
+     * (Hisense VIDAA_TV, MT9653, issue #261).
+     */
+    private fun recentRevivals(context: Context, now: Long): List<Long> {
+        val bootedAt = now - SystemClock.elapsedRealtime()
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_REVIVALS, null).orEmpty()
+            .split(',').mapNotNull { it.toLongOrNull() }.filter { now - it in 0..REVIVAL_WINDOW_MS && it >= bootedAt }
+    }
 
     fun keepAdb(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_KEEP_ADB, false)

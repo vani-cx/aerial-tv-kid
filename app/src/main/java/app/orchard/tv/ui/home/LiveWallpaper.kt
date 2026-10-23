@@ -174,7 +174,9 @@ fun LiveWallpaper(
 
 /**
  * The film's current frame, at the screen's size, or null: PixelCopy needs Android 7.0, and some
- * TVs put video on a plane apps cannot read, which comes back black.
+ * TVs put video on a plane apps cannot read, which comes back black, or green where the copy holds
+ * brightness without colour (Hisense VIDAA_TV T963, Xiaomi MiTV-MTEQ0: the wallpaper turned green
+ * at the first key press, issue #256).
  */
 private suspend fun capture(view: SurfaceView): Bitmap? {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N || view.width <= 0 || !view.holder.surface.isValid) return null
@@ -184,9 +186,9 @@ private suspend fun capture(view: SurfaceView): Bitmap? {
             PixelCopy.request(view, bitmap, { done.resume(it) }, Handler(Looper.getMainLooper()))
         }.onFailure { done.resume(-1) }
     }
-    val black = result == PixelCopy.SUCCESS && isBlack(bitmap)
-    if (result != PixelCopy.SUCCESS || black) DiagLog.i("wallpaper frame copy: result $result, black $black")
-    return bitmap.takeIf { result == PixelCopy.SUCCESS && !black }
+    val unread = if (result == PixelCopy.SUCCESS) unreadable(bitmap) else null
+    if (result != PixelCopy.SUCCESS || unread != null) DiagLog.i("wallpaper frame copy: result $result, $unread")
+    return bitmap.takeIf { result == PixelCopy.SUCCESS && unread == null }
 }
 
 /**
@@ -224,11 +226,30 @@ private suspend fun decodeFrame(context: android.content.Context, id: String, at
 
 private const val DECODE_TIMEOUT_MS = 10_000L
 
-private fun isBlack(b: Bitmap): Boolean {
+/**
+ * Why a copied frame is not the film, or null if it looks like one: black; one flat colour; or
+ * green, which is what video with its colour planes left at zero reads as (red and blue clip to 0).
+ */
+private fun unreadable(b: Bitmap): String? {
     var lit = 0
+    var green = 0
+    var lo = 255
+    var hi = 0
     for (y in 1..8) for (x in 1..8) {
         val c = b.getPixel(b.width * x / 9, b.height * y / 9)
-        if ((c shr 16 and 0xFF) + (c shr 8 and 0xFF) + (c and 0xFF) > 24) lit++
+        val r = c shr 16 and 0xFF
+        val g = c shr 8 and 0xFF
+        val bl = c and 0xFF
+        if (r + g + bl > 24) lit++
+        if (r < 12 && bl < 12 && g > 32) green++
+        val luma = (r * 3 + g * 6 + bl) / 10
+        lo = minOf(lo, luma)
+        hi = maxOf(hi, luma)
     }
-    return lit < 3
+    return when {
+        lit < 3 -> "black"
+        green > 32 -> "green"
+        hi - lo < 6 -> "flat"
+        else -> null
+    }
 }

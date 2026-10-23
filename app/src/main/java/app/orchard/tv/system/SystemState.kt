@@ -11,6 +11,7 @@ import android.media.tv.TvInputManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.Uri
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.provider.Settings
@@ -141,6 +142,10 @@ object SystemProbe {
             Intent(Settings.ACTION_SETTINGS),
             // TCL MT5879 (China): nothing answers ACTION_SETTINGS; MAIN opens TCL's full settings panel.
             Intent(Intent.ACTION_MAIN).setComponent(ComponentName("com.tcl.settings", "com.tcl.settings.ui.MainActivity")),
+            // PPTV K55U27 (MStar, Android 6): its settings app answers no standard action (issue #264).
+            Intent(Intent.ACTION_MAIN).setComponent(ComponentName("com.pptv.setting", "com.pptv.setting.root.SettingsActivity")),
+            // XGIMI GMUI (Z7X, Android 9) neither; its settings open by link (issue #241).
+            Intent(Intent.ACTION_VIEW, Uri.parse("Settings://com.xgimi.misckey.main/mainPage")),
         )
 
     // TCL MT5879 answers ACTION_WIFI_SETTINGS with its Wi-Fi side panel.
@@ -167,6 +172,9 @@ object SystemProbe {
             context,
             Intent("com.xiaomi.mitv.settings.WIFI_SETTINGS").setComponent(ComponentName("com.xiaomi.mitv.settings", "com.xiaomi.mitv.settings.wifi.MitvWifiActivity")),
             Intent(Settings.ACTION_WIFI_SETTINGS),
+            // PPTV K55U27 and XGIMI Z7X answer no standard Wi-Fi action (issues #264, #241).
+            Intent("com.pptv.intent.action.WIFI_ACTIVITY").setComponent(ComponentName("com.pptv.setting", "com.pptv.setting.wifi.WifiWorkActivity")),
+            Intent(Intent.ACTION_VIEW, Uri.parse("Settings://com.xgimi.settings.net/wifi_misckey")),
             Intent(Settings.ACTION_SETTINGS),
         )
 
@@ -191,7 +199,16 @@ object SystemProbe {
             if (shown) return true
         }
         return runCatching {
-            context.startActivity(firstResolvable(context, Intent(Settings.ACTION_DISPLAY_SETTINGS), Intent(Settings.ACTION_SETTINGS)))
+            context.startActivity(
+                firstResolvable(
+                    context,
+                    Intent(Settings.ACTION_DISPLAY_SETTINGS),
+                    // PPTV K55U27: picture and sound, where its brightness is (issue #264).
+                    Intent("com.pptv.intent.action.PICTUREAUDIO_ACTIVITY")
+                        .setComponent(ComponentName("com.pptv.setting", "com.pptv.setting.media.PictureAudioSettingActivity")),
+                    settingsIntent(context),
+                ),
+            )
         }.isSuccess
     }
 
@@ -203,6 +220,16 @@ object SystemProbe {
      */
     fun openInputPicker(context: Context): Boolean {
         val pm = context.packageManager
+        // Hisense VIDAA_TV (MT9653, Android 11) lists no inputs either; its input panel is a
+        // foreground service (issue #261, tried on the reporter's TV).
+        val hisense = Intent("com.hisense.tv.start_inputs")
+            .setComponent(ComponentName("com.hisense.tv.inputs", "com.hisense.tv.InputsUIService"))
+        if (pm.resolveService(hisense, 0) != null) {
+            val shown = runCatching {
+                if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(hisense) else context.startService(hisense)
+            }.getOrNull() != null
+            if (shown) return true
+        }
         val intent = if (pm.hasSystemFeature("com.tcl.software.systemui_custom_tv_source")) {
             Intent("com.tcl.tvstatusbar.action.SHOW_WINDOW").setPackage("com.android.systemui")
                 .putExtra("TvStatusBar_Type", "Source")
