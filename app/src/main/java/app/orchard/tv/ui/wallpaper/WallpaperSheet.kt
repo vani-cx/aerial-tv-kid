@@ -59,6 +59,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import app.orchard.tv.R
+import app.orchard.tv.parental.Parental
 import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.settings.FocusStyle
 import app.orchard.tv.ui.components.Pressable
@@ -96,6 +97,7 @@ fun WallpaperSheet(
     onHiddenApps: () -> Unit,
     onStartScreensaver: () -> Unit,
     onPin: (on: Boolean) -> Unit,
+    onKid: () -> Unit,
 ) {
     val context = LocalContext.current
     var phoneUrl by remember { mutableStateOf<String?>(null) }
@@ -220,12 +222,30 @@ fun WallpaperSheet(
                         SettingRow(R.string.wp_weather_city, null, note, first = true) { WeatherValue() }
                     }
 
-                    // One row says what it is; a title over it would only repeat it.
+                    // One row says what it is; a title over it would only repeat it. Once the parent's
+                    // eight-character password is set it guards Settings as well, and the old PIN row
+                    // only says so: two passwords for the same door would just be confusing.
                     Spacer(Modifier.height(10.dp))
-                    Group(stringResource(R.string.st_pin_hint)) { note ->
-                        SettingRow(R.string.st_pin, null, note, first = true) {
-                            // The last row that takes focus: bring the note under it into view too.
-                            PinChoice(onPin, onFocused = { scope.launch { scroll.animateScrollTo(scroll.maxValue) } })
+                    if (Parental.adminSet) {
+                        Group(stringResource(R.string.st_pin_admin_hint)) { note ->
+                            SettingRow(R.string.st_pin, null, note, first = true) {
+                                BasicText(stringResource(R.string.st_pin_admin), style = Type.Body.copy(color = Palette.SecondaryLabel))
+                            }
+                        }
+                    } else {
+                        Group(stringResource(R.string.st_pin_hint)) { note ->
+                            SettingRow(R.string.st_pin, null, note, first = true) {
+                                // The last row that takes focus: bring the note under it into view too.
+                                PinChoice(onPin, onFocused = { scope.launch { scroll.animateScrollTo(scroll.maxValue) } })
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(22.dp))
+                    SectionTitle(R.string.kid_settings_title)
+                    Group(stringResource(R.string.kid_entry_hint)) { note ->
+                        SettingRow(R.string.kid_entry, null, note, first = true) {
+                            ActionChip(stringResource(R.string.kid_entry_open), Glyph.ChevronRight, onKid)
                         }
                     }
                     Spacer(Modifier.height(24.dp))

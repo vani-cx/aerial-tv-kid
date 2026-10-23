@@ -38,6 +38,7 @@
 - **屏保**：Apple TV 的 114 段航拍影片，也可以换成照片或时钟。
 - **壁纸**：必应每日精选、14 张内置壁纸，或者用手机扫码传自己的照片。
 - **个性化**：单排或双排、时钟大小和位置、App 名称、焦点样式、按键声音，都能改。
+- **儿童与时间管理**（本分支新增）：锁定的 App 要用遥控器方向密码才能打开；分组的 App 有每日总时长、每次使用时长、间隔休息和允许时段，可按周内每天设；到点弹出拦截页，可以答一道数学题换 5 分钟、请家长输管理员密码换 10–50 分钟。用法见 [docs/PARENTAL.md](docs/PARENTAL.md)，安全性审查见 [docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md)。
 
 <p align="center">
   <img src="site/img/folder.jpg" width="49%" alt="打开的文件夹">

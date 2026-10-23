@@ -40,6 +40,11 @@ import app.orchard.tv.apps.CustomIcons
 import app.orchard.tv.apps.TileArtFactory
 import app.orchard.tv.guard.GuardSetup
 import app.orchard.tv.guard.HomeGuardService
+import app.orchard.tv.parental.FallbackClock
+import app.orchard.tv.parental.Parental
+import app.orchard.tv.parental.Usage
+import app.orchard.tv.parental.Verdict
+import app.orchard.tv.parental.WatchService
 import app.orchard.tv.ui.home.HomeScreen
 import app.orchard.tv.ui.theme.LocalReducedMotion
 import app.orchard.tv.ui.theme.canvasDensity
@@ -96,6 +101,10 @@ class MainActivity : ComponentActivity() {
         Updates.init(this)
         CustomIcons.init(this)
         AerialSettings.init(this)
+        // Before the first composition: Home draws the parental rows from these.
+        Parental.init(this)
+        Usage.init(this)
+        FallbackClock.instance = this
         Sounds.init(this)
         val reducedMotion = Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
 
@@ -332,6 +341,8 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         restartIdleTimer()
+        // Home is back in front: whatever was opened is over, so its session and its combo entry end.
+        FallbackClock.stop()
         GuardSetup.setHomeInFront(this, true)
         HomeGuardService.onAerialResumed()
         vm.refreshSystem()
@@ -356,10 +367,23 @@ class MainActivity : ComponentActivity() {
 
     /** Opens an app, growing it out of its tile. */
     private fun launch(app: AppEntry, bounds: Rect?) {
-        // The TV's settings app behind the parental PIN as well, not only Control Center's button.
-        if (AerialSettings.locked && SystemProbe.isSettingsApp(this, app.packageName)) {
+        // The TV's settings app behind a parent's password as well, not only Control Center's button.
+        if (vm.needsParent() && SystemProbe.isSettingsApp(this, app.packageName)) {
             vm.whenUnlocked { launch(app, bounds) }
             return
+        }
+        // Locked apps and time budgets: the wall comes up here, before the app does.
+        if (Parental.enabled) {
+            val verdict = Parental.verdict(app.packageName)
+            if (verdict !is Verdict.Allow) {
+                vm.overlay = Overlay.KidGate(app.packageName, verdict is Verdict.Locked) {
+                    launch(app, bounds)
+                }
+                return
+            }
+            // A session starts now; the service counts it, or this process does when the service is off.
+            WatchService.onAppOpened(app.packageName)
+            FallbackClock.start(this, app.packageName)
         }
         openedAppSinceHome = true
         // The stock launcher (Xiaomi's PatchWall, with the maker's own iQIYI / Mango content) can

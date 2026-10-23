@@ -60,6 +60,17 @@
             </intent-filter>
         </activity>
 
+        <!-- The wall: a full screen over whatever is playing when a group's time runs out or a
+             locked app appears without the combo. Its own task, so finishing it uncovers the app. -->
+        <activity
+            android:name=".parental.BlockActivity"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:taskAffinity="app.orchard.tv.kid"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density" />
+
         <receiver
             android:name=".guard.BootReceiver"
             android:directBootAware="true"
@@ -135,6 +146,21 @@
             <meta-data
                 android:name="android.accessibilityservice"
                 android:resource="@xml/home_guard" />
+        </service>
+
+        <!-- Counts screen time per group and puts the wall up (docs/PARENTAL.md). Reads window
+             changes only: canRetrieveWindowContent is off in res/xml/parental_watch.xml. -->
+        <service
+            android:name=".parental.WatchService"
+            android:label="@string/kid_service_name"
+            android:exported="true"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/parental_watch" />
         </service>
     </application>
 </manifest>

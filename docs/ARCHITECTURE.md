@@ -37,6 +37,15 @@ app/src/main/java/app/orchard/tv/
 │   └── PhoneServer.kt       NanoHTTPD 手机配置页 + 二维码生成
 ├── settings/
 │   └── AerialSettings.kt    Aerial 自己的偏好（SharedPreferences "settings"）：焦点样式 FocusStyle（默认高对比度）、固定到主屏幕的信号源、开机信号源、屏保开始时间、家长密码（SHA-256，解锁 10 分钟或按 HOME 重新上锁）
+├── parental/                儿童模式与时间管理（见 docs/PARENTAL.md、docs/SECURITY-REVIEW.md）
+│   ├── Parental.kt          状态与规则引擎：两个密码、锁定的 App、分组、verdict()、分组 JSON
+│   ├── Secrets.kt           PBKDF2-HMAC-SHA1 60000 轮 + 随机盐，constant-time 比较
+│   ├── Usage.kt             当天的分钟数、家长放行（挂钟）、进行中的一次、上次结束时刻；按本地日期滚动
+│   ├── WatchService.kt      无障碍「儿童计时」：5 秒 tick 加前台组的亮屏时间（待机不算），到点拉起拦截页；FallbackClock 是无障碍未开时的降级
+│   └── BlockActivity.kt     拦截页宿主：独立任务、singleInstance、excludeFromRecents、FLAG_KEEP_SCREEN_ON
+├── ui/parental/
+│   ├── ParentalWall.kt      拦截页 UI：Ask / Combo / Admin / Pass / Math 五步，方向盘、字符键盘、数学题、10–50 分钟滚轮
+│   └── KidSettings.kt       设置面板：根页、App 选择、分组编辑（按周内每天）、管理员密码与方向密码的门
 ├── update/
 │   └── Updates.kt           每天最多一次读官网 download/version.txt，有新版时控制中心提示；不在后台下载安装
 ├── weather/
@@ -50,7 +59,7 @@ app/src/main/java/app/orchard/tv/
 │   ├── RevivalListener.kt   通知监听服务：被强杀后由系统重绑，借此复活并重开守护；10 分钟内复活 3 次以上时，看不到前台就不再抢 HOME（乐视 #63）
 │   ├── RevivalSync.kt       同步适配器（挂在 settings 上，带一个自己的账号）：系统不许通知监听的低内存 Android 9（小米 MFTP0，#72）上，强停后约 30–60 秒由同步框架拉起 Aerial 并重开守护；守护在运行时什么都不做
 │   ├── BootReceiver.kt      真正重启后的兜底
-│   └── ConfigReceiver.kt    ADB 专用配置入口（keep_adb、own_screensaver、clear_pin、export_tiles），要求发送方持有 WRITE_SECURE_SETTINGS
+│   └── ConfigReceiver.kt    ADB 专用配置入口（keep_adb、own_screensaver、clear_pin、clear_kid、export_tiles），要求发送方持有 WRITE_SECURE_SETTINGS
 └── dream/AerialDream.kt    系统级屏保（DreamService + Compose）
 
 app/src/main/assets/aerials.json   Apple 航拍目录（114 条：地址 + 中英文地名 + 时间点说明）

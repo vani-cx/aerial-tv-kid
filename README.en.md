@@ -38,6 +38,7 @@ Made for the Xiaomi, TCL and other TVs sold in China. It starts at boot and surv
 - **Screensaver**: Apple TV's 114 aerial films, or your photos, or a clock.
 - **Wallpaper**: Bing's photo of the day, fourteen built-ins, or photos you upload by scanning a code with your phone.
 - **Personalize**: one or two rows, clock size and corner, app names, focus style and key sounds.
+- **Parental controls** (this branch): locked apps need a D-pad combination before they open; a group of apps gets a daily budget, a per-session limit, a rest between sessions and allowed hours, set per weekday. When time runs out a full-screen wall offers a maths question for five more minutes, or a parent's password for ten to fifty. See [docs/PARENTAL.md](docs/PARENTAL.md) and the security review in [docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md).
 
 <p align="center">
   <img src="site/img/folder.jpg" width="49%" alt="An open folder">

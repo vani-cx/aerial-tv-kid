@@ -14,6 +14,8 @@ import android.provider.Settings
 import androidx.core.content.ContextCompat
 import android.util.Log
 import app.orchard.tv.dream.AerialDream
+import app.orchard.tv.parental.Parental
+import app.orchard.tv.parental.WatchService
 
 /**
  * Turns Home Guard back on after the firmware turned it off.
@@ -110,9 +112,61 @@ object GuardSetup {
      * makes Android bind it again.
      */
     fun rebindIfStalled(context: Context) {
-        if (HomeGuardService.isRunning) return
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_SECURE_SETTINGS) != PackageManager.PERMISSION_GRANTED) return
-        val me = ComponentName(context, HomeGuardService::class.java).flattenToString()
+        if (!HomeGuardService.isRunning) rebindIfStalled(context, HomeGuardService::class.java)
+        // The watch matters just as much after an update: unbound, the limits would count only what
+        // Aerial itself launches. Only while children's mode is on (docs/PARENTAL.md).
+        if (!WatchService.running && watchWanted(context)) rebindIfStalled(context, WatchService::class.java)
+    }
+
+    /**
+     * Puts the parental watch back after the firmware dropped it. Android removes every
+     * accessibility service of an app it force-stops, and Xiaomi does exactly that on standby;
+     * without this the time limits quietly fall back to counting only Aerial's own launches.
+     * Does nothing unless the owner has children's mode on, so nobody else's list is touched.
+     */
+    fun ensureWatch(context: Context) {
+        if (!watchWanted(context)) return
+        val me = ComponentName(context, WatchService::class.java).flattenToString()
+        val resolver = context.contentResolver
+        val entries = Settings.Secure.getString(resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
+            .split(':').filter { it.isNotBlank() }
+        if (entries.any { ComponentName.unflattenFromString(it)?.flattenToString() == me }) return
+        runCatching {
+            Settings.Secure.putString(resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, (entries + me).joinToString(":"))
+            Settings.Secure.putInt(resolver, Settings.Secure.ACCESSIBILITY_ENABLED, 1)
+            Log.i(TAG, "the parental watch had been switched off; turned it back on")
+        }.onFailure { Log.w(TAG, "could not re-enable the parental watch", it) }
+    }
+
+    /**
+     * Takes the watch out of the accessibility list when children's mode is switched off, so a
+     * service nobody uses does not stay bound. ensureWatch puts it back when it is switched on.
+     */
+    fun releaseWatch(context: Context) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_SECURE_SETTINGS) != PackageManager.PERMISSION_GRANTED) return
+        val me = ComponentName(context, WatchService::class.java).flattenToString()
+        val resolver = context.contentResolver
+        val entries = Settings.Secure.getString(resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
+            .split(':').filter { it.isNotBlank() }
+        val kept = entries.filter { ComponentName.unflattenFromString(it)?.flattenToString() != me }
+        if (kept.size == entries.size) return
+        runCatching {
+            Settings.Secure.putString(resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, kept.joinToString(":"))
+            Log.i(TAG, "children's mode is off; took the parental watch out of the accessibility list")
+        }.onFailure { Log.w(TAG, "could not switch the parental watch off", it) }
+    }
+
+    /** Whether the owner wants the watch: children's mode on, unlocked, and we may write settings. */
+    private fun watchWanted(context: Context): Boolean {
+        if (!isUserUnlocked(context)) return false
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_SECURE_SETTINGS) != PackageManager.PERMISSION_GRANTED) return false
+        Parental.init(context)
+        return Parental.enabled
+    }
+
+    private fun rebindIfStalled(context: Context, service: Class<*>) {
+        val me = ComponentName(context, service).flattenToString()
         val resolver = context.contentResolver
         val entries = Settings.Secure.getString(resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
             .split(':').filter { it.isNotBlank() }
@@ -122,7 +176,7 @@ object GuardSetup {
             // A guard that had to be bound again counts as revived: whatever is in front came up
             // while it was not watching (MiTV-MFTR0, Android 11: woken from standby after Aerial's
             // screensaver, PatchWall stayed in front once the guard was back, issue #47).
-            lastRevivedAt = SystemClock.elapsedRealtime()
+            if (service == HomeGuardService::class.java) lastRevivedAt = SystemClock.elapsedRealtime()
             Settings.Secure.putString(resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, others.joinToString(":"))
             // Two writes in a row are coalesced and Android sees no change; give it a moment between.
             // Read the list again then, so a service another app added meanwhile is kept (#57).
@@ -133,7 +187,7 @@ object GuardSetup {
                     Settings.Secure.putString(resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, (now + me).joinToString(":"))
                 }
             }, 1500)
-            Log.i(TAG, "Home Guard was enabled but not running; asked Android to bind it again")
+            Log.i(TAG, "${service.simpleName} was enabled but not running; asked Android to bind it again")
         }
     }
 
@@ -175,7 +229,7 @@ object GuardSetup {
         val current = Settings.Secure.getString(resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
         val entries = current.split(':').filter { it.isNotBlank() }
         val alreadyOn = entries.any { ComponentName.unflattenFromString(it)?.flattenToString() == me }
-        return runCatching {
+        val on = runCatching {
             if (!alreadyOn) {
                 lastRevivedAt = SystemClock.elapsedRealtime()
                 Settings.Secure.putString(resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, (entries + me).joinToString(":"))
@@ -184,5 +238,8 @@ object GuardSetup {
             Settings.Secure.putInt(resolver, Settings.Secure.ACCESSIBILITY_ENABLED, 1)
             !alreadyOn
         }.onFailure { Log.w(TAG, "could not re-enable Home Guard", it) }.getOrDefault(false)
+        // Same treatment for the watch, which Android drops whenever the firmware force-stops Aerial.
+        ensureWatch(context)
+        return on
     }
 }

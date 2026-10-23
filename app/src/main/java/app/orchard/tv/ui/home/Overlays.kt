@@ -129,7 +129,12 @@ fun AppMenu(
     inFolder: Boolean,
     /** The folders on Home, for Move to Folder. */
     folders: List<Folder>,
+    /** Children's mode is on: the app can be locked from here. */
+    lockable: Boolean,
+    /** The app already needs the direction password. */
+    locked: Boolean,
     onMove: (String) -> Unit,
+    onToggleLock: (String) -> Unit,
     onHide: (String) -> Unit,
     onInfo: (String) -> Unit,
     onUninstall: (String) -> Unit,
@@ -210,6 +215,15 @@ fun AppMenu(
                                 MenuRow(Glyph.Move, stringResource(R.string.menu_move), { onMove(shownApp.key) }, focusRequester = first)
                             }
                             MenuRow(Glyph.Folder, stringResource(R.string.menu_to_folder), { page = MenuPage.Folders }, trailing = "›")
+                            // Locking lives here as well as in Settings: this is where a parent
+                            // already is when they decide an app is off limits (docs/PARENTAL.md).
+                            if (lockable && shownApp.source == null) {
+                                MenuRow(
+                                    Glyph.Shield,
+                                    stringResource(if (locked) R.string.menu_unlock else R.string.menu_lock),
+                                    { onToggleLock(shownApp.key) },
+                                )
+                            }
                             if (shownApp.source != null) {
                                 // A pinned TV input: no app info or uninstall, and "remove" unpins it.
                                 MenuRow(Glyph.EyeSlash, stringResource(R.string.menu_unpin_source), { onUnpin(shownApp.key) })

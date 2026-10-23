@@ -18,6 +18,8 @@ import app.orchard.tv.apps.TileArt
 import app.orchard.tv.apps.TileArtFactory
 import app.orchard.tv.apps.folderEntry
 import app.orchard.tv.apps.sourceEntry
+import app.orchard.tv.parental.Parental
+import app.orchard.tv.parental.Verdict
 import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.system.Brightness
 import app.orchard.tv.system.HomeStatus
@@ -42,6 +44,12 @@ sealed interface Overlay {
     data object HiddenApps : Overlay
     data object Wallpaper : Overlay
     data class Pin(val mode: PinMode, val onDone: () -> Unit) : Overlay
+    /** The parent's password, before anything a parent alone may do (see Parental). */
+    data class KidAdmin(val onDone: () -> Unit) : Overlay
+    /** The block wall, before an app opens: `lockMode` when the app itself is locked. */
+    data class KidGate(val packageName: String, val lockMode: Boolean, val onAllow: () -> Unit) : Overlay
+    /** Children and time limits (docs/PARENTAL.md). */
+    data object Kid : Overlay
 }
 
 enum class CcPage { Main, Inputs, InputSettings, Update }
@@ -223,11 +231,22 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         volume = SystemProbe.volume(context)
     }
 
-    /** Runs [action] at once, or after the parental PIN when one is set (issue #10). */
+    /** True when opening the TV's settings app should ask a parent first, whichever password is set. */
+    fun needsParent(): Boolean = Parental.adminSet || AerialSettings.pinSet
+
+    /** Runs [action] at once, or after the parent's password (see Parental for the two levels). */
     fun whenUnlocked(action: () -> Unit) {
-        if (!AerialSettings.locked) action()
-        else overlay = Overlay.Pin(PinMode.Unlock) { overlay = Overlay.None; action() }
+        when {
+            Parental.adminSet && !Parental.adminOpen -> overlay = Overlay.KidAdmin { overlay = Overlay.None; action() }
+            !Parental.adminSet && AerialSettings.locked ->
+                overlay = Overlay.Pin(PinMode.Unlock) { overlay = Overlay.None; action() }
+            else -> action()
+        }
     }
+
+    /** Every launchable app, including the hidden ones and those inside folders, by name. */
+    fun appEntries(): List<AppEntry> =
+        all.filter { it.folder == null && it.source == null }.sortedBy { it.label.lowercase() }
 
     fun hide(key: String) {
         store.hide(key)
@@ -264,6 +283,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun onHomePressed(resetFocus: Boolean = true) {
         screensaverVisible = false
         AerialSettings.relock()
+        // Home also ends the parent's ten minutes in Settings: the remote is fair game again.
+        Parental.closeAdmin()
         overlay = Overlay.None
         movingKey = null
         if (resetFocus) homeResetPending = true

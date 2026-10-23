@@ -17,6 +17,7 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.util.Locale
 import javax.net.ssl.SSLException
 import kotlin.math.roundToInt
 
@@ -41,6 +42,8 @@ object Weather {
     private const val RELOCATE_MS = 24 * 60 * 60 * 1000L
     /** A reading older than this is not shown at all. */
     private const val STALE_MS = 3 * 60 * 60 * 1000L
+    /** Start of the CJK block: a name past this is already in Chinese and needs no lookup. */
+    private const val CJK_START = 0x2E80
 
     var now by mutableStateOf<WeatherNow?>(null); private set
 
@@ -62,6 +65,12 @@ object Weather {
         prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         place = prefs.getString("place", null)
         chosen = prefs.getBoolean("chosen", false)
+        // Older builds stored the network's English city ("Shanghai"). Re-guess it once so the
+        // name comes back in the screen's own language.
+        if (!chosen && place?.none { it.code >= CJK_START } == true && language() == "zh") {
+            lastAttempt = 0L
+            prefs.edit { remove("located_at") }
+        }
         if (System.currentTimeMillis() - prefs.getLong("fetched_at", 0) < STALE_MS) {
             val kind = runCatching { WeatherKind.valueOf(prefs.getString("kind", null) ?: "") }.getOrNull()
             if (kind != null) now = WeatherNow(prefs.getInt("celsius", 0), kind, prefs.getBoolean("day", true))
@@ -111,7 +120,7 @@ object Weather {
             lon = loc[1].toFloat()
             prefs.edit {
                 putFloat("lat", lat); putFloat("lon", lon)
-                putString("place", ip.optString("city").ifBlank { null })
+                putString("place", ip.optString("city").ifBlank { null }?.let { localizedPlace(it) })
                 putLong("located_at", System.currentTimeMillis())
             }
         }
@@ -124,6 +133,22 @@ object Weather {
         )
     }
 
+    /** The language the screen is in: Open-Meteo names a place in the language it is asked in. */
+    private fun language(): String = if (Locale.getDefault().language.startsWith("zh")) "zh" else "en"
+
+    /**
+     * The network's city arrives in English ("Shanghai"). Ask the geocoder for the same name again
+     * in the screen's language, so the line beside the clock reads 上海 instead of Shanghai.
+     */
+    private fun localizedPlace(city: String): String {
+        if (city.any { it.code >= CJK_START }) return city
+        return runCatching {
+            val q = URLEncoder.encode(city, "UTF-8")
+            JSONObject(get("https://geocoding-api.open-meteo.com/v1/search?name=$q&count=1&language=${language()}&format=json"))
+                .optJSONArray("results")?.optJSONObject(0)?.optString("name")?.takeIf { it.isNotBlank() }
+        }.onFailure { Log.w(TAG, "could not name $city in ${language()}", it) }.getOrNull() ?: city
+    }
+
     /**
      * Names the place (from the phone page), looked up in Open-Meteo's geocoder, and fetches its
      * weather at once. False when there is no such place.
@@ -132,7 +157,9 @@ object Weather {
         val hit = withContext(Dispatchers.IO) {
             runCatching {
                 val q = URLEncoder.encode(name.trim(), "UTF-8")
-                JSONObject(get("https://geocoding-api.open-meteo.com/v1/search?name=$q&count=1&language=zh&format=json"))
+                // A name typed in Chinese is looked up in Chinese whatever the screen language is.
+                val lang = if (name.any { it.code >= CJK_START }) "zh" else language()
+                JSONObject(get("https://geocoding-api.open-meteo.com/v1/search?name=$q&count=1&language=$lang&format=json"))
                     .optJSONArray("results")?.optJSONObject(0)
             }.onFailure { Log.w(TAG, "could not look up $name", it) }.getOrNull()
         } ?: return false

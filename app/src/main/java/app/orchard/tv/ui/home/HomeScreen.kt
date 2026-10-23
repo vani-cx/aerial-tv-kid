@@ -68,7 +68,11 @@ import app.orchard.tv.Overlay
 import app.orchard.tv.R
 import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.apps.AppEntry
+import app.orchard.tv.parental.Parental
 import app.orchard.tv.ui.control.ControlCenter
+import app.orchard.tv.ui.parental.AdminPrompt
+import app.orchard.tv.ui.parental.KidSettingsSheet
+import app.orchard.tv.ui.parental.ParentalWallHost
 import app.orchard.tv.ui.wallpaper.WallpaperSheet
 import app.orchard.tv.wallpaper.Wallpapers
 import app.orchard.tv.ui.components.liquidGlass
@@ -513,6 +517,14 @@ fun HomeScreen(
             anchor = menu?.anchor,
             inFolder = menu?.inFolder != null,
             folders = vm.folders(),
+            lockable = Parental.enabled,
+            locked = menu?.let { vm.entry(it.key)?.packageName }?.let { Parental.lockedPackages.contains(it) } == true,
+            onToggleLock = { key ->
+                val pkg = vm.entry(key)?.packageName ?: key
+                closeMenu()
+                // Changing what a child may open is a parent's move: the admin password comes first.
+                vm.whenUnlocked { Parental.toggleLocked(pkg) }
+            },
             onMove = { vm.startMove(it) },
             onHide = { key ->
                 closeMenu()
@@ -573,6 +585,7 @@ fun HomeScreen(
                 if (on) vm.overlay = Overlay.Pin(PinMode.Create) { vm.overlay = Overlay.Wallpaper }
                 else vm.whenUnlocked { AerialSettings.choosePin(null); vm.overlay = Overlay.Wallpaper }
             },
+            onKid = { vm.whenUnlocked { vm.overlay = Overlay.Kid } },
         )
 
         val pin = overlay as? Overlay.Pin
@@ -582,6 +595,39 @@ fun HomeScreen(
             onDone = { pin?.onDone?.invoke() },
             onCancel = { vm.overlay = Overlay.None },
         )
+
+        KidSettingsSheet(
+            visible = overlay is Overlay.Kid,
+            apps = vm.appEntries(),
+            onDismiss = { vm.overlay = Overlay.Wallpaper },
+        )
+
+        val adminGate = overlay as? Overlay.KidAdmin
+        AdminPrompt(
+            visible = adminGate != null,
+            onDone = {
+                val then = adminGate?.onDone
+                vm.overlay = Overlay.None
+                then?.invoke()
+            },
+            onCancel = { vm.overlay = Overlay.None },
+        )
+
+        // Last of all: a wall nobody can press past without the combo, the maths question or a parent.
+        val gate = overlay as? Overlay.KidGate
+        if (gate != null) {
+            ParentalWallHost(
+                pkg = gate.packageName,
+                appLabel = vm.entry(gate.packageName)?.label ?: gate.packageName,
+                lockMode = gate.lockMode,
+                onAllowed = {
+                    val then = gate.onAllow
+                    vm.overlay = Overlay.None
+                    then()
+                },
+                onCancel = { vm.overlay = Overlay.None },
+            )
+        }
 
         Screensaver(visible = vm.screensaverVisible, apps = apps, now = now, skips = vm.screensaverSkips)
     }
