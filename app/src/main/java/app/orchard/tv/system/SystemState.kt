@@ -190,6 +190,8 @@ object SystemProbe {
             Intent("com.pptv.intent.action.WIFI_ACTIVITY").setComponent(ComponentName("com.pptv.setting", "com.pptv.setting.wifi.WifiWorkActivity")),
             Intent(Intent.ACTION_VIEW, Uri.parse("Settings://com.xgimi.settings.net/wifi_misckey")),
             Intent(Settings.ACTION_SETTINGS),
+            // TCL tcl_m7642 (Android 9) answers neither Wi-Fi nor settings actions (issue #15).
+            Intent(Intent.ACTION_MAIN).setComponent(ComponentName("com.tcl.settings", "com.tcl.settings.ui.MainActivity")),
         )
 
     /**
