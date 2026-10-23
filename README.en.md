@@ -11,7 +11,7 @@ Made for the Xiaomi, TCL and other TVs sold in China. It starts at boot and surv
 
 [中文](README.md) · **English**
 
-**This repository is [vani-cx](https://github.com/vani-cx)'s personal branch**: it adds parental controls and time limits on top of 1.35 (app locks, daily budgets, allowed hours, rests between sessions, age-matched maths questions) and drops the four-digit parent PIN and the in-app updater. See **[PROJECT.md](PROJECT.md)** for what changed and how to install it.
+**This repository is [vani-cx](https://github.com/vani-cx)'s own fork for one household - not an official release, and not guaranteed to work on other devices**: it adds parental controls and time limits on top of 1.35 (app locks, daily budgets, allowed hours, rests between sessions, age-matched maths questions) and drops the four-digit parent PIN and the in-app updater. The code was written with AI assistance and is only meant for a **JMGO N1 projector**; other TVs and projectors are untested. See **[PROJECT.md](PROJECT.md)** for what changed and how to install it.
 
 <a href="https://aerial.qust.me/en/"><img alt="Website" src="https://img.shields.io/badge/Website-1f6feb?style=for-the-badge&logo=safari&logoColor=white"></a>
 <a href="https://github.com/pengchujin/aerial-tv/releases/latest"><img alt="Download APK" src="https://img.shields.io/badge/Download%20APK-34a853?style=for-the-badge&logo=android&logoColor=white"></a>
