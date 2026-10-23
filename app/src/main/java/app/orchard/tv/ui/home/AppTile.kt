@@ -129,6 +129,8 @@ fun AppTile(
     modifier: Modifier = Modifier,
     /** Last tile of its row: Right stops here instead of finding the status pill above (#211). */
     rowEnd: Boolean = false,
+    /** False on the glass plate: the top row shows no names there, as on tvOS 26. */
+    showName: Boolean = true,
 ) {
     val reduced = LocalReducedMotion.current
     // The tile's face at its drawn size, made on first draw and kept while the artwork lasts.
@@ -444,7 +446,7 @@ fun AppTile(
             }
         }
 
-        BasicText(
+        if (showName) BasicText(
             text = app.label,
             style = Type.Headline.copy(
                 textAlign = TextAlign.Center,
@@ -458,9 +460,8 @@ fun AppTile(
                 .offset(y = height + 10.dp)
                 .requiredSize(width + 36.dp, 24.dp)
                 .graphicsLayer {
-                    // Only the focused app shows its name, top row included (tvOS 26 hides it on the
-                    // glass, but people read that as a bug: #196 #199 #219). With every name shown,
-                    // the others stay a little dimmer than the focused one.
+                    // Only the focused app shows its name. With every name shown, the others stay a
+                    // little dimmer than the focused one.
                     alpha = if (AerialSettings.showAllNames) 0.7f + 0.3f * lift else lift
                     // Sits just under the lifted tile, and rises into place as it appears.
                     translationY = height.toPx() * (scale - 1f) / 2f - (1f - lift) * 6.dp.toPx() +

@@ -322,7 +322,7 @@ fun HomeScreen(
                     (metrics.margin - PlatePadH).toPx(),
                     (metrics.topRowY - PlatePadV).toPx(),
                     (metrics.margin + metrics.pitchX * (topCount - 1) + metrics.tileW + PlatePadH).toPx(),
-                    (metrics.topRowY + metrics.tileH + PlatePadV + metrics.nameRoom).toPx(),
+                    (metrics.topRowY + metrics.tileH + PlatePadV).toPx(),
                 )
             }
             // The aerial wallpaper's film, under everything; it moves only on a still top row.
@@ -420,6 +420,9 @@ fun HomeScreen(
                             },
                             modifier = Modifier.offset { slot.value },
                             rowEnd = index % COLUMNS == COLUMNS - 1 || index == apps.lastIndex,
+                            // No names on the glass plate (an earlier build showed the focused one
+                            // there, but it sat oddly on the glass).
+                            showName = plate == null || index >= COLUMNS,
                         )
                     }
                 }
