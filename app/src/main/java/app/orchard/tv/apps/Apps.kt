@@ -37,7 +37,8 @@ data class AppEntry(
 
 /**
  * A Home tile for a TV input. Its key never collides with a package name. A device or name chosen
- * for the input titles the tile, with the port underneath; a picture from the phone page covers it.
+ * for the input titles its caption; a device gives the tile its mark alone, a typed name titles the
+ * tile with the port underneath. A picture from the phone page covers it.
  */
 fun sourceEntry(context: Context, source: TvSource): AppEntry {
     val key = SOURCE_KEY_PREFIX + source.id
@@ -47,11 +48,12 @@ fun sourceEntry(context: Context, source: TvSource): AppEntry {
     val made = SourceArt(look, source.label, source.deviceName, CustomIcons.stamp(key), TileArtFactory.W)
     val art = synchronized(sourceArt) { sourceArt[key]?.takeIf { it.first == made }?.second } ?: run {
         val custom = CustomIcons.load(key)
-        when {
-            custom != null -> TileArtFactory.fromBanner(android.graphics.drawable.BitmapDrawable(android.content.res.Resources.getSystem(), custom))
-            name != null -> TileArtFactory.forSource(source.kind, name, source.label, look?.device)
-            else -> TileArtFactory.forSource(source.kind, source.label, source.deviceName)
-        }.also { synchronized(sourceArt) { sourceArt[key] = made to it } }
+        (if (custom != null) TileArtFactory.fromBanner(android.graphics.drawable.BitmapDrawable(android.content.res.Resources.getSystem(), custom))
+        // A chosen device's mark goes on alone, its name on the caption; a typed name still shows.
+        else if (look?.device != null && look.name == null) TileArtFactory.forSource(source.kind, null, null, look.device)
+        else if (name != null) TileArtFactory.forSource(source.kind, name, source.label, look?.device)
+        else TileArtFactory.forSource(source.kind, source.label, source.deviceName))
+            .also { synchronized(sourceArt) { sourceArt[key] = made to it } }
     }
     return AppEntry(
         packageName = key,
