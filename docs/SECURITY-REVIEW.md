@@ -111,7 +111,7 @@ sylvan.apple.com                                 航拍影片
 ### 3.5 存储与备份
 
 - `android:allowBackup="false"`：SharedPreferences 和照片不会进云备份、不会被 `adb backup` 整包带走。
-- 数据都在 `/data/data/app.orchard.tv/`（`shared_prefs/`、`files/`），靠 Android 的沙箱隔离；**设备 root 之后全部可读**。
+- 数据都在 `/data/data/com.vani.aerialkid/`（`shared_prefs/`、`files/`），靠 Android 的沙箱隔离；**设备 root 之后全部可读**。
 - 照片存 `files/photos/`，用户自选图标存 `files/icons/<包名>.png`，上传的临时文件在 `cacheDir` 里由 NanoHTTPD 自己清。
 
 ### 3.6 两个无障碍服务
@@ -153,7 +153,7 @@ sylvan.apple.com                                 航拍影片
 
 ### K-3 哈希明文存 prefs（低）
 
-`/data/data/app.orchard.tv/shared_prefs/parental.xml` 里是 `pbkdf2$60000$<salt>$<hash>`。设备 root 后可读，但读到的是哈希不是密码。**没有**用 Android Keystore 加密，原因：Keystore 在 Android 5.0 上行为不一致，而且它保护的是"密钥"而不是"已经哈希过的东西"，收益很小；真正的风险是 root，root 之后 Keystore 也挡不住。
+`/data/data/com.vani.aerialkid/shared_prefs/parental.xml` 里是 `pbkdf2$60000$<salt>$<hash>`。设备 root 后可读，但读到的是哈希不是密码。**没有**用 Android Keystore 加密，原因：Keystore 在 Android 5.0 上行为不一致，而且它保护的是"密钥"而不是"已经哈希过的东西"，收益很小；真正的风险是 root，root 之后 Keystore 也挡不住。
 
 顺带一处已加固的点：`Secrets.verify` 会从存储的字符串里读回轮数，如果之后被改成 1，爆破成本就归零。现在限制在 10000–200000 之间（`MIN_ROUNDS`/`MAX_ROUNDS`）。
 
@@ -207,7 +207,7 @@ Android 上，一个普通 App 没有办法保证自己的无障碍服务不被�
 ### K-9 `clear_kid` 后门（低）
 
 ```bash
-adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver --ez clear_kid true
+adb shell am broadcast -a app.orchard.tv.CONFIG -n com.vani.aerialkid/app.orchard.tv.guard.ConfigReceiver --ez clear_kid true
 ```
 
 它能一键清掉管理员密码、两个方向密码、锁定列表和所有分组。这是设计上的"救命令"：PBKDF2 只存哈希，忘了密码没有第二条路。保护是清单里的 `android:permission="android.permission.WRITE_SECURE_SETTINGS"`——普通 App 拿不到这个权限，只有 ADB shell（和系统）能发。

@@ -587,6 +587,9 @@ private fun WallButton(
  * The pad for a combo. Every direction key is taken at the wall's root before the focus system sees
  * it (see [ParentalWallHost]'s onKey), so the arrows here are only a target for a finger and
  * deliberately cannot take focus: the D-pad must never land on them.
+ *
+ * What has been entered is a row of dots, not the directions themselves: anyone standing behind the
+ * owner could read a password off the screen otherwise, and the owner asked for that to stop.
  */
 @Composable
 internal fun ComboPad(
@@ -608,13 +611,13 @@ internal fun ComboPad(
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             repeat(length.coerceAtLeast(1)) { i ->
-                val dir = entered.getOrNull(i)
+                val filled = entered.getOrNull(i) != null
                 Box(
                     Modifier.size(34.dp).clip(CircleShape)
-                        .background(if (dir != null) Palette.FillStrong else Color.Transparent)
-                        .border(1.5.dp, if (dir != null) Palette.Focus else Palette.TertiaryLabel, CircleShape),
+                        .background(if (filled) Palette.FillStrong else Color.Transparent)
+                        .border(1.5.dp, if (filled) Palette.Focus else Palette.TertiaryLabel, CircleShape),
                     contentAlignment = Alignment.Center,
-                ) { if (dir != null) Arrow(dir, Palette.Label, 14.dp) }
+                ) { if (filled) SecretDot() }
             }
         }
         Spacer(Modifier.height(16.dp))
@@ -639,10 +642,18 @@ internal fun ComboPad(
     }
 }
 
+/**
+ * What a filled password slot shows: a dot, never the character or the direction. The owner asked
+ * for this — the password used to be on screen in clear, so anyone standing behind could read it.
+ */
+@Composable
+private fun SecretDot(size: Dp = 10.dp) {
+    Box(Modifier.size(size).clip(CircleShape).background(Palette.Label))
+}
+
 /** A drawn arrow, so no font has to carry the glyphs. */
 @Composable
-private fun Arrow(dir: Dir, color: Color, size: Dp) {
-    Canvas(Modifier.size(size)) {
+private fun Arrow(dir: Dir, color: Color, size: Dp) {    Canvas(Modifier.size(size)) {
         val w = this.size.width
         val h = this.size.height
         val path = Path().apply {
@@ -705,13 +716,13 @@ internal fun AdminPad(
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             repeat(Parental.ADMIN_LENGTH) { i ->
-                val ch = entered.getOrNull(i)
+                val filled = entered.getOrNull(i) != null
                 Box(
                     Modifier.size(30.dp).clip(RoundedCornerShape(8.dp))
-                        .background(if (ch != null) Palette.FillStrong else Color.Transparent)
-                        .border(1.5.dp, if (ch != null) Palette.Focus else Palette.TertiaryLabel, RoundedCornerShape(8.dp)),
+                        .background(if (filled) Palette.FillStrong else Color.Transparent)
+                        .border(1.5.dp, if (filled) Palette.Focus else Palette.TertiaryLabel, RoundedCornerShape(8.dp)),
                     contentAlignment = Alignment.Center,
-                ) { BasicText(ch?.toString().orEmpty(), style = Type.Headline.copy(color = Palette.Label)) }
+                ) { if (filled) SecretDot(9.dp) }
             }
         }
         Spacer(Modifier.height(14.dp))

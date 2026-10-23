@@ -58,6 +58,8 @@
 
 不用 root，不动系统应用，随时能还原。电脑和电视连同一个网络。
 
+> **本分支的装法**：装出来的包名是 **`com.vani.aerialkid`**（不是上游的 `app.orchard.tv`），用自己构建的 APK 和 `tools/install.sh TV=<ip>` 或 `adb install -r`。下面的在线安装脚本和「让 Agent 装」那一段是上游的流程，装的是上游正式版，不适用本分支。细节见 [PROJECT.md](PROJECT.md#五构建与安装)。
+
 ### 1. 打开电视的 ADB 调试
 
 | 电视 | 怎么打开 |
@@ -99,10 +101,10 @@ curl -fsSL https://aerial.qust.me/install.sh | KEEP_ADB=1 TV=192.168.1.20 bash
 ```bash
 adb connect 192.168.1.20:5555
 adb install -r aerial-standard.apk
-adb shell pm grant app.orchard.tv android.permission.WRITE_SECURE_SETTINGS
-adb shell cmd notification allow_listener app.orchard.tv/app.orchard.tv.guard.RevivalListener
-adb shell appops set app.orchard.tv SYSTEM_ALERT_WINDOW allow
-adb shell am start -n app.orchard.tv/.MainActivity
+adb shell pm grant com.vani.aerialkid android.permission.WRITE_SECURE_SETTINGS
+adb shell cmd notification allow_listener com.vani.aerialkid/app.orchard.tv.guard.RevivalListener
+adb shell appops set com.vani.aerialkid SYSTEM_ALERT_WINDOW allow
+adb shell am start -n com.vani.aerialkid/app.orchard.tv.MainActivity
 ```
 
 Windows 用 Agent 装，或照[安装说明](site/agent.md)里的 Windows 步骤。

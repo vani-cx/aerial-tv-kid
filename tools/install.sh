@@ -33,8 +33,11 @@ REPO=pengchujin/aerial-tv
 command -v adb >/dev/null || { echo "adb not found. macOS: brew install android-platform-tools; Linux: install android-tools / adb." >&2; exit 1; }
 FLAVOR="${1:-standard}"
 case "$FLAVOR" in standard|guard|repair) ;; *) echo "flavor must be standard or guard (or repair)" >&2; exit 1 ;; esac
-PKG=app.orchard.tv
-GUARD="$PKG/$PKG.guard.HomeGuardService"
+# The installed package. The Java package below is still app.orchard.tv: component names read
+# <applicationId>/<namespace>.<Class>, so the two are spelled separately here.
+PKG=com.vani.aerialkid
+NS=app.orchard.tv
+GUARD="$PKG/$NS.guard.HomeGuardService"
 
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 if [ "${BUILD:-0}" = 1 ]; then
@@ -66,7 +69,7 @@ wait_guard() {
 restart_aerial() {
   adb shell am force-stop "$PKG"
   sleep 3
-  adb shell am start -W -n "$PKG/.MainActivity" >/dev/null 2>&1 || true
+  adb shell am start -W -n "$PKG/$NS.MainActivity" >/dev/null 2>&1 || true
 }
 
 if [ "$FLAVOR" = repair ]; then
@@ -185,10 +188,10 @@ adb shell pm grant "$PKG" android.permission.ACCESS_FINE_LOCATION 2>/dev/null ||
 adb shell pm grant "$PKG" android.permission.WRITE_SECURE_SETTINGS 2>/dev/null || true  # keep Home Guard (and ADB) on
 adb shell appops set "$PKG" SYSTEM_ALERT_WINDOW allow 2>/dev/null || true             # open Aerial after boot
 adb shell appops set "$PKG" WRITE_SETTINGS allow 2>/dev/null || true                  # brightness
-adb shell cmd notification allow_listener "$PKG/$PKG.guard.RevivalListener" 2>/dev/null || true  # come back after a kill
+adb shell cmd notification allow_listener "$PKG/$NS.guard.RevivalListener" 2>/dev/null || true  # come back after a kill
 # Android 9 on Xiaomi MiTV-MFTP0 reports success but never binds it (issue #72): low-RAM devices
 # get no notification listeners at all. Aerial's sync adapter brings it back there instead, later.
-if ! adb shell dumpsys notification 2>/dev/null | grep -q "$PKG/$PKG.guard.RevivalListener"; then
+if ! adb shell dumpsys notification 2>/dev/null | grep -q "$PKG/$NS.guard.RevivalListener"; then
   echo "Note: this TV refuses notification listeners. After the TV stops Aerial (Xiaomi does at standby)," >&2
   echo "Aerial comes back through Android's sync service about 30-60 seconds later, not at once: after a" >&2
   echo "short standby the TV's launcher can show for up to a minute. Keep auto-sync on. If Home ever stays" >&2
@@ -199,9 +202,9 @@ adb shell cmd package compile -m speed -f "$PKG" >/dev/null 2>&1 || true
 # TVs on Android's standard screensaver (TCL's carries a membership upsell) get Aerial's instead,
 # so it also starts while another app sits idle. Xiaomi uses its own; Aerial covers it from Home.
 if [ "$(adb shell settings get secure screensaver_enabled | tr -d '\r')" = 1 ]; then
-  adb shell settings put secure screensaver_components "$PKG/$PKG.dream.AerialDream"
+  adb shell settings put secure screensaver_components "$PKG/$NS.dream.AerialDream"
   # Some firmwares (TCL) put their own back on every boot; Aerial restores it when it starts.
-  adb shell am broadcast -a "$PKG.CONFIG" -n "$PKG/.guard.ConfigReceiver" --ez own_screensaver true >/dev/null
+  adb shell am broadcast -a "$NS.CONFIG" -n "$PKG/$NS.guard.ConfigReceiver" --ez own_screensaver true >/dev/null
   echo "Aerial's screensaver is now the TV's screensaver."
 fi
 # TCL's 自启动管理 (TclAppBootManager in system_server) refuses to start or bind third-party apps
@@ -210,11 +213,11 @@ fi
 adb shell appops set "$PKG" APP_AUTO_START allow >/dev/null 2>&1 || true
 adb shell appops set "$PKG" APP_ASSOC_START allow >/dev/null 2>&1 || true
 if [ "${KEEP_ADB:-0}" = 1 ]; then
-  adb shell am broadcast -a "$PKG.CONFIG" -n "$PKG/.guard.ConfigReceiver" --ez keep_adb true >/dev/null
+  adb shell am broadcast -a "$NS.CONFIG" -n "$PKG/$NS.guard.ConfigReceiver" --ez keep_adb true >/dev/null
   echo "Aerial will switch ADB debugging back on whenever the TV turns it off."
 fi
 
-if ! adb shell am start -W -n "$PKG/.MainActivity" | grep -q "Status: ok"; then
+if ! adb shell am start -W -n "$PKG/$NS.MainActivity" | grep -q "Status: ok"; then
   echo "Aerial did not start; Home was left untouched." >&2
   exit 1
 fi

@@ -180,7 +180,7 @@
 | 项 | 改动 |
 |---|---|
 | `values/strings.xml`、`values-zh/strings.xml` | 各 +33 条、−12 条旧键（`cc_update*`、`pin_*`、`kid_wall_session/window*` 等），中英一一对应 |
-| `app/build.gradle.kts` | `versionCode 37 → 38`、`versionName 1.35 → 1.36` |
+| `app/build.gradle.kts` | `versionCode 37 → 38`、`versionName 1.35 → 1.36`；1.37 再改 `applicationId = com.vani.aerialkid`、`versionCode 39`、`versionName 1.37` |
 | `AndroidManifest.xml` | 去掉 FileProvider、`REQUEST_INSTALL_PACKAGES`；保留 `BlockActivity`（`exported=false`、`singleInstance`、`excludeFromRecents`、独立 `taskAffinity`） |
 | `tools/install.sh` | 去掉 `appops set ... REQUEST_INSTALL_PACKAGES allow` |
 | `docs/ARCHITECTURE.md`、`docs/HANDOFF.md`、`README.md`、`README.en.md` | 同步删掉 `update/`、`PinPad.kt` 条目，改写「升级」章节；README 顶部加了这个分支的说明 |
@@ -193,6 +193,7 @@
 | `84dfe49` | 合并上游 1.35（36 个提交，7 处冲突手工解决） |
 | `70d438c` | 1.36：删 4 位密码与更新检查，锁定解耦，四类拦截，分龄数学题 |
 | `ec26474` | 加 `PROJECT.md`、两份 README 的分支说明 |
+| 1.37 | 改包名 `com.vani.aerialkid` + 正式签名；密码输入改成圆点；家长放行期间退出 App 延迟 1 分钟再上锁 |
 
 ---
 
@@ -254,23 +255,73 @@ export ANDROID_HOME=/path/to/android-sdk
 gradle --no-daemon assembleStandardRelease assembleGuardRelease
 ```
 
-- `standard`：正常的 HOME 应用，带 HOME intent-filter。
+- `standard`：正常的 HOME 应用，带 HOME intent-filter（坚果 N1 用这个）。
 - `guard`：不带 HOME intent-filter，靠无障碍服务接管 Home，给那些拒绝安装声明 `CATEGORY_HOME` 的应用的固件用。
 
 产物：`app/build/outputs/apk/standard/release/` 与 `app/build/outputs/apk/guard/release/`。
 
-**签名**：正式更新签名放在 `local/signing.properties`（不在版本控制里）。没有它就退回本机 debug 签名——能装新机器，**覆盖不了已装官方签名的包**，要装得先卸载（数据与密码一起没）。仓库里**没有**正式签名，这里构建出来的都是 debug 签名。
+### 5.1 包名：从这一版起叫 `com.vani.aerialkid`
 
-安装后要授一次权限，见 [README.md](README.md#安装)。儿童模式额外需要的是无障碍服务，不是普通权限，不能用 `pm grant` 授权：
+1.37 起装出来的包名是 **`com.vani.aerialkid`**，不再是上游的 `app.orchard.tv`。这样它和上游正式版、和之前自用的 1.36 都能同时装在电视上，用的是自己的正式签名，不会被上游的包覆盖。
+
+改动只有一层：`build.gradle.kts` 里的 `applicationId`，**Java 包名（`namespace`）仍然是 `app.orchard.tv`**。所以：
+
+| 场景 | 写法 |
+|---|---|
+| 启动 | `adb shell am start -n com.vani.aerialkid/app.orchard.tv.MainActivity` |
+| 配置广播 | `adb shell am broadcast -a app.orchard.tv.CONFIG -n com.vani.aerialkid/app.orchard.tv.guard.ConfigReceiver ...` |
+| 数据目录 | `/data/data/com.vani.aerialkid/` |
+| 无障碍 / 屏保组件 | `com.vani.aerialkid/app.orchard.tv.parental.WatchService`、`com.vani.aerialkid/app.orchard.tv.dream.AerialDream` |
+
+`tools/install.sh`、`restore.sh`、`report.sh` 里已经用 `PKG`（applicationId）+ `NS`（Java 包）两个变量拼好，不用手改。
+
+**从 1.36 或上游版迁过来的代价**（改包名的必然结果，不是 bug）：
+
+- 电视把它当成**新 App**：旧版的锁定列表、分组、三个密码都不会继承，要在新版里重新设一遍。
+- 桌面、屏保、无障碍、通知监听、`WRITE_SECURE_SETTINGS` 这些**都要重新指定/授权**（`tools/install.sh` 一条命令做完）。
+- 旧版可以留着当退路：`pm disable-user --user 0 app.orchard.tv` 只是停用，`pm enable` 随时回来。
+
+### 5.2 签名：这一版有正式签名了
+
+正式签名在 `local/`（不进版本控制）：
+
+```
+local/aerial-release.jks      # RSA 4096，有效期 30 年
+local/signing.properties      # storeFile / storePassword / keyAlias / keyPassword
+```
+
+`app/build.gradle.kts` 发现 `local/signing.properties` 就用它签 release，没有才退回本机 debug 签名。**这个 keystore 丢了就再也没法给已装的电视发更新**（只能卸载重装、数据全丢），务必单独备份。
+
+两件事要注意：
+
+1. **同一台电视上，包名 + 签名是绑定的**。以后所有给 `com.vani.aerialkid` 的更新都必须用这个 keystore 签，直接 `adb install -r` 就能覆盖，数据保留。
+2. 想换 keystore 或包名，等于换一个 App：先卸载旧的。
+
+### 5.3 装到电视上
+
+```bash
+adb install -r app/build/outputs/apk/standard/release/app-standard-release.apk
+adb shell cmd package set-home-activity com.vani.aerialkid/app.orchard.tv.MainActivity
+adb shell pm grant com.vani.aerialkid android.permission.WRITE_SECURE_SETTINGS
+adb shell appops set com.vani.aerialkid SYSTEM_ALERT_WINDOW allow
+adb shell appops set com.vani.aerialkid WRITE_SETTINGS allow
+adb shell appops set com.vani.aerialkid GET_USAGE_STATS allow          # 只有坚果 N1 这类开不了无障碍的机器需要
+adb shell cmd notification allow_listener com.vani.aerialkid/app.orchard.tv.guard.RevivalListener
+adb shell settings put secure screensaver_components com.vani.aerialkid/app.orchard.tv.dream.AerialDream
+```
+
+`tools/install.sh TV=<ip>` 把上面这些一次做完（还带构建、验收和还原）。
+
+儿童模式的计时靠**无障碍服务**，它不是普通权限，`pm grant` 授不了：
 
 ```bash
 adb shell settings get secure enabled_accessibility_services   # 先看现在开着哪些
 adb shell settings put secure enabled_accessibility_services \
-  app.orchard.tv/app.orchard.tv.parental.WatchService
+  com.vani.aerialkid/app.orchard.tv.parental.WatchService
 adb shell settings put secure accessibility_enabled 1
 ```
 
-这一步只做一次：写进的是系统的 `secure` 设置，重启、待机都不会丢。
+这一步只做一次：写进的是系统的 `secure` 设置，重启、待机都不会丢。**坚果 N1 的固件拒绝写这个键**（见 [docs/devices/jmgo-n1.md](docs/devices/jmgo-n1.md)），那台机器上只有从 Aerial 启动的 App 会计时。
 
 ---
 

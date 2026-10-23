@@ -138,6 +138,12 @@ object Parental {
     const val WINDOW_QUIZ_MINUTES = 15
     const val REST_QUIZ_MINUTES = 5
 
+    /**
+     * Leaving a locked app while a parent's pass is running relocks it after a minute, so a wrong
+     * press on Home does not end the visit. Only the pass gets this; every other exit locks at once.
+     */
+    private const val RELOCK_GRACE_MS = 60_000L
+
     /** The ages the maths questions are picked for. */
     const val MIN_AGE = 3
     const val MAX_AGE = 12
@@ -172,6 +178,15 @@ object Parental {
 
     /** Apps opened with the password this session; dropped when the viewer leaves them. */
     private val unlocked = HashSet<String>()
+
+    /**
+     * When an app locks itself again after the viewer left it while a parent's pass was running,
+     * keyed by package. A pass means the grown-up said yes, so leaving the app (Home by mistake, an
+     * input switch and back) gets [RELOCK_GRACE_MS] to return before the password is asked for
+     * again; the owner asked for that. Every other way out — the screen going off, a restart — still
+     * locks at once.
+     */
+    private val relockAt = HashMap<String, Long>()
 
     fun init(context: Context) {
         if (started) return
@@ -397,17 +412,34 @@ object Parental {
 
     fun groupOf(pkg: String): Group? = groups.firstOrNull { it.enabled && pkg in it.packages }
 
-    fun isAppUnlocked(pkg: String): Boolean = pkg in unlocked
+    /** Open with the password, or still inside the minute a pass gave after leaving it. */
+    fun isAppUnlocked(pkg: String, now: Long = System.currentTimeMillis()): Boolean {
+        val until = relockAt[pkg] ?: return pkg in unlocked
+        if (now < until) return true
+        relockAt -= pkg
+        unlocked -= pkg
+        return false
+    }
 
-    fun markAppUnlocked(pkg: String) { unlocked += pkg }
+    fun markAppUnlocked(pkg: String) {
+        relockAt -= pkg
+        unlocked += pkg
+    }
 
-    fun lockApp(pkg: String) { unlocked -= pkg }
+    fun lockApp(pkg: String) {
+        relockAt -= pkg
+        unlocked -= pkg
+    }
 
     /**
      * The app lock's auto-relock rule, as the owner asked: the password covers one visit. Going
      * back to Home, switching to another app, the screen going off and a restart all lock again.
+     * A minute of grace applies while a parent's pass is running (see [RELOCK_GRACE_MS]).
      */
-    fun lockAll() { unlocked.clear() }
+    fun lockAll() {
+        unlocked.clear()
+        relockAt.clear()
+    }
 
     /**
      * Someone left [from] for [to] (null for Home): the password entry for the app left expires, and
@@ -415,8 +447,15 @@ object Parental {
      */
     fun onForegroundChanged(from: String?, to: String?) {
         if (from == null || from == to) return
-        lockApp(from)
-        val was = groupOf(from) ?: return
+        val was = groupOf(from)
+        val now = System.currentTimeMillis()
+        if (was != null && from in unlocked && Usage.passLeftSec(was.id, now) > 0) {
+            // A grown-up said yes to this group: a minute to come back before the lock returns.
+            relockAt[from] = now + RELOCK_GRACE_MS
+        } else {
+            lockApp(from)
+        }
+        if (was == null) return
         val next = to?.let { groupOf(it) }
         if (next?.id != was.id) {
             Usage.endSession(was.id)

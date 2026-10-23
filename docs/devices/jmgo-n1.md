@@ -3,11 +3,12 @@
 - Android 11（SDK 30），`MediaTek/S700/S700:11/RP1A.200720.011/1.2.31.46:userdebug/dev-keys`，固件 1.2.31.46（2024-07-18），32 位 ARM（armeabi-v7a）。
 - 1920×1080，320dpi（960×540dp），单显示。投影亮度/对焦由 `com.jmgo.autokeystone`、`com.jmgo.tofautofocus`、`com.jmgo.dewarping` 负责，别动。
 - 原桌面：`com.jmgo.tv/.MainActivity`。没有 `com.android.settings`，系统设置是 `com.jmgo.setting.x`（单 Activity + Fragment）。
-- 安装的 flavor：`standard`。`adb install -r` 直接能装（1.27-guard 也是这个方案装进去的，用的是同一把 debug key）。**这台机器没有正式签名包，所以 debug 签名可以原地升级**。
+- 安装的 flavor：`standard`。1.27-guard（debug 签名）、1.36（debug 签名）都能 `adb install -r` 原地升级。
+- **2026-10-23 起装的是 1.37**：包名换成 `com.vani.aerialkid`，用自己生成的正式签名（`local/aerial-release.jks`）。这是另一个 App，旧版的锁定列表和密码不继承；旧的 `app.orchard.tv` 已 `pm disable-user` 停用（`pm enable` 可恢复）。
 
 ## HOME 接管（可用）
 
-`cmd package set-home-activity app.orchard.tv/.MainActivity` 返回 `Success`，之后 `resolve-activity` 就返回 Aerial 了。重启后仍然是 Aerial，不需要无障碍守护。
+`cmd package set-home-activity com.vani.aerialkid/app.orchard.tv.MainActivity` 返回 `Success`，之后 `resolve-activity` 就返回 Aerial 了。重启后仍然是 Aerial，不需要无障碍守护。
 
 （对比小米 MFTR0：那边这个命令「成功但无效」，只能靠无障碍守护。坚果这边不需要。）
 
@@ -17,7 +18,7 @@
 
 证据链：
 
-1. `settings put secure enabled_accessibility_services "...app.orchard.tv/app.orchard.tv.parental.WatchService"` 返回 0，但回读还是只有 `com.jmgo.hippo/...JmgoKeyAccessibilityService`。
+1. `settings put secure enabled_accessibility_services "...com.vani.aerialkid/app.orchard.tv.parental.WatchService"` 返回 0，但回读还是只有 `com.jmgo.hippo/...JmgoKeyAccessibilityService`。
 2. logcat 里是固件改了 `SettingsProvider`：
 
    ```
@@ -62,7 +63,7 @@
 ### 唯一新拿到的权限：用量统计
 
 ```bash
-adb shell appops set app.orchard.tv GET_USAGE_STATS allow   # 回读 GET_USAGE_STATS: allow
+adb shell appops set com.vani.aerialkid GET_USAGE_STATS allow   # 回读 GET_USAGE_STATS: allow
 ```
 
 `dumpsys usagestats` 能看到系统自己记的事件流，正好是家长控制需要的两件事：
@@ -77,12 +78,34 @@ type=SCREEN_INTERACTIVE / type=SCREEN_NON_INTERACTIVE
 
 顺带：TCL 固件用 `APP_AUTO_START` 这个 app-op 来保证无障碍服务能绑上，**这台机器没有这个 op**（`Error: Unknown operation string`），所以那条路也不适用。
 
+## 亮度：第三方 App 改不了灯（2026-10-23 实测）
+
+Aerial 控制中心的亮度行在这台机器上是**空转的**，写下去的值不会改变投影亮度。查证过程：
+
+| 通道 | 结果 |
+|---|---|
+| `Settings.System.SCREEN_BRIGHTNESS`（Aerial 走的标准路径，也是遥控器亮度键走的） | 值会变（102→151），但 `LightsHAL` 打印 `[FIXME]Can not really set the brightness now, need to refactor the flow with apollo later!`——**驱动层根本没实现** |
+| `Settings.Global.picture_backlight`（小米那套，这台也有这个键，值 55） | 写入成功、回读也是新值，但用 `shark_test 04` 读灯的实际驱动值，始终是 `R255G255B255C0`，没变 |
+| `Settings.Global.picture_brightness`（50） | 同上，写 80 和写回 50 都毫无反应 |
+| `am broadcast -a android.jmgo.action.brightness --ei value 5` | `Broadcast completed: result=0`，**没有接收者**（这个 action 只出现在 `com.jmgo.setting.x` 的 dex 里） |
+| `shark_test 04` | 只能**读**（`getString: E_ID_DISPLAY_BRIGHTNESS(201): R255G255B255C0`），带参数也不会改 |
+| 真正的存放处 | 坚果自己的 env 存储：`shark_test 65 1` 里 `"20": "display.brightness=100"`、`"19": "display.brightness_value=255,255,255,0"`、`"14": "dlpBrightness=-1"` |
+| 谁在改它 | `com.jmgo.hippo` 里的 `jmgomiddle-01`（`com.jmgo.middleware.service.IJmGOSystemService`），`setBrightness` 在 hippo 的 dex 里；`dumpsys jmgomiddle-01` 有完整的厂商调试命令清单，唯独没有给第三方 App 的入口 |
+
+结论：**亮度是坚果私有 binder，普通 App 拿不到**。想从 Aerial 调只有三条路，都不干净：
+
+1. 反射拿 `ServiceManager.getService("jmgomiddle-01")` 直接 transact——事务码只能从 dex 里猜，猜错可能调到 DLP 固件升级之类的方法，**不建议**。
+2. `Runtime.exec("shark_test ...")`——`/vendor/bin/shark_test` 是 755，SELinux 又是 Permissive，理论上能跑，但 `shark_test 14`（环境变量写入）的正确语法没试出来（写入被当成了 `W:display.brightness` 这样的键名）。
+3. 全屏黑色遮罩（`SYSTEM_ALERT_WINDOW` 已经允许）——能把**画面**压暗，灯还是全功率，且遮罩会盖住所有 App。
+
+> 试 `shark_test 14` 时往坚果的 env 里留了两个无用键（重启后编号是 `26`、`27`，内容是 `W:display.brightness=/vendor/bin/shark_test` 和 `D:W:display.brightness=...`）。它们只是多出来的字符串条目，不参与任何读取；`display.brightness` 本身没被改动（仍是 100）。env 存在 `/data` 里、只有 root 能改，所以留着不管。`shark_test 14` 的正确语法也没试出来——`W:` 前缀会被当成键名的一部分。
+
 ## 换掉自带屏保
 
 自带屏保是 `com.jmgo.os.dream/com.jmgo.os.dream.core.service.JGDreamService`。`settings put secure` 对这个键**没有**被封，直接换成 Aerial 的 dream 服务即可，重启后仍然生效：
 
 ```bash
-adb shell settings put secure screensaver_components app.orchard.tv/app.orchard.tv.dream.AerialDream
+adb shell settings put secure screensaver_components com.vani.aerialkid/app.orchard.tv.dream.AerialDream
 ```
 
 想换回去就写回 `com.jmgo.os.dream/com.jmgo.os.dream.core.service.JGDreamService`。
@@ -103,6 +126,7 @@ done
 ## 已验证（2026-10-23）
 
 - `adb install -r app-standard-release.apk` → `Success`，版本从 `1.27-guard`（versionCode 29）升到 `1.36`（38）。
-- 设为默认桌面，`input keyevent KEYCODE_HOME` 回到 Aerial（`mResumedActivity: app.orchard.tv/.MainActivity`）。
+- 1.37（包名 `com.vani.aerialkid`，versionCode 39）→ `Success`；`cmd package set-home-activity com.vani.aerialkid/app.orchard.tv.MainActivity` 返回 `Success`，`resolve-activity` 返回新包；`pm disable-user app.orchard.tv` 停用旧版；屏保改指 `com.vani.aerialkid/app.orchard.tv.dream.AerialDream`；`WRITE_SECURE_SETTINGS`、`SYSTEM_ALERT_WINDOW`、`WRITE_SETTINGS`、`GET_USAGE_STATS`、通知监听 `RevivalListener` 全部重新授过。
+- 设为默认桌面，`input keyevent KEYCODE_HOME` 回到 Aerial（`mResumedActivity: com.vani.aerialkid/app.orchard.tv.MainActivity`）。
 - `adb reboot` 之后自动进 Aerial，屏保设置与冻结列表都还在。
 - 屏幕截图（1920×1080）：天气、壁纸、玻璃底板、App 磁贴都正常渲染。

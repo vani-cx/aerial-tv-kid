@@ -58,6 +58,8 @@ Made for the Xiaomi, TCL and other TVs sold in China. It starts at boot and surv
 
 No root, no system apps touched, and you can undo it. Your computer and TV need to be on the same network.
 
+> **This branch's package is `com.vani.aerialkid`**, not upstream's `app.orchard.tv`. Install it from a local build with `tools/install.sh TV=<ip>` or `adb install -r`; the online installer and the agent prompt below are upstream's and install upstream Aerial. See [PROJECT.md](PROJECT.md#五构建与安装).
+
 ### 1. Turn on ADB debugging
 
 The menus on Chinese firmware are in Chinese; their names are in brackets.
@@ -101,10 +103,10 @@ curl -fsSL https://aerial.qust.me/install.sh | KEEP_ADB=1 TV=192.168.1.20 bash
 ```bash
 adb connect 192.168.1.20:5555
 adb install -r aerial-standard.apk
-adb shell pm grant app.orchard.tv android.permission.WRITE_SECURE_SETTINGS
-adb shell cmd notification allow_listener app.orchard.tv/app.orchard.tv.guard.RevivalListener
-adb shell appops set app.orchard.tv SYSTEM_ALERT_WINDOW allow
-adb shell am start -n app.orchard.tv/.MainActivity
+adb shell pm grant com.vani.aerialkid android.permission.WRITE_SECURE_SETTINGS
+adb shell cmd notification allow_listener com.vani.aerialkid/app.orchard.tv.guard.RevivalListener
+adb shell appops set com.vani.aerialkid SYSTEM_ALERT_WINDOW allow
+adb shell am start -n com.vani.aerialkid/app.orchard.tv.MainActivity
 ```
 
 On Windows, use an agent, or follow the Windows steps in the [install guide](site/en/agent.md).

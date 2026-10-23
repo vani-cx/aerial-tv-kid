@@ -21,6 +21,8 @@ Aerial 自己原来的 4 位家长密码已经删掉了（1.36）。原来被它
 
 方向密码是**变长**的：按 4 到 8 个方向，按 OK 就算这一遍输完（不是等某个固定位数）。设置时要连输两遍，一致才保存。
 
+**输入时屏幕只显示圆点**，不显示按了哪些方向；管理员密码同理，只显示 8 个圆点。这样站在后面看的人读不走密码（1.37 起）。
+
 儿童时间锁密码默认跟应用锁定密码**是同一个**（`kid_combo_same`），一户人家只需要记一个方向密码；想分开也可以在设置里单独设一个。
 
 ## 从哪里进
@@ -60,6 +62,7 @@ Aerial 自己原来的 4 位家长密码已经删掉了（1.36）。原来被它
 - 从 Aerial 点开 → 直接进应用锁定密码盘（`Overlay.KidGate(lockMode = true)`），输对才启动。
 - 已经在别处打开了（比如从系统的「最近任务」或厂商桌面进来）→ 无障碍服务看见前台变了，弹 `BlockActivity` 盖住。
 - **自动复锁**（`Parental.lockAll` / `lockApp`）：解锁只覆盖「这一次」。回主屏幕、切到别的 App（`onForegroundChanged`）、**息屏/待机**（`ACTION_SCREEN_OFF`）、以及 Aerial 进程重启，都会重新上锁。密码本身不设「打开多少分钟」。
+- **例外：家长放行期间退出 App 有 1 分钟缓冲**（`RELOCK_GRACE_MS`）。正在放行（`Usage.passLeftSec > 0`）时按错了 Home、或者切去信号源又切回来，1 分钟内回来不用再输密码；超过 1 分钟就重新上锁。息屏、重启不走这个缓冲，立刻锁。
 
 ## 时间限制分组
 
@@ -170,15 +173,15 @@ adb shell settings get secure enabled_accessibility_services
 
 # 只有这一个服务时
 adb shell settings put secure enabled_accessibility_services \
-  app.orchard.tv/app.orchard.tv.parental.WatchService
+  com.vani.aerialkid/app.orchard.tv.parental.WatchService
 adb shell settings put secure accessibility_enabled 1
 
 # 已经有别的服务时，把新的接在后面
 adb shell settings put secure enabled_accessibility_services \
-  "com.example.other/com.example.other.Service:app.orchard.tv/app.orchard.tv.parental.WatchService"
+  "com.example.other/com.example.other.Service:com.vani.aerialkid/app.orchard.tv.parental.WatchService"
 ```
 
-> **有的固件把这条路封死了。** 坚果 N1（S700）的 `SettingsProvider` 直接拒绝第三方写 `enabled_accessibility_services`（连写回原值都拒），系统里也没有无障碍设置页，`adb root` 也不可用——那台机器上只能用降级计时。它唯一还拿得到的相关权限是 `appops set app.orchard.tv GET_USAGE_STATS allow`（系统自己记着哪个 App 何时在前台、屏幕何时亮着），细节见 [docs/devices/jmgo-n1.md](devices/jmgo-n1.md)。
+> **有的固件把这条路封死了。** 坚果 N1（S700）的 `SettingsProvider` 直接拒绝第三方写 `enabled_accessibility_services`（连写回原值都拒），系统里也没有无障碍设置页，`adb root` 也不可用——那台机器上只能用降级计时。它唯一还拿得到的相关权限是 `appops set com.vani.aerialkid GET_USAGE_STATS allow`（系统自己记着哪个 App 何时在前台、屏幕何时亮着），细节见 [docs/devices/jmgo-n1.md](devices/jmgo-n1.md)。
 
 改完回设置面板看「计时服务」是不是「已开启」。**这一步只做一次**：写进的是系统的 `secure` 设置，重启、待机都不会自己丢。丢的情况只有三种——卸载重装（设置跟着包走）、恢复出厂，以及被固件「强行停止」（见下）。
 
@@ -208,7 +211,7 @@ Android 13 起，侧载应用的开关在「设置 → 无障碍」里可能是�
 密码只有哈希，救不回来。用电脑：
 
 ```bash
-adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver --ez clear_kid true
+adb shell am broadcast -a app.orchard.tv.CONFIG -n com.vani.aerialkid/app.orchard.tv.guard.ConfigReceiver --ez clear_kid true
 ```
 
 这条会：关掉儿童模式、删掉管理员密码和两个方向密码、清空锁定列表、删掉所有分组（用量一起清）。这个广播要求发送方持有 `WRITE_SECURE_SETTINGS`，普通 App 拿不到，只有 ADB shell 能发（见 `guard/ConfigReceiver.kt`）。
@@ -258,3 +261,7 @@ app/src/main/java/app/orchard/tv/
 19. 跨零点：把日期改到明天 → 今天用的分钟数清零。
 20. `clear_kid` 广播 → 全部回到初始状态。
 21. 旧版升级：原来设过方向密码的电视，升级后那个密码同时是应用锁定密码和时间锁密码；原来设过 4 位家长密码的电视，那个密码不再被问，改成问管理员密码。
+22. 输密码时盯着屏幕：方向密码和管理员密码都只出现**圆点**，看不出按了什么。
+23. 请家长放行 10 分钟 → 打开被锁的 App → 按 Home → 立刻再打开：1 分钟内**不用**再输密码。
+24. 同样的情况等 1 分钟以上再打开 → 要重新输方向密码。
+25. 同样的情况按一下电源键息屏再开 → 立刻要密码（不走缓冲）。

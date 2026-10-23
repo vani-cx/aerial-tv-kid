@@ -11,7 +11,7 @@
   - **三个密码**：8 位字母数字的管理员密码、应用锁定方向密码、儿童时间锁方向密码（默认与应用锁定同一个，可分开设）。
   - **拦截页按四种情况给不同文案和出口**：时段外（太早 / 午休 / 太晚 / 还不到点）答数学题换 15 分钟（每天一次）；这一次到点 → 「你已经看很久啦」+ 墙钟倒计时（进出不打断），答数学题换 5 分钟（计入每日总量）；每日总量用完 → 没有数学题按钮；App 被锁 → 直接进密码盘。「叫爸爸妈妈来」先问时间锁密码再选 10/20/30/40/50 分钟。数学题难度按设置里的儿童年龄（3–12）分四档。
   - 计时照 tvwall 用无障碍服务（`WatchService`，5 秒 tick、只看亮屏、待机不算、跨零点归零），无障碍没开时有一层只覆盖"从 Aerial 启动"的降级计时。
-  - **代码已用 Gradle 8.14.3 + JDK 17 + SDK 36 编译通过（`assembleStandardRelease`、`assembleGuardRelease`），但一次都没在真机上跑过**——[PARENTAL.md](PARENTAL.md) 末尾有 21 条该在电视上走的清单。安全性审查见 [SECURITY-REVIEW.md](SECURITY-REVIEW.md)（结论：能挡住拿遥控器的孩子，挡不住有 ADB 的人）。忘了密码时用 `adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver --ez clear_kid true` 清掉整个功能。
+  - **代码已用 Gradle 8.14.3 + JDK 17 + SDK 36 编译通过（`assembleStandardRelease`、`assembleGuardRelease`），但一次都没在真机上跑过**——[PARENTAL.md](PARENTAL.md) 末尾有 21 条该在电视上走的清单。安全性审查见 [SECURITY-REVIEW.md](SECURITY-REVIEW.md)（结论：能挡住拿遥控器的孩子，挡不住有 ADB 的人）。忘了密码时用 `adb shell am broadcast -a app.orchard.tv.CONFIG -n com.vani.aerialkid/app.orchard.tv.guard.ConfigReceiver --ez clear_kid true` 清掉整个功能。
 - 版本 **1.35（versionCode 37）**，2026-10-23 发布（[v1.35](https://github.com/pengchujin/aerial-tv/releases/tag/v1.35)），两台都装了：Aerial 是默认桌面时守护不再过滤按键（小米 ASTP0 上过滤后的音量键让 MitvFreezer 在 system_server 里空指针、整机重启，#249；#115 #268 也可能受益）；复活次数只算本次开机以来的（#154 #261）；航拍壁纸停下时 PixelCopy 拷出绿色或纯色也改为解码（#256）；腾讯极光盒子 `com.ktcp.launcher` 的 `LauncherHomeSingleTaskActivity` 当原桌面（#269 #270）；海信语音桌面 `com.ju.secondscreen.HomeActivity`（优先级 -150）当原桌面、没有输入时控制中心打开海信信号源面板（#261）；「电视」按键音改用 `playSoundEffect(effect, -1f)` 并自己检查按键音开关（海信单参数版只收 10–18，#262）；`adjustStreamVolume` 抛 SecurityException 时改用 `setStreamVolume`（TCL m7642，#15）；ColorOS TV `tv_power_mode=QUICK` 时守护不拉回（OPPO S1，#22）；PPTV、极米的设置/网络/图像入口，网络按钮最后退到 TCL 设置（#264 #241 #15）。小米 MFTR0（standard）和 TCL MT5879（guard，多屏互动推送，ADB 点「同意」）回归过首页、HOME 拉回、控制中心音量（13→14→13 已复原）；TCL 刚装完时 `input keyevent HOME` 有一次要 5 秒才回到 Aerial（守护过滤还没生效），强停重启后日志有 `filtering keys`，HOME 立刻回来，原因没查清；涉及的机型都没有真机，按键过滤那条在两台上都走不到（MFTR0 是 Android 14、TCL guard 不是默认桌面），模拟器守护绑不上。
 - 1.34（versionCode 36），2026-10-23 发布（[v1.34](https://github.com/pengchujin/aerial-tv/releases/tag/v1.34)）：第一排玻璃底板上不显示 App 名称（和 tvOS 26 一样，下面几排和不显示底板时照旧）；信号源磁贴的图标换成 Material Symbols Rounded 实心图标（和系统磁贴同一套，Switch 按同样风格手画），选了「接入的设备」的磁贴只显示设备图标、不写名字和端口，默认 HDMI 磁贴保留图标和「HDMI 1」。小米 MFTR0（standard）上看过默认 HDMI、Apple TV、电脑、PlayStation，测完 HDMI 1 改回默认；TCL 没装 1.34。
 - 1.33（versionCode 35），2026-10-22 发布（[v1.33](https://github.com/pengchujin/aerial-tv/releases/tag/v1.33)）：选了航拍壁纸时，屏保出现前立刻释放壁纸的播放器（1.32 上它占着解码器，小米 MFTR0 的杜比视界屏保报 `vdec resource lost`，降成 1080p）。两台都装了。
@@ -69,7 +69,7 @@
 ## 环境
 
 - macOS，JDK 17（`/opt/homebrew/opt/openjdk@17`），Android SDK 在 `~/Library/Android/sdk`，Gradle Wrapper 8.14.3，AGP 8.12，Kotlin 2.2.10。
-- **签名**：`local/signing.keystore` 加 `local/signing.properties`，`app/build.gradle.kts` 会优先使用它。电视上的版本都是用这把钥匙签的（SHA-256 `e08962dc…6685`）。没有它也能编译，但会回落到本机的 debug key，装不上电视（签名不一致）。
+- **签名**：上游的钥匙是 `local/signing.keystore`（SHA-256 `e08962dc…6685`）。**本分支 1.37 起改成自己的包名和钥匙**：`local/aerial-release.jks` 加 `local/signing.properties`（`storeFile=aerial-release.jks`），SHA-256 `65dc676b7db17dcfc698324b8884c80402a88d8aa6f03bfa380b2a680a30a87f`，`applicationId = com.vani.aerialkid`。`app/build.gradle.kts` 只要看到 `local/signing.properties` 就用它签 release。**这把 jks 丢了就再也发不了更新**（只能卸载重装），要单独备份；没有它也能编译，但会回落到本机 debug key。
 - **ADB 连电视**需要关闭 Claude Code 的沙箱（局域网访问被拦）。电视第一次连接时要在电视上点「允许 USB 调试」。
 
 ## 日常操作
@@ -88,7 +88,7 @@ TV=<ip> tools/restore.sh [--uninstall]                  # 撤销所有授权和�
 
 ```bash
 adb -s $XIAOMI_TV:5555 install -r app/build/outputs/apk/standard/release/app-standard-release.apk
-adb -s $XIAOMI_TV:5555 shell cmd package compile -m speed -f app.orchard.tv
+adb -s $XIAOMI_TV:5555 shell cmd package compile -m speed -f com.vani.aerialkid
 ```
 
 覆盖安装会保留之前的授权；守护服务由 App 启动时自己恢复。
@@ -109,17 +109,17 @@ adb -s $XIAOMI_TV:5555 shell cmd package compile -m speed -f app.orchard.tv
 ## 调试技巧
 
 - **截图**：`adb shell screencap -p /data/local/tmp/x.png && adb pull ...`（小米用 `/data/local/tmp`，TCL 用 `/sdcard`）。用完要删掉。
-- **帧率**：`adb shell dumpsys gfxinfo app.orchard.tv reset`，操作几下，再执行 `... framestats`，看 `SwapBuffers→GpuCompleted` 这一段的耗时。
-- **守护状态**：`dumpsys accessibility | grep -E "label=(Aerial|app.orchard.tv)"`（有输出就是已绑定；小米 ASTP0 上标签显示成类名）；日志 tag 是 `AerialGuard`。
+- **帧率**：`adb shell dumpsys gfxinfo com.vani.aerialkid reset`，操作几下，再执行 `... framestats`，看 `SwapBuffers→GpuCompleted` 这一段的耗时。
+- **守护状态**：`dumpsys accessibility | grep -E "label=(Aerial|com.vani.aerialkid)"`（有输出就是已绑定；小米 ASTP0 上标签显示成类名）；日志 tag 是 `AerialGuard`。
 - **壁纸**：日志 tag 是 `AerialWallpaper`。
-- **logcat 看不到 App 日志的电视**（创维 7T631_T60）：`adb shell dumpsys activity app.orchard.tv/.MainActivity` 末尾打印 `DiagLog` 最近的记录（启动、显示模式、绘制、按键、焦点、屏保、加载耗时）；诊断版（`./gradlew -Pdiag ...`，版本名带 `-diag`）或 `ConfigReceiver --ez diag true` 之后还写进 `/sdcard/Android/data/app.orchard.tv/files/aerial-diag.log`，可以 `adb pull`。试验开关（下次启动生效）：`--ez mode_switch false` 不切刷新率（诊断版默认就不切），`--ez soft_layer true` 用软件绘制首页。
+- **logcat 看不到 App 日志的电视**（创维 7T631_T60）：`adb shell dumpsys activity com.vani.aerialkid/app.orchard.tv.MainActivity` 末尾打印 `DiagLog` 最近的记录（启动、显示模式、绘制、按键、焦点、屏保、加载耗时）；诊断版（`./gradlew -Pdiag ...`，版本名带 `-diag`）或 `ConfigReceiver --ez diag true` 之后还写进 `/sdcard/Android/data/com.vani.aerialkid/files/aerial-diag.log`，可以 `adb pull`。试验开关（下次启动生效）：`--ez mode_switch false` 不切刷新率（诊断版默认就不切），`--ez soft_layer true` 用软件绘制首页。
 - **机型适配信息**：`TV=<ip> tools/report.sh`（只读）生成可以贴进 issue 的 `aerial-report-<机型>.md`，macOS 上顺便复制到剪贴板；用户也可以在手机页最下面「反馈问题」里复制。issue 表单是 `.github/ISSUE_TEMPLATE/device.yml`。内容和隐私边界见 ARCHITECTURE.md「诊断报告」。
-- **测应用内升级**：`ConfigReceiver --ez check_update true` 立刻检查；`--ez update_test true` 让「下载并安装」用推到 `Android/data/app.orchard.tv/files/update-test.apk` 的包（测完删掉这个文件）。见 ARCHITECTURE.md「升级」。
+- **测应用内升级**：`ConfigReceiver --ez check_update true` 立刻检查；`--ez update_test true` 让「下载并安装」用推到 `Android/data/com.vani.aerialkid/files/update-test.apk` 的包（测完删掉这个文件）。见 ARCHITECTURE.md「升级」。
 - **手机配置页**：令牌不写日志，从电视截图里识别二维码即可：`swift tools/qr-from-screenshot.swift shot.png`。
-- **立即预览屏保**：`adb shell am start -a app.orchard.tv.PREVIEW_SCREENSAVER -n app.orchard.tv/.MainActivity`；TCL 上测系统屏保：`am start -n com.android.systemui/.Somnambulator`。
-- **模拟小米的待机清理**：`adb shell am force-stop app.orchard.tv`，然后看日志里出现 `revived by the notification listener binding`。
-- **配置**：`adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver --ez keep_adb true`。
-- **磁贴对比图**：`adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver --es export_tiles before`，等日志 `AerialTiles` 出现 `Wrote`，再 `adb pull /sdcard/Android/data/app.orchard.tv/files/tiles/before.png`。改 `TileArt` 或 `TileRecipes` 前后各导一次。别的电视上的 App 不用装：把 APK 去掉 `lib/`、`assets/`、`*.dex` 之后推到 `files/tiles/apks/`，会按「装上了」的样子画在后面（名字后带「·」）。这个目录是自己建的，用完可以整个删掉。
+- **立即预览屏保**：`adb shell am start -a app.orchard.tv.PREVIEW_SCREENSAVER -n com.vani.aerialkid/app.orchard.tv.MainActivity`；TCL 上测系统屏保：`am start -n com.android.systemui/.Somnambulator`。
+- **模拟小米的待机清理**：`adb shell am force-stop com.vani.aerialkid`，然后看日志里出现 `revived by the notification listener binding`。
+- **配置**：`adb shell am broadcast -a app.orchard.tv.CONFIG -n com.vani.aerialkid/app.orchard.tv.guard.ConfigReceiver --ez keep_adb true`。
+- **磁贴对比图**：`adb shell am broadcast -a app.orchard.tv.CONFIG -n com.vani.aerialkid/app.orchard.tv.guard.ConfigReceiver --es export_tiles before`，等日志 `AerialTiles` 出现 `Wrote`，再 `adb pull /sdcard/Android/data/com.vani.aerialkid/files/tiles/before.png`。改 `TileArt` 或 `TileRecipes` 前后各导一次。别的电视上的 App 不用装：把 APK 去掉 `lib/`、`assets/`、`*.dex` 之后推到 `files/tiles/apks/`，会按「装上了」的样子画在后面（名字后带「·」）。这个目录是自己建的，用完可以整个删掉。
 
 ## 必须遵守（踩过的坑）
 
@@ -152,7 +152,7 @@ plutil -convert json -o en.json TVIdleScreenStrings.bundle/en.lproj/Localizable.
 - HDMI 设备名只能显示「已连接」，读真实 CEC 名称需要系统权限。
 - 航拍和每日精选都需要联网，航拍视频没有本地缓存。4K 杜比视界约 24 Mbps，网慢的家里会频繁跳段，要在个性化里改成 1080p。
 - 手机配置页是局域网 HTTP，只靠随机令牌保护。
-- 签名用的是 debug key。想换成正式密钥，必须先在两台电视上卸载重装（会丢掉壁纸、照片和图标排序），TCL 还要走一遍当贝流程。
+- 本分支 1.37 起用的是自己的正式密钥（`local/aerial-release.jks`）和包名 `com.vani.aerialkid`，装到电视上是**另一个 App**：旧的 `app.orchard.tv`（含上游正式版）数据和授权都不继承，要重新设一遍；旧包可以 `pm disable-user` 停用当退路。
 - 海信等其他品牌没有在真机上验证过。
 
 ## 可以继续做的事（按价值排序）
