@@ -417,14 +417,14 @@ private fun ColumnScope.Root(
                                 Usage.usedMinutes(group.id),
                                 label(rule.dailyMinutes),
                             ),
-                            style = Type.Caption.copy(color = Palette.SecondaryLabel),
+                            style = Type.Callout.copy(color = Palette.SecondaryLabel),
                             modifier = Modifier.padding(end = 4.dp),
                         )
                         val pass = Usage.passLeftSec(group.id)
                         if (pass > 0) {
                             BasicText(
                                 stringResource(R.string.kid_pass_left, (pass + 59) / 60),
-                                style = Type.Caption.copy(color = Palette.Orange),
+                                style = Type.Callout.copy(color = Palette.Orange),
                                 modifier = Modifier.padding(end = 4.dp),
                             )
                         }
@@ -443,7 +443,7 @@ private fun ColumnScope.Root(
         Spacer(Modifier.height(10.dp))
         BasicText(
             stringResource(R.string.kid_root_hint),
-            style = Type.Caption.copy(color = Palette.TertiaryLabel),
+            style = Type.Hint.copy(color = Palette.TertiaryLabel),
             modifier = Modifier.padding(start = 12.dp),
         )
         Spacer(Modifier.height(8.dp))
@@ -491,7 +491,7 @@ private fun AppPicker(
         Chip(stringResource(R.string.kid_done), true, null, onClick = onBack)
         BasicText(
             stringResource(R.string.kid_pick_hint),
-            style = Type.Caption.copy(color = Palette.TertiaryLabel),
+            style = Type.Hint.copy(color = Palette.TertiaryLabel),
             modifier = Modifier.padding(top = 12.dp),
         )
     }
@@ -579,7 +579,7 @@ private fun GroupEditor(
         Spacer(Modifier.height(4.dp))
         BasicText(
             stringResource(R.string.kid_group_unsaved),
-            style = Type.Caption.copy(color = Palette.Orange),
+            style = Type.Hint.copy(color = Palette.Orange),
         )
     }
     Spacer(Modifier.height(8.dp))
@@ -754,9 +754,10 @@ private fun RowItem(label: String, hint: String?, first: Boolean = false, contro
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f).padding(end = 10.dp)) {
-            BasicText(label, style = Type.Body, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            BasicText(label, style = Type.Headline, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (hint != null) {
-                BasicText(hint, style = Type.Caption.copy(color = Palette.TertiaryLabel), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // Two lines are allowed: at a readable size a hint is worth more than one line.
+                BasicText(hint, style = Type.Hint.copy(color = Palette.TertiaryLabel), maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
         control()
@@ -786,8 +787,8 @@ private fun Chip(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            if (on) BasicText("✓", style = Type.Caption.copy(color = fg))
-            BasicText(label, style = Type.Caption.copy(color = fg))
+            if (on) BasicText("✓", style = Type.Callout.copy(color = fg))
+            BasicText(label, style = Type.Callout.copy(color = fg))
         }
     }
 }
@@ -929,7 +930,7 @@ private fun AdminGate(
             Spacer(Modifier.height(6.dp))
             BasicText(
                 message,
-                style = Type.Caption.copy(color = if (wrong) Palette.Red else Palette.SecondaryLabel, textAlign = TextAlign.Center),
+                style = Type.Notice.copy(color = if (wrong) Palette.Red else Palette.SecondaryLabel, textAlign = TextAlign.Center),
             )
             Spacer(Modifier.height(14.dp))
             AdminPad(
@@ -1032,7 +1033,7 @@ internal fun ComboSetup(kind: ComboKind, onDone: () -> Unit, onCancel: () -> Uni
             Spacer(Modifier.height(6.dp))
             BasicText(
                 message,
-                style = Type.Caption.copy(color = if (wrong) Palette.Red else Palette.SecondaryLabel, textAlign = TextAlign.Center),
+                style = Type.Notice.copy(color = if (wrong) Palette.Red else Palette.SecondaryLabel, textAlign = TextAlign.Center),
             )
             Spacer(Modifier.height(12.dp))
             ComboPad(
@@ -1134,7 +1135,7 @@ fun AppUnlockGate(visible: Boolean, onCancel: () -> Unit, onUnlocked: () -> Unit
                         wrong -> stringResource(R.string.kid_combo_wrong)
                         else -> stringResource(R.string.kid_unlock_hint)
                     },
-                    style = Type.Caption.copy(
+                    style = Type.Notice.copy(
                         color = if (wrong) Palette.Red else Palette.SecondaryLabel,
                         textAlign = TextAlign.Center,
                     ),

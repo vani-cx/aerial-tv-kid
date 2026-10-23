@@ -303,7 +303,7 @@
     <string name="kid_math_title">算一算</string>
     <string name="kid_math_hint">答对了就给你时间。输入答案，再按 OK。</string>
     <string name="kid_math_wrong">你答错了，再想想。</string>
-    <string name="kid_math_ok">OK</string>
+    <string name="kid_math_ok">确认</string>
     <string-array name="kid_day_names">
         <item>周一</item><item>周二</item><item>周三</item><item>周四</item><item>周五</item><item>周六</item><item>周日</item>
     </string-array>

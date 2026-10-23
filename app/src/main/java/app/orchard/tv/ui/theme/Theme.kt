@@ -105,4 +105,19 @@ object Type {
         fontFamily = InterText, fontWeight = FontWeight.W500,
         fontSize = 11.sp, letterSpacing = 0.01.em, color = Palette.SecondaryLabel,
     )
+
+    /**
+     * A reminder line under a setting. Caption is a footnote for a desk-sized screen; these rows
+     * are read from a sofa, so they get a real size — the owner could not read them.
+     */
+    val Hint = TextStyle(
+        fontFamily = InterText, fontWeight = FontWeight.W500,
+        fontSize = 15.sp, lineHeight = 20.sp, color = Palette.SecondaryLabel,
+    )
+
+    /** The same reminder on the block screen, which is looked at from further away. */
+    val Notice = TextStyle(
+        fontFamily = InterText, fontWeight = FontWeight.W500,
+        fontSize = 17.sp, lineHeight = 24.sp, color = Palette.SecondaryLabel,
+    )
 }

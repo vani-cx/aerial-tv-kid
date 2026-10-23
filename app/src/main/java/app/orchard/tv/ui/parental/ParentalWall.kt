@@ -48,6 +48,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -252,14 +253,16 @@ fun ParentalWallHost(
                 return true
             }
             Step.Math -> {
+                // Digits and Delete are taken here so the remote's own number keys work; the OK key
+                // is deliberately NOT taken: this runs on preview, before the focused key sees the
+                // press, so swallowing OK here turned every tap on a digit into "submit the empty
+                // box" — the wall showed "wrong" and the digit never landed. The keycap gets it.
                 when {
                     code in NativeKeyEvent.KEYCODE_0..NativeKeyEvent.KEYCODE_9 -> {
                         // Three boxes: the largest answer here is 188 (89 + 99).
                         if (entered.length < 3) entered += '0' + (code - NativeKeyEvent.KEYCODE_0)
                     }
                     code == NativeKeyEvent.KEYCODE_DEL -> entered = entered.dropLast(1)
-                    code == NativeKeyEvent.KEYCODE_DPAD_CENTER || code == NativeKeyEvent.KEYCODE_ENTER ||
-                        code == NativeKeyEvent.KEYCODE_NUMPAD_ENTER -> answerMath(entered.toIntOrNull() == question.answer)
                     else -> return false
                 }
                 return true
@@ -364,8 +367,16 @@ fun ParentalWallHost(
                     question = question,
                     entered = entered,
                     wrong = wrongMath,
-                    onDigit = { if (entered.length < 3) entered += it },
-                    onDelete = { entered = entered.dropLast(1) },
+                    // Typing again clears the red line: the new question is already up, so the old
+                    // verdict underneath it would be about the wrong sum.
+                    onDigit = {
+                        wrongMath = false
+                        if (entered.length < 3) entered += it
+                    },
+                    onDelete = {
+                        wrongMath = false
+                        entered = entered.dropLast(1)
+                    },
                     onSubmit = { answerMath(entered.toIntOrNull() == question.answer) },
                 )
 
@@ -374,7 +385,7 @@ fun ParentalWallHost(
                     Spacer(Modifier.height(10.dp))
                     BasicText(
                         stringResource(noteRes, noteMinutes),
-                        style = Type.Body.copy(color = Palette.SecondaryLabel, textAlign = TextAlign.Center),
+                        style = Type.Notice.copy(color = Palette.SecondaryLabel, textAlign = TextAlign.Center),
                     )
                 }
             }
@@ -387,7 +398,7 @@ fun ParentalWallHost(
                     Step.Math -> stringResource(R.string.kid_math_hint)
                     else -> stringResource(R.string.kid_wall_back_hint)
                 },
-                style = Type.Caption.copy(textAlign = TextAlign.Center),
+                style = Type.Notice.copy(color = Palette.SecondaryLabel, textAlign = TextAlign.Center),
             )
         }
     }
@@ -506,7 +517,7 @@ private fun ColumnScope.Ask(
 
     BasicText(title, style = Type.LargeTitle.copy(textAlign = TextAlign.Center))
     Spacer(Modifier.height(8.dp))
-    BasicText(body, style = Type.Body.copy(color = Palette.SecondaryLabel, textAlign = TextAlign.Center))
+    BasicText(body, style = Type.Notice.copy(color = Palette.SecondaryLabel, textAlign = TextAlign.Center))
     if (reason == Reason.Break && blocked.restSec > 0) {
         Spacer(Modifier.height(10.dp))
         BasicText(
@@ -548,7 +559,7 @@ private fun ColumnScope.Ask(
         Spacer(Modifier.height(12.dp))
         BasicText(
             stringResource(R.string.kid_wall_daily_hint),
-            style = Type.Caption.copy(color = Palette.TertiaryLabel, textAlign = TextAlign.Center),
+            style = Type.Hint.copy(color = Palette.TertiaryLabel, textAlign = TextAlign.Center),
         )
     }
 }
@@ -606,7 +617,7 @@ internal fun ComboPad(
         Spacer(Modifier.height(6.dp))
         BasicText(
             error ?: hint,
-            style = Type.Caption.copy(color = if (error != null) Palette.Red else Palette.SecondaryLabel, textAlign = TextAlign.Center),
+            style = Type.Notice.copy(color = if (error != null) Palette.Red else Palette.SecondaryLabel, textAlign = TextAlign.Center),
         )
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -638,7 +649,7 @@ internal fun ComboPad(
                 .padding(horizontal = 30.dp)
                 .pointerInput(onConfirm) { detectTapGestures { onConfirm() } },
             contentAlignment = Alignment.Center,
-        ) { BasicText(stringResource(R.string.kid_combo_ok), style = Type.Body.copy(color = Palette.Label)) }
+        ) { BasicText(stringResource(R.string.kid_combo_ok), style = Type.Headline.copy(color = Palette.Label)) }
     }
 }
 
@@ -708,7 +719,7 @@ internal fun AdminPad(
         Spacer(Modifier.height(6.dp))
         BasicText(
             message,
-            style = Type.Caption.copy(
+            style = Type.Notice.copy(
                 color = if (wrong) Palette.Red else Palette.SecondaryLabel,
                 textAlign = TextAlign.Center,
             ),
@@ -739,10 +750,10 @@ internal fun AdminPad(
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                KeyCap(label = stringResource(R.string.kid_admin_delete), wide = true, onClick = onDelete)
+                KeyCap(label = stringResource(R.string.kid_admin_delete), width = 150.dp, onClick = onDelete)
                 KeyCap(
                     label = stringResource(R.string.kid_admin_ok),
-                    wide = true,
+                    width = 150.dp,
                     enabled = entered.length == Parental.ADMIN_LENGTH,
                     onClick = onSubmit,
                 )
@@ -754,9 +765,11 @@ internal fun AdminPad(
 @Composable
 private fun KeyCap(
     label: String,
-    wide: Boolean = false,
+    width: Dp = 42.dp,
+    height: Dp = 40.dp,
     enabled: Boolean = true,
     focusRequester: FocusRequester? = null,
+    textStyle: TextStyle = Type.Body,
     onClick: () -> Unit,
 ) {
     Pressable(onClick = onClick, enabled = enabled, focusRequester = focusRequester, focusedScale = 1.08f) { state ->
@@ -774,9 +787,9 @@ private fun KeyCap(
             else -> Palette.TertiaryLabel
         }
         Box(
-            Modifier.size(if (wide) 150.dp else 42.dp, 40.dp).clip(RoundedCornerShape(10.dp)).background(bg),
+            Modifier.size(width, height).clip(RoundedCornerShape(10.dp)).background(bg),
             contentAlignment = Alignment.Center,
-        ) { BasicText(label, style = Type.Body.copy(color = fg)) }
+        ) { BasicText(label, style = textStyle.copy(color = fg)) }
     }
 }
 
@@ -857,9 +870,11 @@ internal fun newQuestion(age: Int, random: Random = Random.Default): Question {
 }
 
 /**
- * The question, the answer typed so far and a keypad. A wrong answer says so, clears the box and
- * puts a new question up, as the owner asked; the remote's number keys work as well as the pad
- * (the host takes them at the root).
+ * The question, the answer typed so far and a keypad, three columns wide: 1-9, then Confirm / 0 /
+ * Delete in the last row so the pad is one block instead of a narrow grid with a wide strip under
+ * it (the owner saw the numbers off to the left). A wrong answer says so, clears the box and puts a
+ * new question up, as the owner asked; the remote's number keys work as well as the pad (the host
+ * takes those at the root, and only those — the OK key belongs to the keys on screen).
  */
 @Composable
 private fun MathPad(
@@ -875,16 +890,20 @@ private fun MathPad(
         withFrameNanos { }
         runCatching { first.requestFocus() }
     }
+    val keyWidth = 84.dp
+    val keyHeight = 44.dp
+    val digitStyle = Type.Title.copy(fontSize = 22.sp)
+    val actionStyle = Type.Headline.copy(fontSize = 16.sp)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         BasicText(stringResource(R.string.kid_math_title), style = Type.LargeTitle)
         Spacer(Modifier.height(6.dp))
         BasicText(
             if (wrong) stringResource(R.string.kid_math_wrong) else stringResource(R.string.kid_math_hint),
-            style = Type.Caption.copy(color = if (wrong) Palette.Red else Palette.SecondaryLabel, textAlign = TextAlign.Center),
+            style = Type.Notice.copy(color = if (wrong) Palette.Red else Palette.SecondaryLabel, textAlign = TextAlign.Center),
         )
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(10.dp))
         BasicText(question.text, style = Type.Clock.copy(fontSize = 40.sp, lineHeight = 44.sp))
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             repeat(3) { i ->
                 val ch = entered.getOrNull(i)
@@ -897,26 +916,44 @@ private fun MathPad(
             }
         }
         Spacer(Modifier.height(12.dp))
+        // One grid, three equal columns, every row the same width: nothing to look off-centre.
         Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
             listOf("123", "456", "789").forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     row.forEach { ch ->
                         KeyCap(
                             label = ch.toString(),
+                            width = keyWidth,
+                            height = keyHeight,
+                            textStyle = digitStyle,
                             focusRequester = if (ch == '1') first else null,
                             onClick = { onDigit(ch) },
                         )
                     }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                KeyCap(label = "0", onClick = { onDigit('0') })
-                KeyCap(label = stringResource(R.string.kid_admin_delete), wide = true, onClick = onDelete)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 KeyCap(
                     label = stringResource(R.string.kid_math_ok),
-                    wide = true,
+                    width = keyWidth,
+                    height = keyHeight,
+                    textStyle = actionStyle,
                     enabled = entered.isNotEmpty(),
                     onClick = onSubmit,
+                )
+                KeyCap(
+                    label = "0",
+                    width = keyWidth,
+                    height = keyHeight,
+                    textStyle = digitStyle,
+                    onClick = { onDigit('0') },
+                )
+                KeyCap(
+                    label = stringResource(R.string.kid_admin_delete),
+                    width = keyWidth,
+                    height = keyHeight,
+                    textStyle = actionStyle,
+                    onClick = onDelete,
                 )
             }
         }

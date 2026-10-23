@@ -304,7 +304,7 @@
     <string name="kid_math_title">Quick Maths</string>
     <string name="kid_math_hint">Get it right and the time is yours. Type the answer, then OK.</string>
     <string name="kid_math_wrong">That is not it. Have another go.</string>
-    <string name="kid_math_ok">OK</string>
+    <string name="kid_math_ok">Confirm</string>
     <string-array name="kid_day_names">
         <item>Mon</item><item>Tue</item><item>Wed</item><item>Thu</item><item>Fri</item><item>Sat</item><item>Sun</item>
     </string-array>
