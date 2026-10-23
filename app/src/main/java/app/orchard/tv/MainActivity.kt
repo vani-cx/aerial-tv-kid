@@ -59,7 +59,6 @@ import app.orchard.tv.system.MissingClipboard
 import app.orchard.tv.system.Sounds
 import app.orchard.tv.system.SystemProbe
 import app.orchard.tv.system.settingsLaunchIntent
-import app.orchard.tv.update.Updates
 import app.orchard.tv.weather.Weather
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -83,7 +82,6 @@ class MainActivity : ComponentActivity() {
             vm.refreshNetwork()
             Wallpapers.refreshDailyIfStale(networkCameUp = true)
             Weather.refreshIfStale(networkCameUp = true)
-            Updates.checkIfStale()
         }
         override fun onLost(network: Network) = runOnUiThread { vm.refreshNetwork() }
         override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) = runOnUiThread { vm.refreshNetwork() }
@@ -106,7 +104,6 @@ class MainActivity : ComponentActivity() {
         TileArtFactory.useCanvasDensity(canvasDensity(resources.displayMetrics))
         Wallpapers.init(this)
         Weather.init(this)
-        Updates.init(this)
         CustomIcons.init(this)
         SourceLooks.init(this)
         AerialSettings.init(this)
@@ -145,7 +142,14 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        ContextCompat.registerReceiver(this, screenOnReceiver, IntentFilter(Intent.ACTION_SCREEN_ON), ContextCompat.RECEIVER_NOT_EXPORTED)
+        ContextCompat.registerReceiver(
+            this, screenOnReceiver,
+            IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_SCREEN_OFF)
+            },
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
         if (savedInstanceState == null && firstStartSinceBoot()) openBootSource("boot")
         if (intent.getBooleanExtra(EXTRA_WOKE, false)) openBootSource("brought back on wake")
     }
@@ -162,9 +166,17 @@ class MainActivity : ComponentActivity() {
     /**
      * Woken with Aerial still in front (TCL keeps it through standby). Where the firmware killed
      * Aerial instead (Xiaomi), Home Guard brings it back with [EXTRA_WOKE].
+     *
+     * The same receiver re-locks the locked apps when the panel goes off: the way back is a
+     * direction password, and standby is the plainest sign that whoever was watching has stopped.
+     * Leaving an app does it too, through [Parental.onForegroundChanged] (docs/PARENTAL.md).
      */
     private val screenOnReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == Intent.ACTION_SCREEN_OFF) {
+                Parental.lockAll()
+                return
+            }
             idleHandler.postDelayed({
                 if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) openBootSource("screen on")
             }, 1500)
@@ -404,7 +416,6 @@ class MainActivity : ComponentActivity() {
         Wallpapers.refreshDailyIfStale()
         Wallpapers.rotateIfDue()
         Weather.refreshIfStale()
-        Updates.checkIfStale()
     }
 
     override fun onResume() {
@@ -416,7 +427,6 @@ class MainActivity : ComponentActivity() {
         FallbackClock.stop()
         GuardSetup.setHomeInFront(this, true)
         HomeGuardService.onAerialResumed()
-        Updates.onHomeResumed()
         vm.refreshSystem()
         // Back in front by any route (Home was handled in onNewIntent, which runs first; Back from
         // the app lands here directly), so the next Home press is a Home-on-Home again.
@@ -447,15 +457,16 @@ class MainActivity : ComponentActivity() {
             vm.whenUnlocked { launch(app, bounds) }
             return
         }
-        // Locked apps and time budgets: the wall comes up here, before the app does.
-        if (Parental.enabled) {
-            val verdict = Parental.verdict(app.packageName)
-            if (verdict !is Verdict.Allow) {
-                vm.overlay = Overlay.KidGate(app.packageName, verdict is Verdict.Locked) {
-                    launch(app, bounds)
-                }
-                return
+        // Locked apps and time budgets: the wall comes up here, before the app does. The app lock
+        // stands on its own, so this runs even with the children's mode off.
+        val verdict = Parental.verdict(app.packageName)
+        if (verdict !is Verdict.Allow) {
+            vm.overlay = Overlay.KidGate(app.packageName, verdict is Verdict.Locked) {
+                launch(app, bounds)
             }
+            return
+        }
+        if (Parental.groupOf(app.packageName) != null) {
             // A session starts now; the service counts it, or this process does when the service is off.
             WatchService.onAppOpened(app.packageName)
             FallbackClock.start(this, app.packageName)

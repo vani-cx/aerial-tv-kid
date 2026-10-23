@@ -131,8 +131,6 @@ fun AppMenu(
     inFolder: Boolean,
     /** The folders on Home, for Move to Folder. */
     folders: List<Folder>,
-    /** Children's mode is on: the app can be locked from here. */
-    lockable: Boolean,
     /** The app already needs the direction password. */
     locked: Boolean,
     onMove: (String) -> Unit,
@@ -222,7 +220,7 @@ fun AppMenu(
                             MenuRow(Glyph.Folder, stringResource(R.string.menu_to_folder), { page = MenuPage.Folders }, trailing = "›")
                             // Locking lives here as well as in Settings: this is where a parent
                             // already is when they decide an app is off limits (docs/PARENTAL.md).
-                            if (lockable && shownApp.source == null) {
+                            if (shownApp.source == null) {
                                 MenuRow(
                                     Glyph.Shield,
                                     stringResource(if (locked) R.string.menu_unlock else R.string.menu_lock),

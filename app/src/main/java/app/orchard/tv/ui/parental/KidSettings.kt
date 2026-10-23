@@ -122,7 +122,8 @@ fun KidSettingsSheet(visible: Boolean, apps: List<AppEntry>, onDismiss: () -> Un
                         // reachable without one, and a gate nobody can pass would be a dead end.
                         askAdmin = { then -> if (Parental.adminSet) gate = Gate.Verify(then) else then() },
                         onSetAdmin = { gate = Gate.CreateAdmin },
-                        onSetCombo = { gate = Gate.CreateCombo },
+                        onSetAppCombo = { gate = Gate.CreateAppCombo },
+                        onSetKidCombo = { gate = Gate.CreateKidCombo },
                     )
 
                     is Screen.Apps -> AppPicker(
@@ -157,7 +158,8 @@ private sealed interface Screen {
 private sealed interface Gate {
     data class Verify(val then: () -> Unit) : Gate
     data object CreateAdmin : Gate
-    data object CreateCombo : Gate
+    data object CreateAppCombo : Gate
+    data object CreateKidCombo : Gate
 }
 
 @Composable
@@ -187,7 +189,9 @@ private fun GateOverlay(gate: Gate, onClose: () -> Unit) {
                 onCancel = onClose,
             )
 
-            Gate.CreateCombo -> ComboGate(onCancel = onClose, onDone = onClose)
+            Gate.CreateAppCombo -> ComboSetup(ComboKind.App, onDone = { onClose() }, onCancel = onClose)
+
+            Gate.CreateKidCombo -> ComboSetup(ComboKind.Kid, onDone = { onClose() }, onCancel = onClose)
         }
     }
 }
@@ -201,7 +205,8 @@ private fun ColumnScope.Root(
     onEdit: (String) -> Unit,
     askAdmin: (() -> Unit) -> Unit,
     onSetAdmin: () -> Unit,
-    onSetCombo: () -> Unit,
+    onSetAppCombo: () -> Unit,
+    onSetKidCombo: () -> Unit,
 ) {
     val context = LocalContext.current
     val first = remember { FocusRequester() }
@@ -262,7 +267,7 @@ private fun ColumnScope.Root(
                         style = Type.Body.copy(color = Palette.SecondaryLabel),
                         modifier = Modifier.padding(end = 6.dp),
                     )
-                    Chip(stringResource(if (Parental.adminSet) R.string.kid_admin_change else R.string.kid_admin_new), false, next(), onSetAdmin)
+                    Chip(stringResource(if (Parental.adminSet) R.string.kid_admin_change else R.string.kid_admin_new), false, next(), onClick = onSetAdmin)
                     if (Parental.adminSet) {
                         Chip(stringResource(R.string.kid_clear), false, next()) {
                             askAdmin {
@@ -274,20 +279,61 @@ private fun ColumnScope.Root(
                     }
                 }
             }
-            RowItem(stringResource(R.string.kid_combo), stringResource(R.string.kid_combo_settings_hint)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Locking works with the children's mode off; changing the password only inside it,
+            // as the owner asked.
+            RowItem(
+                stringResource(R.string.kid_app_combo),
+                stringResource(if (Parental.enabled) R.string.kid_app_combo_hint else R.string.kid_combo_mode_hint),
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     BasicText(
-                        if (Parental.comboSet) stringResource(R.string.kid_combo_set, Parental.comboLength)
+                        if (Parental.appComboSet) stringResource(R.string.kid_combo_set, Parental.appComboLength)
                         else stringResource(R.string.kid_combo_none),
                         style = Type.Body.copy(color = Palette.SecondaryLabel),
                         modifier = Modifier.padding(end = 6.dp),
                     )
-                    Chip(stringResource(if (Parental.comboSet) R.string.kid_admin_change else R.string.kid_admin_new), false, next()) {
-                        askAdmin(onSetCombo)
+                    Chip(
+                        stringResource(if (Parental.appComboSet) R.string.kid_admin_change else R.string.kid_admin_new),
+                        false, next(), enabled = Parental.enabled,
+                    ) { if (Parental.enabled) askAdmin(onSetAppCombo) }
+                    if (Parental.appComboSet) {
+                        Chip(stringResource(R.string.kid_clear), false, next(), enabled = Parental.enabled) {
+                            if (Parental.enabled) askAdmin { Parental.clearAppCombo() }
+                        }
                     }
-                    if (Parental.comboSet) {
-                        Chip(stringResource(R.string.kid_clear), false, next()) { askAdmin { Parental.clearCombo() } }
+                }
+            }
+            RowItem(stringResource(R.string.kid_kid_combo), stringResource(R.string.kid_kid_combo_hint)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    BasicText(
+                        when {
+                            !Parental.kidComboSame && Parental.kidComboSet -> stringResource(R.string.kid_combo_set, Parental.kidComboLengthShown)
+                            Parental.appComboSet -> stringResource(R.string.kid_combo_same)
+                            else -> stringResource(R.string.kid_combo_none)
+                        },
+                        style = Type.Body.copy(color = Palette.SecondaryLabel),
+                        modifier = Modifier.padding(end = 6.dp),
+                    )
+                    Chip(
+                        stringResource(if (Parental.kidComboSet && !Parental.kidComboSame) R.string.kid_admin_change else R.string.kid_admin_new),
+                        false, next(), enabled = Parental.enabled,
+                    ) { if (Parental.enabled) askAdmin(onSetKidCombo) }
+                    if (!Parental.kidComboSame && Parental.kidComboSet) {
+                        Chip(stringResource(R.string.kid_combo_use_app), false, next(), enabled = Parental.enabled) {
+                            if (Parental.enabled) askAdmin { Parental.chooseKidComboSame(true) }
+                        }
                     }
+                }
+            }
+            RowItem(stringResource(R.string.kid_age), stringResource(R.string.kid_age_hint)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    StepChip("−", next()) { Parental.setAge(Parental.childAge - 1) }
+                    BasicText(
+                        stringResource(R.string.kid_age_value, Parental.childAge),
+                        style = Type.Body.copy(textAlign = TextAlign.Center),
+                        modifier = Modifier.width(64.dp),
+                    )
+                    StepChip("+", next()) { Parental.setAge(Parental.childAge + 1) }
                 }
             }
             RowItem(stringResource(R.string.kid_locked), stringResource(R.string.kid_locked_hint)) {
@@ -297,7 +343,7 @@ private fun ColumnScope.Root(
                         style = Type.Body.copy(color = Palette.SecondaryLabel),
                         modifier = Modifier.padding(end = 6.dp),
                     )
-                    Chip(stringResource(R.string.kid_choose), false, next(), onPickLocked)
+                    Chip(stringResource(R.string.kid_choose), false, next(), onClick = onPickLocked)
                 }
             }
         }
@@ -305,7 +351,7 @@ private fun ColumnScope.Root(
         Spacer(Modifier.height(12.dp))
         Card {
             RowItem(stringResource(R.string.kid_groups), stringResource(R.string.kid_groups_hint), first = true) {
-                Chip(stringResource(R.string.kid_group_new), false, next(), onNewGroup)
+                Chip(stringResource(R.string.kid_group_new), false, next(), onClick = onNewGroup)
             }
             val now = System.currentTimeMillis()
             Parental.groups.forEach { group ->
@@ -394,7 +440,7 @@ private fun AppPicker(apps: List<AppEntry>, groupId: String?, onBack: () -> Unit
     }
     Spacer(Modifier.height(6.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Chip(stringResource(R.string.kid_done), true, null, onBack)
+        Chip(stringResource(R.string.kid_done), true, null, onClick = onBack)
         BasicText(
             stringResource(R.string.kid_pick_hint),
             style = Type.Caption.copy(color = Palette.TertiaryLabel),
@@ -486,7 +532,7 @@ private fun GroupEditor(id: String, onPickApps: () -> Unit, onBack: () -> Unit, 
                         style = Type.Body.copy(color = Palette.SecondaryLabel),
                         modifier = Modifier.padding(end = 6.dp),
                     )
-                    Chip(stringResource(R.string.kid_choose), false, next(), onPickApps)
+                    Chip(stringResource(R.string.kid_choose), false, next(), onClick = onPickApps)
                 }
             }
             RowItem(stringResource(R.string.kid_group_enabled), null) {
@@ -582,7 +628,7 @@ private fun GroupEditor(id: String, onPickApps: () -> Unit, onBack: () -> Unit, 
         }
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Chip(stringResource(R.string.kid_back), true, next(), onBack)
+            Chip(stringResource(R.string.kid_back), true, next(), onClick = onBack)
             Chip(stringResource(R.string.kid_group_delete), false, next()) {
                 askAdmin { Parental.removeGroup(id); onBack() }
             }
@@ -637,9 +683,10 @@ private fun Chip(
     label: String,
     on: Boolean,
     focusRequester: FocusRequester?,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
-    Pressable(onClick = onClick, focusRequester = focusRequester, focusedScale = 1.06f) { state ->
+    Pressable(onClick = onClick, enabled = enabled, focusRequester = focusRequester, focusedScale = 1.06f) { state ->
         val bg by animateColorAsState(
             when {
                 state.focused -> Palette.Focus
@@ -809,18 +856,25 @@ private fun AdminGate(
                 onSubmit = { submit() },
             )
             Spacer(Modifier.height(12.dp))
-            Chip(stringResource(R.string.kid_cancel), false, null, onCancel)
+            Chip(stringResource(R.string.kid_cancel), false, null, onClick = onCancel)
         }
     }
 }
 
-/** Sets the direction combo: entered twice, like any other password. */
+/** Which of the two direction passwords a panel sets. */
+enum class ComboKind { App, Kid }
+
+/**
+ * Sets a direction password: four to eight directions, OK to finish, then the same again. The app
+ * password also carries the reminder that changing it later means opening the children's mode.
+ */
 @Composable
-private fun ComboGate(onDone: () -> Unit, onCancel: () -> Unit) {
+internal fun ComboSetup(kind: ComboKind, onDone: () -> Unit, onCancel: () -> Unit) {
     var entered by remember { mutableStateOf(emptyList<Dir>()) }
     var firstTry by remember { mutableStateOf<List<Dir>?>(null) }
-    val createHint = stringResource(R.string.kid_combo_create_hint)
-    var message by remember { mutableStateOf(createHint) }
+    val rule = stringResource(R.string.kid_combo_create_hint)
+    val appRule = stringResource(R.string.kid_combo_app_rule)
+    var message by remember { mutableStateOf(if (kind == ComboKind.App) "$rule\n$appRule" else rule) }
     var wrong by remember { mutableStateOf(false) }
     val againText = stringResource(R.string.kid_combo_again)
     val mismatchText = stringResource(R.string.kid_combo_mismatch)
@@ -834,6 +888,7 @@ private fun ComboGate(onDone: () -> Unit, onCancel: () -> Unit) {
         withFrameNanos { }
         runCatching { focus.requestFocus() }
     }
+    val title = stringResource(if (kind == ComboKind.App) R.string.kid_combo_app_title else R.string.kid_combo_kid_title)
 
     fun confirm() {
         if (entered.size < minLength) {
@@ -850,7 +905,7 @@ private fun ComboGate(onDone: () -> Unit, onCancel: () -> Unit) {
                 message = againText
             }
             first == entered -> {
-                Parental.setCombo(entered)
+                if (kind == ComboKind.App) Parental.setAppCombo(entered) else Parental.setKidCombo(entered)
                 onDone()
             }
             else -> {
@@ -888,7 +943,7 @@ private fun ComboGate(onDone: () -> Unit, onCancel: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            BasicText(stringResource(R.string.kid_combo_settings_title), style = Type.LargeTitle)
+            BasicText(title, style = Type.LargeTitle)
             Spacer(Modifier.height(6.dp))
             BasicText(
                 message,
@@ -896,15 +951,122 @@ private fun ComboGate(onDone: () -> Unit, onCancel: () -> Unit) {
             )
             Spacer(Modifier.height(12.dp))
             ComboPad(
+                title = "",
+                hint = "",
                 entered = entered,
                 length = slots,
                 error = null,
-                showHeader = false,
                 onTap = { dir -> entered = if (entered.size < Parental.MAX_COMBO) entered + dir else entered },
                 onConfirm = { confirm() },
             )
             Spacer(Modifier.height(12.dp))
-            Chip(stringResource(R.string.kid_cancel), false, null, onCancel)
+            Chip(stringResource(R.string.kid_cancel), false, null, onClick = onCancel)
+        }
+    }
+}
+
+/**
+ * First lock on an app with no app password yet: the parent makes one right here (the owner asked
+ * for this instead of sending them to Settings), then the app is locked.
+ */
+@Composable
+fun AppLockSetup(visible: Boolean, onCancel: () -> Unit, onLocked: () -> Unit) {
+    if (!visible) return
+    BackHandler(onBack = onCancel)
+    Box(
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        ComboSetup(ComboKind.App, onDone = onLocked, onCancel = onCancel)
+    }
+}
+
+/** Turning a lock off: the app password, and only that. */
+@Composable
+fun AppUnlockGate(visible: Boolean, onCancel: () -> Unit, onUnlocked: () -> Unit) {
+    if (!visible) return
+    BackHandler(onBack = onCancel)
+    var entered by remember { mutableStateOf(emptyList<Dir>()) }
+    var wrong by remember { mutableStateOf(false) }
+    var waitSec by remember { mutableStateOf(0L) }
+    val scope = rememberCoroutineScope()
+    val focus = remember { FocusRequester() }
+    val length = Parental.appComboLength
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        runCatching { focus.requestFocus() }
+    }
+
+    fun submit() {
+        if (entered.size != length) return
+        val dirs = entered
+        scope.launch {
+            val ok = withContext(Dispatchers.Default) { Parental.verifyAppCombo(dirs) }
+            entered = emptyList()
+            if (ok) onUnlocked() else {
+                wrong = true
+                waitSec = Parental.waitMs() / 1000
+            }
+        }
+    }
+
+    Box(
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .width(640.dp)
+                .clip(RoundedCornerShape(26.dp))
+                .background(Palette.Glass)
+                .border(1.dp, Palette.Hairline, RoundedCornerShape(26.dp))
+                .padding(horizontal = 30.dp, vertical = 22.dp)
+                .focusRequester(focus)
+                .focusable()
+                .onPreviewKeyEvent { e ->
+                    if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    if (e.nativeKeyEvent.repeatCount > 0) return@onPreviewKeyEvent false
+                    val code = e.nativeKeyEvent.keyCode
+                    if (code == NativeKeyEvent.KEYCODE_DPAD_CENTER || code == NativeKeyEvent.KEYCODE_ENTER) {
+                        submit(); return@onPreviewKeyEvent true
+                    }
+                    if (code == NativeKeyEvent.KEYCODE_DEL) {
+                        entered = entered.dropLast(1); return@onPreviewKeyEvent true
+                    }
+                    val next = comboEdit(entered, code, length) ?: return@onPreviewKeyEvent false
+                    entered = next
+                    true
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                BasicText(stringResource(R.string.kid_unlock_title), style = Type.LargeTitle)
+                Spacer(Modifier.height(6.dp))
+                BasicText(
+                    when {
+                        waitSec > 0 -> waitMessage(context, waitSec)
+                        wrong -> stringResource(R.string.kid_combo_wrong)
+                        else -> stringResource(R.string.kid_unlock_hint)
+                    },
+                    style = Type.Caption.copy(
+                        color = if (wrong) Palette.Red else Palette.SecondaryLabel,
+                        textAlign = TextAlign.Center,
+                    ),
+                )
+                Spacer(Modifier.height(12.dp))
+                ComboPad(
+                    title = "",
+                    hint = "",
+                    entered = entered,
+                    length = length,
+                    error = null,
+                    onTap = { dir -> entered = add(entered, dir, length) },
+                    onConfirm = { submit() },
+                )
+                Spacer(Modifier.height(12.dp))
+                Chip(stringResource(R.string.kid_cancel), false, null, onClick = onCancel)
+            }
         }
     }
 }

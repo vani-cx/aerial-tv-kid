@@ -31,7 +31,6 @@ import app.orchard.tv.system.NetworkStatus
 import app.orchard.tv.system.SystemProbe
 import app.orchard.tv.system.TvSource
 import app.orchard.tv.system.VolumeStatus
-import app.orchard.tv.ui.home.PinMode
 import app.orchard.tv.ui.home.ScreensaverSkips
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -48,16 +47,19 @@ sealed interface Overlay {
     data class Folder(val id: String) : Overlay
     data object HiddenApps : Overlay
     data object Wallpaper : Overlay
-    data class Pin(val mode: PinMode, val onDone: () -> Unit) : Overlay
     /** The parent's password, before anything a parent alone may do (see Parental). */
     data class KidAdmin(val onDone: () -> Unit) : Overlay
     /** The block wall, before an app opens: `lockMode` when the app itself is locked. */
     data class KidGate(val packageName: String, val lockMode: Boolean, val onAllow: () -> Unit) : Overlay
     /** Children and time limits (docs/PARENTAL.md). */
     data object Kid : Overlay
+    /** First lock on [packageName] and there is no app password yet: make one. */
+    data class LockSetup(val packageName: String) : Overlay
+    /** Turning a lock off: the app password first. */
+    data class LockConfirm(val packageName: String) : Overlay
 }
 
-enum class CcPage { Main, Inputs, InputSettings, Update, Setup }
+enum class CcPage { Main, Inputs, InputSettings, Setup }
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val context get() = getApplication<Application>()
@@ -268,16 +270,18 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         volume = SystemProbe.volume(context)
     }
 
-    /** True when opening the TV's settings app should ask a parent first, whichever password is set. */
-    fun needsParent(): Boolean = Parental.adminSet || AerialSettings.pinSet
+    /** True when opening the TV's settings app should ask a parent first: the admin password is set. */
+    fun needsParent(): Boolean = Parental.adminSet
 
-    /** Runs [action] at once, or after the parent's password (see Parental for the two levels). */
+    /**
+     * Runs [action] at once, or after the parent's password. One door now: Aerial's old four-digit
+     * PIN is gone, so a parent without an admin password has nothing to type (docs/PARENTAL.md).
+     */
     fun whenUnlocked(action: () -> Unit) {
-        when {
-            Parental.adminSet && !Parental.adminOpen -> overlay = Overlay.KidAdmin { overlay = Overlay.None; action() }
-            !Parental.adminSet && AerialSettings.locked ->
-                overlay = Overlay.Pin(PinMode.Unlock) { overlay = Overlay.None; action() }
-            else -> action()
+        if (Parental.adminSet && !Parental.adminOpen) {
+            overlay = Overlay.KidAdmin { overlay = Overlay.None; action() }
+        } else {
+            action()
         }
     }
 
@@ -319,7 +323,6 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun onHomePressed(resetFocus: Boolean = true) {
         screensaverVisible = false
-        AerialSettings.relock()
         // Home also ends the parent's ten minutes in Settings: the remote is fair game again.
         Parental.closeAdmin()
         overlay = Overlay.None

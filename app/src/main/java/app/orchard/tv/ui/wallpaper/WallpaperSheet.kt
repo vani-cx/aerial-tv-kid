@@ -40,7 +40,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -59,7 +58,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import app.orchard.tv.R
-import app.orchard.tv.parental.Parental
 import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.settings.FocusStyle
 import app.orchard.tv.settings.UiSounds
@@ -100,7 +98,6 @@ fun WallpaperSheet(
     hiddenCount: Int,
     onHiddenApps: () -> Unit,
     onStartScreensaver: () -> Unit,
-    onPin: (on: Boolean) -> Unit,
     onKid: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -145,7 +142,6 @@ fun WallpaperSheet(
                     .padding(start = 40.dp, end = 32.dp, top = 24.dp),
             ) {
                 val scroll = rememberScrollState()
-                val scope = rememberCoroutineScope()
                 // How Home looks, in the order you see it: the picture behind everything, how Home
                 // is laid out over it, what replaces it when idle, then the weather and the PIN.
                 // Settings sit in tvOS-style grouped rows; each group's note follows the focused row.
@@ -244,25 +240,8 @@ fun WallpaperSheet(
                         SettingRow(R.string.wp_weather_city, null, note, first = true) { WeatherValue() }
                     }
 
-                    // One row says what it is; a title over it would only repeat it. Once the parent's
-                    // eight-character password is set it guards Settings as well, and the old PIN row
-                    // only says so: two passwords for the same door would just be confusing.
-                    Spacer(Modifier.height(10.dp))
-                    if (Parental.adminSet) {
-                        Group(stringResource(R.string.st_pin_admin_hint)) { note ->
-                            SettingRow(R.string.st_pin, null, note, first = true) {
-                                BasicText(stringResource(R.string.st_pin_admin), style = Type.Body.copy(color = Palette.SecondaryLabel))
-                            }
-                        }
-                    } else {
-                        Group(stringResource(R.string.st_pin_hint)) { note ->
-                            SettingRow(R.string.st_pin, null, note, first = true) {
-                                // The last row that takes focus: bring the note under it into view too.
-                                PinChoice(onPin, onFocused = { scope.launch { scroll.animateScrollTo(scroll.maxValue) } })
-                            }
-                        }
-                    }
-
+                    // One door for a parent now: the eight-character admin password, and the children's
+                    // mode behind it. Aerial's old four-digit PIN is gone (docs/PARENTAL.md).
                     Spacer(Modifier.height(22.dp))
                     SectionTitle(R.string.kid_settings_title)
                     Group(stringResource(R.string.kid_entry_hint)) { note ->
@@ -427,18 +406,6 @@ private fun <T> Choices(
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             options.forEach { (value, text) ->
                 Chip(if (text is Int) stringResource(text) else text.toString(), on = current == value) { choose(value) }
-            }
-        }
-    }
-}
-
-/** Parental PIN on or off; either way goes through the PIN pad (issue #10). */
-@Composable
-private fun PinChoice(onPin: (on: Boolean) -> Unit, onFocused: () -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        listOf(false to R.string.st_pin_off, true to R.string.st_pin_on).forEach { (on, label) ->
-            Chip(stringResource(label), on = AerialSettings.pinSet == on, onFocused = onFocused) {
-                if (AerialSettings.pinSet != on) onPin(on)
             }
         }
     }

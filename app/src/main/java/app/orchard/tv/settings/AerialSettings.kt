@@ -5,10 +5,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.edit
-import android.os.SystemClock
 import android.provider.Settings
 import app.orchard.tv.wallpaper.AerialQuality
-import java.security.MessageDigest
 
 /**
  * How the focused app shows itself, named after tvOS's Accessibility > Increase Contrast > Focus Style.
@@ -79,15 +77,6 @@ object AerialSettings {
     var backStartsScreensaver by mutableStateOf(true); private set
 
     /**
-     * Parental PIN (issue #10): asked before TV settings open and before hidden apps come back.
-     * Kept as a SHA-256 hash. One right entry holds for a while, until Home is pressed.
-     */
-    var pinSet by mutableStateOf(false); private set
-    private var pinHash: String? = null
-    private var unlockedUntil = 0L
-    private const val UNLOCK_MS = 10 * 60 * 1000L
-
-    /**
      * Minutes of no input on Home before Aerial's screensaver starts (issue #66). The firmware's own
      * screensaver still caps it: Aerial starts just ahead of that one, see MainActivity.
      */
@@ -107,8 +96,9 @@ object AerialSettings {
         focusStyle = FocusStyle.of(prefs.getString("focus_style", null))
         pinnedSources = prefs.getStringSet("pinned_sources", null)?.toSet() ?: emptySet()
         bootSource = prefs.getString("boot_source", null)
-        pinHash = prefs.getString("pin_hash", null)
-        pinSet = pinHash != null
+        // Aerial's old four-digit PIN is gone (docs/PARENTAL.md): drop what earlier versions kept,
+        // so no hash of it stays on the TV.
+        if (prefs.contains("pin_hash")) prefs.edit { remove("pin_hash") }
         oneRowHome = prefs.getBoolean("one_row_home", true)
         clockRight = prefs.getBoolean("clock_right", false)
         largeClock = prefs.getBoolean("large_clock", false)
@@ -129,27 +119,6 @@ object AerialSettings {
         bootSource = id
         app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putString("boot_source", id) }
     }
-
-    val locked: Boolean get() = pinSet && SystemClock.elapsedRealtime() > unlockedUntil
-
-    fun unlock(pin: String): Boolean {
-        if (hash(pin) != pinHash) return false
-        unlockedUntil = SystemClock.elapsedRealtime() + UNLOCK_MS
-        return true
-    }
-
-    fun relock() { unlockedUntil = 0L }
-
-    /** Sets the PIN, or turns it off with null. */
-    fun choosePin(pin: String?) {
-        pinHash = pin?.let(::hash)
-        pinSet = pinHash != null
-        unlockedUntil = if (pin != null) SystemClock.elapsedRealtime() + UNLOCK_MS else 0L
-        app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putString("pin_hash", pinHash) }
-    }
-
-    private fun hash(pin: String): String =
-        MessageDigest.getInstance("SHA-256").digest("aerial:$pin".toByteArray()).joinToString("") { "%02x".format(it) }
 
     fun chooseOneRowHome(on: Boolean) {
         oneRowHome = on

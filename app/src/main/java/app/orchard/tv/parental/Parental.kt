@@ -9,7 +9,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
 
-/** A D-pad direction: the alphabet of the children's combo password. */
+/** A D-pad direction: the alphabet of the children's direction passwords. */
 enum class Dir { Up, Down, Left, Right }
 
 /** Minutes from midnight, [start] inclusive, [end] exclusive. */
@@ -39,7 +39,7 @@ data class Group(
     fun dayRule(now: Long): DayRule = days.getOrElse(weekdayIndex(now)) { DayRule() }
 }
 
-enum class Reason { Daily, Session, Break, Window }
+enum class Reason { Daily, Window, Break }
 
 /**
  * What happens when someone tries to open [pkg], or keeps using it.
@@ -47,7 +47,7 @@ enum class Reason { Daily, Session, Break, Window }
 sealed interface Verdict {
     data object Allow : Verdict
 
-    /** The app is locked: the remote combo (or a parent's password) opens it. */
+    /** The app is locked: the app password (a direction combo) opens it. */
     data object Locked : Verdict
 
     data class Blocked(
@@ -56,8 +56,16 @@ sealed interface Verdict {
         /** Seconds and minutes the group has used today, and its allowance, for the message. */
         val usedSec: Int,
         val limitMinutes: Int,
-        /** Minutes until it opens again by itself; 0 when only a parent can help. */
-        val waitMinutes: Int,
+        /** Minutes until it opens again by itself; 0 when only a parent or the maths can help. */
+        val waitMinutes: Int = 0,
+        /** Seconds of rest still to run, for the countdown on the wall. */
+        val restSec: Int = 0,
+        /** Minute of the day the next allowed stretch starts (may be less than now: tomorrow). */
+        val nextAtMinute: Int = -1,
+        /** The maths question may buy time here. */
+        val offerQuiz: Boolean = false,
+        /** Minutes one right answer buys: 15 outside the windows, 5 after a rest. */
+        val quizMinutes: Int = 0,
     ) : Verdict
 }
 
@@ -81,23 +89,27 @@ fun dayKey(now: Long): String {
 fun clock(minute: Int): String = "%d:%02d".format(minute / 60, minute % 60)
 
 /**
- * Parental controls: two passwords, locked apps and time budgets (see docs/PARENTAL.md).
+ * Parental controls: passwords, locked apps and time budgets (see docs/PARENTAL.md).
  *
- * Two levels, as the owner asked:
- *  - the **admin password**: eight characters, letters and digits mixed, opens Settings, changing
- *    either password, and buying extra minutes. It also replaces Aerial's old four-digit PIN
- *    (AerialSettings) once it is set, see HomeViewModel.whenUnlocked.
- *  - the **combo**: a sequence of D-pad directions, confirmed with OK, that opens a locked app. It
- *    is deliberately weak (a few thousand combinations at most) and only ever guards "can this app
- *    start"; every loosening of a rule goes through the admin password.
+ * Three passwords, with different jobs:
+ *  - the **admin password**: eight characters, letters and digits mixed. It opens Settings (and the
+ *    TV's own settings app), and it is the only way to change or delete either direction password.
+ *  - the **app password**: a direction combo. It locks single apps and opens them again. Locking
+ *    works with the children's mode off; changing or deleting the password needs the mode on.
+ *  - the **time password**: a direction combo for the time wall, so a parent can give 10…50 minutes
+ *    without typing the long admin one. It may be the same combo as the app password.
  *
  * State only, on the main thread; hashing runs off it (Secrets). Preferences: "parental".
  */
 object Parental {
     private const val PREFS = "parental"
     private const val KEY_ADMIN = "admin_hash"
-    private const val KEY_COMBO = "combo_hash"
-    private const val KEY_COMBO_LEN = "combo_len"
+    private const val KEY_APP_COMBO = "app_combo_hash"
+    private const val KEY_APP_COMBO_LEN = "app_combo_len"
+    private const val KEY_KID_COMBO = "kid_combo_hash"
+    private const val KEY_KID_COMBO_LEN = "kid_combo_len"
+    private const val KEY_KID_SAME = "kid_combo_same"
+    private const val KEY_AGE = "child_age"
     private const val KEY_ENABLED = "enabled"
     private const val KEY_LOCKED = "locked"
     private const val KEY_GROUPS = "groups"
@@ -108,7 +120,7 @@ object Parental {
     /** How long one admin entry keeps Settings open, so a parent is not asked at every row. */
     private const val ADMIN_WINDOW_MS = 10 * 60 * 1000L
 
-    /** Wrong entries allowed before waiting: the combo has too few combinations to allow guessing. */
+    /** Wrong entries allowed before waiting: a direction combo has too few combinations to guess at. */
     private const val MAX_FAILS = 5
 
     /**
@@ -122,13 +134,25 @@ object Parental {
     /** Quiet time after a wait that starts the doubling over. */
     private const val QUIET_MS = 60 * 60 * 1000L
 
+    /** What one right answer buys, as the owner asked. */
+    const val WINDOW_QUIZ_MINUTES = 15
+    const val REST_QUIZ_MINUTES = 5
+
+    /** The ages the maths questions are picked for. */
+    const val MIN_AGE = 3
+    const val MAX_AGE = 12
+
     private var started = false
     private lateinit var app: Context
 
     var enabled by mutableStateOf(false); private set
     var adminSet by mutableStateOf(false); private set
-    var comboSet by mutableStateOf(false); private set
-    var comboLength by mutableStateOf(6); private set
+    var appComboSet by mutableStateOf(false); private set
+    var appComboLength by mutableStateOf(DEFAULT_COMBO) ; private set
+    var kidComboSet by mutableStateOf(false); private set
+    /** True while the time password is the app password (the default). */
+    var kidComboSame by mutableStateOf(true); private set
+    var childAge by mutableStateOf(6); private set
     var groups by mutableStateOf<List<Group>>(emptyList()); private set
     var lockedPackages by mutableStateOf<Set<String>>(emptySet()); private set
 
@@ -136,15 +160,17 @@ object Parental {
     var revision by mutableStateOf(0); private set
 
     private var adminHash: String? = null
-    private var comboHash: String? = null
+    private var appComboHash: String? = null
+    private var kidComboHash: String? = null
+    private var kidComboLength = DEFAULT_COMBO
     private var adminAt = 0L
     private var fails = 0
 
-    /** Rounds of [MAX_FAILS] wrong entries so far today, each doubling the wait before the next try. */
+    /** Rounds of [MAX_FAILS] wrong entries so far, each doubling the wait before the next try. */
     private var lockouts = 0
     private var blockedUntil = 0L
 
-    /** Apps opened with the combo this session; dropped when the viewer leaves them. */
+    /** Apps opened with the password this session; dropped when the viewer leaves them. */
     private val unlocked = HashSet<String>()
 
     fun init(context: Context) {
@@ -153,10 +179,30 @@ object Parental {
         app = context.applicationContext
         val p = prefs()
         adminHash = p.getString(KEY_ADMIN, null)
-        comboHash = p.getString(KEY_COMBO, null)
+        appComboHash = p.getString(KEY_APP_COMBO, null)
+        kidComboHash = p.getString(KEY_KID_COMBO, null)
+        appComboLength = p.getInt(KEY_APP_COMBO_LEN, DEFAULT_COMBO).coerceIn(MIN_COMBO, MAX_COMBO)
+        kidComboLength = p.getInt(KEY_KID_COMBO_LEN, DEFAULT_COMBO).coerceIn(MIN_COMBO, MAX_COMBO)
+        kidComboSame = p.getBoolean(KEY_KID_SAME, true)
+        childAge = p.getInt(KEY_AGE, 6).coerceIn(MIN_AGE, MAX_AGE)
+        // One combo before 1.36: it becomes both the app and the time password.
+        val old = p.getString("combo_hash", null)
+        if (old != null && appComboHash == null) {
+            appComboHash = old
+            kidComboHash = old
+            appComboLength = p.getInt("combo_len", DEFAULT_COMBO).coerceIn(MIN_COMBO, MAX_COMBO)
+            kidComboLength = appComboLength
+            kidComboSame = true
+            p.edit {
+                putString(KEY_APP_COMBO, old); putString(KEY_KID_COMBO, old)
+                putInt(KEY_APP_COMBO_LEN, appComboLength); putInt(KEY_KID_COMBO_LEN, kidComboLength)
+                putBoolean(KEY_KID_SAME, true)
+                remove("combo_hash"); remove("combo_len")
+            }
+        }
         adminSet = adminHash != null
-        comboSet = comboHash != null
-        comboLength = p.getInt(KEY_COMBO_LEN, 6).coerceIn(MIN_COMBO, MAX_COMBO)
+        appComboSet = appComboHash != null
+        kidComboSet = kidComboHash != null
         enabled = p.getBoolean(KEY_ENABLED, false)
         lockedPackages = p.getStringSet(KEY_LOCKED, null)?.toSet().orEmpty()
         groups = runCatching { parseGroups(p.getString(KEY_GROUPS, null)) }.getOrDefault(emptyList())
@@ -195,11 +241,21 @@ object Parental {
         return ok
     }
 
-    /** Checks a direction combo. Runs a hash of the whole sequence: cheap, call off the main thread. */
-    fun verifyCombo(dirs: List<Dir>): Boolean {
+    /** Checks the app-lock combo. Runs a hash of the whole sequence: call it off the main thread. */
+    fun verifyAppCombo(dirs: List<Dir>): Boolean = verifySeq(dirs, appComboLength, appComboHash)
+
+    /**
+     * Checks the time wall's combo. It is the app combo unless the parent set a second one, so a
+     * household with one password types it in both places.
+     */
+    fun verifyKidCombo(dirs: List<Dir>): Boolean =
+        if (kidComboSame || kidComboHash == null) verifyAppCombo(dirs)
+        else verifySeq(dirs, kidComboLength, kidComboHash)
+
+    private fun verifySeq(dirs: List<Dir>, length: Int, hash: String?): Boolean {
         if (waitMs() > 0) return false
-        if (dirs.size != comboLength) return false
-        val ok = Secrets.verify(dirs.joinToString("-") { it.name }, comboHash)
+        if (dirs.size != length) return false
+        val ok = Secrets.verify(dirs.joinToString("-") { it.name }, hash)
         count(ok)
         return ok
     }
@@ -238,17 +294,55 @@ object Parental {
         prefs().edit { putString(KEY_ADMIN, null) }
     }
 
-    fun setCombo(dirs: List<Dir>) {
-        comboHash = Secrets.encode(dirs.joinToString("-") { it.name })
-        comboSet = true
-        comboLength = dirs.size
-        prefs().edit { putString(KEY_COMBO, comboHash); putInt(KEY_COMBO_LEN, comboLength) }
+    fun setAppCombo(dirs: List<Dir>) {
+        appComboHash = Secrets.encode(dirs.joinToString("-") { it.name })
+        appComboSet = true
+        appComboLength = dirs.size
+        prefs().edit { putString(KEY_APP_COMBO, appComboHash); putInt(KEY_APP_COMBO_LEN, appComboLength) }
     }
 
-    fun clearCombo() {
-        comboHash = null
-        comboSet = false
-        prefs().edit { putString(KEY_COMBO, null) }
+    fun clearAppCombo() {
+        appComboHash = null
+        appComboSet = false
+        prefs().edit { putString(KEY_APP_COMBO, null) }
+    }
+
+    fun setKidCombo(dirs: List<Dir>) {
+        kidComboHash = Secrets.encode(dirs.joinToString("-") { it.name })
+        kidComboSet = true
+        kidComboLength = dirs.size
+        kidComboSame = false
+        prefs().edit {
+            putString(KEY_KID_COMBO, kidComboHash); putInt(KEY_KID_COMBO_LEN, kidComboLength)
+            putBoolean(KEY_KID_SAME, false)
+        }
+    }
+
+    fun clearKidCombo() {
+        kidComboHash = null
+        kidComboSet = false
+        prefs().edit { putString(KEY_KID_COMBO, null) }
+    }
+
+    /** Back to one password for both doors. */
+    fun chooseKidComboSame(on: Boolean) {
+        kidComboSame = on
+        if (on) {
+            kidComboHash = null
+            kidComboSet = false
+        }
+        prefs().edit { putBoolean(KEY_KID_SAME, on); if (on) putString(KEY_KID_COMBO, null) }
+    }
+
+    /** The combo the time wall asks for, as its length; 0 when nobody has set one. */
+    val kidComboLengthShown: Int get() = if (kidComboSame || kidComboHash == null) appComboLength else kidComboLength
+
+    /** The time wall has a password of its own or through the app's. */
+    val kidDoorSet: Boolean get() = kidComboSame && appComboSet || kidComboHash != null
+
+    fun setAge(age: Int) {
+        childAge = age.coerceIn(MIN_AGE, MAX_AGE)
+        prefs().edit { putInt(KEY_AGE, childAge) }
     }
 
     /** The eight-character rule: letters and digits, both present. */
@@ -258,6 +352,7 @@ object Parental {
     const val ADMIN_LENGTH = 8
     const val MIN_COMBO = 4
     const val MAX_COMBO = 8
+    private const val DEFAULT_COMBO = 4
 
     // ---- Settings ----
 
@@ -309,8 +404,14 @@ object Parental {
     fun lockApp(pkg: String) { unlocked -= pkg }
 
     /**
-     * Someone left [from] for [to] (null for Home): the combo entry for the app left expires, and if
-     * the group changed the session there ends, so the break before the next one starts counting.
+     * The app lock's auto-relock rule, as the owner asked: the password covers one visit. Going
+     * back to Home, switching to another app, the screen going off and a restart all lock again.
+     */
+    fun lockAll() { unlocked.clear() }
+
+    /**
+     * Someone left [from] for [to] (null for Home): the password entry for the app left expires, and
+     * if the group changed the session there ends, so the break before the next one starts counting.
      */
     fun onForegroundChanged(from: String?, to: String?) {
         if (from == null || from == to) return
@@ -325,51 +426,85 @@ object Parental {
 
     /**
      * The rules for [pkg] right now. [Verdict.Allow] for apps in no group and not locked, and for
-     * everything while the whole feature is off.
+     * the time rules while the children's mode is off (the app lock still applies then).
      */
     fun verdict(pkg: String, now: Long = System.currentTimeMillis()): Verdict {
-        if (!enabled) return Verdict.Allow
-        val group = groupOf(pkg)
-        val locked = pkg in lockedPackages
-        val lockedVerdict = if (locked && !isAppUnlocked(pkg)) Verdict.Locked else Verdict.Allow
-        if (group == null) return lockedVerdict
+        val lockedVerdict: Verdict =
+            if (pkg in lockedPackages && !isAppUnlocked(pkg)) Verdict.Locked else Verdict.Allow
+        if (!enabled) return lockedVerdict
+        val group = groupOf(pkg) ?: return lockedVerdict
 
         Usage.rollDay(now)
 
-        // A parent's pass covers every rule below it, for as long as it runs.
+        // A parent's pass covers every time rule below it, for as long as it runs.
         if (Usage.passLeftSec(group.id, now) > 0) return lockedVerdict
 
         val rule = group.dayRule(now)
         if (!rule.enabled) return lockedVerdict
 
+        val used = Usage.usedSec(group.id)
+
+        // The day comes first: once it is gone neither the maths nor the windows help.
+        if (rule.dailyMinutes > 0 && used >= rule.dailyMinutes * 60) {
+            return Verdict.Blocked(group, Reason.Daily, used, rule.dailyMinutes)
+        }
+
+        // Minutes bought with a maths question outside the windows: they sit over the window, the
+        // rest and the session, but never over the day above.
+        if (Usage.quizPassLeftSec(group.id, now) > 0) return lockedVerdict
+
         val minute = minuteOfDay(now)
         if (rule.windows.isNotEmpty() && rule.windows.none { it.has(minute) }) {
-            return Verdict.Blocked(group, Reason.Window, Usage.usedSec(group.id), rule.dailyMinutes, waitForWindow(rule.windows, minute))
+            val next = nextWindow(rule.windows, minute)
+            return Verdict.Blocked(
+                group, Reason.Window, used, rule.dailyMinutes,
+                waitMinutes = waitFor(next, minute),
+                nextAtMinute = next,
+                offerQuiz = !Usage.quizExtraUsedToday(group.id, now),
+                quizMinutes = WINDOW_QUIZ_MINUTES,
+            )
         }
 
-        val used = Usage.usedSec(group.id)
-        if (rule.dailyMinutes > 0 && used >= rule.dailyMinutes * 60) {
-            return Verdict.Blocked(group, Reason.Daily, used, rule.dailyMinutes, 0)
+        val rest = Usage.restLeftSec(group.id, rule.breakMinutes, now)
+        if (rest > 0) {
+            return Verdict.Blocked(
+                group, Reason.Break, used, rule.dailyMinutes,
+                waitMinutes = (rest + 59) / 60,
+                restSec = rest,
+                offerQuiz = Usage.restOffersQuiz(group.id) && !Usage.restQuizUsed(group.id),
+                quizMinutes = REST_QUIZ_MINUTES,
+            )
         }
-
-        val breakLeft = Usage.breakMinutesLeft(group.id, rule.breakMinutes, now)
-        if (breakLeft > 0) return Verdict.Blocked(group, Reason.Break, used, rule.dailyMinutes, breakLeft)
 
         val session = Usage.session(group.id)
-        val sessionCap = rule.sessionMinutes * 60 + session.extraSec
-        if (rule.sessionMinutes > 0 && session.usedSec >= sessionCap) {
-            return Verdict.Blocked(group, Reason.Session, session.usedSec, rule.sessionMinutes, 0)
+        if (rule.sessionMinutes > 0 && session.usedSec >= rule.sessionMinutes * 60 + session.extraSec) {
+            // No rest configured: straight into a new session, no wall to show.
+            if (rule.breakMinutes <= 0) {
+                Usage.restartSession(group.id, now)
+                return lockedVerdict
+            }
+            // The session is over where it stands: the rest starts now, and counts down by the
+            // wall clock whether the child stays on the wall, goes Home or comes back later.
+            Usage.hitSession(group.id, rule.breakMinutes, now)
+            val left = Usage.restLeftSec(group.id, rule.breakMinutes, now)
+            return Verdict.Blocked(
+                group, Reason.Break, used, rule.dailyMinutes,
+                waitMinutes = (left + 59) / 60,
+                restSec = left,
+                offerQuiz = left > 0 && !Usage.restQuizUsed(group.id),
+                quizMinutes = REST_QUIZ_MINUTES,
+            )
         }
 
         return lockedVerdict
     }
 
-    /** Minutes until any window opens again (0 when one is open now). */
-    private fun waitForWindow(windows: List<Window>, minute: Int): Int {
-        if (windows.isEmpty()) return 0
-        val next = windows.filter { it.start > minute }.minByOrNull { it.start }
-        return if (next != null) next.start - minute else 24 * 60 - minute + windows.minOf { it.start }
-    }
+    /** Start minute of the next allowed stretch: today if it comes, otherwise tomorrow's first. */
+    private fun nextWindow(windows: List<Window>, minute: Int): Int =
+        windows.filter { it.start > minute }.minByOrNull { it.start }?.start ?: windows.minOf { it.start }
+
+    private fun waitFor(nextStart: Int, minute: Int): Int =
+        if (nextStart > minute) nextStart - minute else 24 * 60 - minute + nextStart
 
     // ---- JSON ----
 

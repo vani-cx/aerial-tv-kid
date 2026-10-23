@@ -72,6 +72,8 @@ import app.orchard.tv.apps.AppEntry
 import app.orchard.tv.parental.Parental
 import app.orchard.tv.ui.control.ControlCenter
 import app.orchard.tv.ui.parental.AdminPrompt
+import app.orchard.tv.ui.parental.AppLockSetup
+import app.orchard.tv.ui.parental.AppUnlockGate
 import app.orchard.tv.ui.parental.KidSettingsSheet
 import app.orchard.tv.ui.parental.ParentalWallHost
 import app.orchard.tv.ui.wallpaper.WallpaperSheet
@@ -534,13 +536,17 @@ fun HomeScreen(
             anchor = menu?.anchor,
             inFolder = menu?.inFolder != null,
             folders = vm.folders(),
-            lockable = Parental.enabled,
             locked = menu?.let { vm.entry(it.key)?.packageName }?.let { Parental.lockedPackages.contains(it) } == true,
             onToggleLock = { key ->
                 val pkg = vm.entry(key)?.packageName ?: key
                 closeMenu()
-                // Changing what a child may open is a parent's move: the admin password comes first.
-                vm.whenUnlocked { Parental.toggleLocked(pkg) }
+                // Locking needs no children's mode and no admin password. The first one asks for a
+                // direction password; taking a lock off asks for it too (docs/PARENTAL.md).
+                when {
+                    pkg !in Parental.lockedPackages ->
+                        if (Parental.appComboSet) Parental.toggleLocked(pkg) else vm.overlay = Overlay.LockSetup(pkg)
+                    else -> vm.overlay = Overlay.LockConfirm(pkg)
+                }
             },
             onMove = { vm.startMove(it) },
             onHide = { key ->
@@ -602,19 +608,27 @@ fun HomeScreen(
                 vm.overlay = Overlay.None
                 onStartScreensaver()
             },
-            onPin = { on ->
-                if (on) vm.overlay = Overlay.Pin(PinMode.Create) { vm.overlay = Overlay.Wallpaper }
-                else vm.whenUnlocked { AerialSettings.choosePin(null); vm.overlay = Overlay.Wallpaper }
-            },
             onKid = { vm.whenUnlocked { vm.overlay = Overlay.Kid } },
         )
 
-        val pin = overlay as? Overlay.Pin
-        PinPad(
-            visible = pin != null,
-            mode = pin?.mode,
-            onDone = { pin?.onDone?.invoke() },
+        val lockSetup = overlay as? Overlay.LockSetup
+        AppLockSetup(
+            visible = lockSetup != null,
             onCancel = { vm.overlay = Overlay.None },
+            onLocked = {
+                lockSetup?.let { Parental.toggleLocked(it.packageName) }
+                vm.overlay = Overlay.None
+            },
+        )
+
+        val lockConfirm = overlay as? Overlay.LockConfirm
+        AppUnlockGate(
+            visible = lockConfirm != null,
+            onCancel = { vm.overlay = Overlay.None },
+            onUnlocked = {
+                lockConfirm?.let { Parental.toggleLocked(it.packageName) }
+                vm.overlay = Overlay.None
+            },
         )
 
         KidSettingsSheet(

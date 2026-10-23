@@ -25,10 +25,9 @@ app/src/main/java/app/orchard/tv/
 │   ├── home/HomeChrome.kt   背景（AmbientBackground）、大时钟、右上角状态胶囊、时间格式
 │   ├── home/Overlays.kt     长按菜单、隐藏的 App 面板、MenuRow、MiniTile
 │   ├── home/FolderView.kt   打开的文件夹
-│   ├── home/PinPad.kt       家长密码键盘（设置 / 解锁，遥控器数字键或屏幕键盘）
 │   ├── home/Screensaver.kt  屏保 UI：航拍（Media3 ExoPlayer，见 wallpaper/AerialStream.kt）/ 照片（Ken Burns）/ 时钟
-│   ├── control/ControlCenter.kt  控制中心：按钮、音量/亮度滑块、「个性化」入口、有新版本时的提示和升级说明页、底部版本号；信号源页（只负责切换）和信号源设置页（显示在主屏幕、开机时打开）
-│   └── wallpaper/WallpaperSheet.kt  个性化面板（壁纸、屏保和开始时间、焦点样式、家长密码、天气）+ 手机扫码卡片
+│   ├── control/ControlCenter.kt  控制中心：按钮、音量/亮度滑块、「个性化」入口、底部版本号（读本机包信息，不再联网查新版）；信号源页（只负责切换）和信号源设置页（显示在主屏幕、开机时打开）
+│   └── wallpaper/WallpaperSheet.kt  个性化面板（壁纸、屏保和开始时间、焦点样式、儿童与时间管理入口、天气）+ 手机扫码卡片
 ├── wallpaper/
 │   ├── Wallpapers.kt        壁纸单例：来源（每日/内置/照片/照片每天换一张/跟随App）、选择、首页背景烘焙、缩略图、上传
 │   ├── Gradients.kt         14 张 Mac 风格内置壁纸（山丘、沙丘、海、波浪、光晕），在电视上按实际分辨率画
@@ -36,18 +35,16 @@ app/src/main/java/app/orchard/tv/
 │   ├── Aerials.kt           读取 assets/aerials.json（Apple 航拍目录）；AerialFormats：这台电视能播哪档画质
 │   └── PhoneServer.kt       NanoHTTPD 手机配置页 + 二维码生成
 ├── settings/
-│   └── AerialSettings.kt    Aerial 自己的偏好（SharedPreferences "settings"）：焦点样式 FocusStyle（默认高对比度）、固定到主屏幕的信号源、开机信号源、屏保开始时间、家长密码（SHA-256，解锁 10 分钟或按 HOME 重新上锁）
+│   └── AerialSettings.kt    Aerial 自己的偏好（SharedPreferences "settings"）：焦点样式 FocusStyle（默认高对比度）、固定到主屏幕的信号源、开机信号源、屏保开始时间、界面布局开关；1.36 起不再存家长密码（旧的 pin_hash 在 init 里删掉）
 ├── parental/                儿童模式与时间管理（见 docs/PARENTAL.md、docs/SECURITY-REVIEW.md）
-│   ├── Parental.kt          状态与规则引擎：两个密码、锁定的 App、分组、verdict()、分组 JSON
+│   ├── Parental.kt          状态与规则引擎：三个密码（管理员 / 应用锁定 / 时间锁）、锁定的 App、分组、verdict()、分组 JSON
 │   ├── Secrets.kt           PBKDF2-HMAC-SHA1 60000 轮 + 随机盐，constant-time 比较
-│   ├── Usage.kt             当天的分钟数、家长放行（挂钟）、进行中的一次、上次结束时刻；按本地日期滚动
+│   ├── Usage.kt             当天的分钟数、家长放行（挂钟）、数学题买的时间、进行中的一次、休息的墙钟起点；按本地日期滚动
 │   ├── WatchService.kt      无障碍「儿童计时」：5 秒 tick 加前台组的亮屏时间（待机不算），到点拉起拦截页；FallbackClock 是无障碍未开时的降级
 │   └── BlockActivity.kt     拦截页宿主：独立任务、singleInstance、excludeFromRecents、FLAG_KEEP_SCREEN_ON
 ├── ui/parental/
-│   ├── ParentalWall.kt      拦截页 UI：Ask / Combo / Admin / Pass / Math 五步，方向盘、字符键盘、数学题、10–50 分钟滚轮
-│   └── KidSettings.kt       设置面板：根页、App 选择、分组编辑（按周内每天）、管理员密码与方向密码的门
-├── update/
-│   └── Updates.kt           每 3 小时读一次官网 download/version.txt，有新版时控制中心提示；点「下载并安装」才下载 APK 并交给系统安装器（见「升级」）
+│   ├── ParentalWall.kt      拦截页 UI：Ask / AppCombo / TimeCombo / Admin / Pass / Math / Done 七步，方向盘、字符键盘、数学题（按年龄出题）、10–50 分钟选项
+│   └── KidSettings.kt       设置面板：根页、App 选择、分组编辑（按周内每天）、三个密码的门、锁定/解除锁定的两个弹窗
 ├── weather/
 │   └── Weather.kt           时钟旁的天气：Open-Meteo 实时天气，城市来自手机页或 IP 定位
 ├── system/
@@ -60,7 +57,7 @@ app/src/main/java/app/orchard/tv/
 │   ├── RevivalListener.kt   通知监听服务：被强杀后由系统重绑，借此复活并重开守护；10 分钟内复活 3 次以上时，看不到前台就不再抢 HOME（乐视 #63）
 │   ├── RevivalSync.kt       同步适配器（挂在 settings 上，带一个自己的账号）：系统不许通知监听的低内存 Android 9（小米 MFTP0，#72）上，强停后约 30–60 秒由同步框架拉起 Aerial 并重开守护；守护在运行时什么都不做
 │   ├── BootReceiver.kt      真正重启后的兜底
-│   └── ConfigReceiver.kt    ADB 专用配置入口（keep_adb、own_screensaver、clear_pin、clear_kid、export_tiles、check_update、update_test），要求发送方持有 WRITE_SECURE_SETTINGS
+│   └── ConfigReceiver.kt    ADB 专用配置入口（keep_adb、own_screensaver、clear_kid、export_tiles、布局开关、诊断开关），要求发送方持有 WRITE_SECURE_SETTINGS
 └── dream/AerialDream.kt    系统级屏保（DreamService + Compose）
 
 app/src/main/assets/aerials.json   Apple 航拍目录（114 条：地址 + 中英文地名 + 时间点说明）
@@ -101,7 +98,7 @@ site/update/                        电视升级页二维码打开的页面：�
 - 首页每帧只允许一次全屏绘制：壁纸和压暗层在 CPU 上预先合成；窗口背景设为 null。
 - 空闲时不能有任何持续动画（测量结果是 0 帧）。
 - 模糊（`BlurEffect`）只在控制中心 / 隐藏 App 面板打开时用。
-- 面板（控制中心、个性化、长按菜单、隐藏的 App、家长密码、移动提示）都用 `Modifier.liquidGlass`：同样取模糊版壁纸里面板身后的那一块，压到一半亮度保证白字可读，再加玻璃边缘。每个面板只填一次自己的面积，和原来的纯色一样；「跟随 App」模式没有模糊版壁纸，退回原来的深色 `Palette.Glass`。
+- 面板（控制中心、个性化、长按菜单、隐藏的 App、儿童与时间管理、移动提示）都用 `Modifier.liquidGlass`：同样取模糊版壁纸里面板身后的那一块，压到一半亮度保证白字可读，再加玻璃边缘。每个面板只填一次自己的面积，和原来的纯色一样；「跟随 App」模式没有模糊版壁纸，退回原来的深色 `Palette.Glass`。
 - 加任何全屏效果前，先测：`adb shell dumpsys gfxinfo app.orchard.tv framestats`。
 - 一定要装 release 版，并执行 `cmd package compile -m speed -f app.orchard.tv`。debug 版的 Compose 在电视上明显卡顿。
 
@@ -130,9 +127,9 @@ Logo 的大小统一：先在 256×256 的采样里找出 Logo 的范围，再�
 
 ## 个性化：壁纸、屏保、焦点样式、天气
 
-控制中心的「个性化」打开 `WallpaperSheet`，按「看得到的效果」从上到下分组：壁纸（缩略图行）、主屏幕（布局、时钟、焦点样式、按键声音、隐藏的 App）、屏幕保护程序（类型和立即开始、开始时间）、天气（只读）、家长密码。除壁纸外都是 tvOS 设置那样的分组卡片，一行一个设置，左边名称、右边选项；每组下面一条说明，跟着组里聚焦的那一行变（`Group` / `SettingRow`），说明区固定两行高，焦点移动时面板不跳。天气的城市在手机页设置。右边是手机扫码卡片。焦点移到最后一行「家长密码」时，面板滚到底，让它下面的说明也露出来。
+控制中心的「个性化」打开 `WallpaperSheet`，按「看得到的效果」从上到下分组：壁纸（缩略图行）、主屏幕（布局、时钟、焦点样式、按键声音、隐藏的 App）、屏幕保护程序（类型和立即开始、开始时间）、天气（只读）、儿童与时间管理（点进去是 `KidSettingsSheet`，要管理员密码）。除壁纸外都是 tvOS 设置那样的分组卡片，一行一个设置，左边名称、右边选项；每组下面一条说明，跟着组里聚焦的那一行变（`Group` / `SettingRow`），说明区固定两行高，焦点移动时面板不跳。天气的城市在手机页设置。右边是手机扫码卡片。焦点移到最后一行时，面板滚到底，让它下面的说明也露出来。
 
-「隐藏的 App」从控制中心挪到了这里：点开是原来的 `HiddenAppsSheet`，返回回到个性化；设了家长密码时先输密码。
+「隐藏的 App」从控制中心挪到了这里：点开是原来的 `HiddenAppsSheet`，返回回到个性化；设了管理员密码时先输密码（`HomeViewModel.whenUnlocked`）。
 
 ## 按键声音
 
@@ -160,15 +157,13 @@ NanoHTTPD 监听 8790 端口，路径前缀是 8 位随机令牌（每次打开�
 - **文件夹**（像 tvOS）：长按菜单「移到文件夹」→ 选已有的文件夹或「新建文件夹」。新文件夹占这个 App 原来的位置，名字按 App 自动起（系统 App 叫「系统应用」，其他叫「文件夹」，重名加数字），可在文件夹的长按菜单里从预设名字（`folder_names`）中改；电视上没有好用的输入法，所以不做自由输入。文件夹在 `LayoutStore` 的排序里占一个 `folder:<id>` 键，里面的 App 不再出现在排序里；存成 JSON（`folders`），只记包名。文件夹磁贴是 `folderEntry`，画面是 `TileArtFactory.forFolder`：半透明底板上三乘三排最多九个 App 的缩略图，只在里面的 App 变了时重画。打开文件夹是全屏的 `FolderView`：主屏模糊变暗，上面是名字和同样大小的磁贴；在里面长按，菜单第一项是「移出文件夹」（放到文件夹后面）而不是「移动」，关掉菜单回到文件夹。最后一个 App 移出后文件夹自动消失；「解散文件夹」把里面的 App 按顺序放回文件夹的位置。浮层（菜单、文件夹）关闭时，Compose 会先把焦点交给浮层下面的磁贴，所以打开时记下要回到哪个磁贴（`focusAfterOverlay`、`FolderView` 的 `menuKey`）。小米 MFTR0 上验证过：新建、放入、打开、文件夹里的菜单、重命名、移出、解散，测完排列和原来一样。
 - **天气**（`Weather`）：Open-Meteo 的实时天气接口和地名查询接口都不需要 Key，国内能访问。城市优先用手机页里设置的；没设置时用 ipinfo.io 按 IP 定位，每天最多一次。整个家庭网络走代理时 IP 定位会定到别的国家（家里的网络就会定到新加坡），所以手机页会显示定位结果，让用户改。回到主页时刷新，最多每小时一次；最近一次结果缓存 3 小时，开机后先显示缓存。老系统不信任 Let's Encrypt 的根证书，HTTPS 失败时改用 HTTP（`network_security_config.xml` 只对这几个域名放行明文）。
 
-## 升级（update/Updates.kt）
+## 升级
 
-控制中心「有新版本」→ 升级页：
+**Aerial 自己不再检查、也不下载更新**（1.36 删掉了 `update/Updates.kt` 与整个升级页）。控制中心只显示版本号，而且是从本机包信息读的（`ControlCenter.appVersion`），所以它连一次网络请求都不发。
 
-- **下载并安装**：先从官网 `download/aerial-<flavor>.apk` 下载，失败再从 GitHub `releases/latest/download`（不用第三方 GitHub 代理）。下载后检查包名、签名（和这台电视上的 Aerial 比）和 versionCode，不对就不打开安装器，并在页上说明原因（`Updates.Failure`）。改过包名的版本（OPPO）不显示按钮。
-- **交给系统安装器**：用 `ACTION_VIEW` + FileProvider（`res/xml/update_files.xml`，Android 7 以下用 `file://`）打开系统安装器，不用 PackageInstaller session：TCL 的安装校验只放行由 `com.android.packageinstaller` 发起的安装，`ACTION_VIEW` 时发起者就是系统安装器（和当贝一样）。要 `REQUEST_INSTALL_PACKAGES`：小米有「安装未知应用」设置页，没开时跳过去；TCL 没有这个页面，靠 `install.sh` 用 `appops set … REQUEST_INSTALL_PACKAGES allow` 放行。
-- **装完回到 Aerial**：安装会杀掉 Aerial 的任务，露出底下的东西（小米上是 PatchWall 的详情页，不是原桌面的 HOME Activity，守护原来的规则不管）。所以打开安装器前记下时间（`GuardSetup.noteInstallerOpened`，用 commit 立刻写盘），新进程的守护在 15 分钟内看到原桌面的任意页面就拉回 Aerial；在安装器里取消、回到 Aerial 时清掉这个记录。
-- **二维码**：装不上的电视（以及 1.31 及以前的版本）还是要再运行一次安装命令。升级页不再显示长命令，而是一个二维码，打开 `https://aerial.qust.me/update/#v=…&f=…&tv=<局域网IP>`（参数放在 `#` 后面，浏览器不会发给服务器），页面上先是 Agent 提示词，再是电视上的按钮说明和可复制的安装命令。
-- 测试：`ConfigReceiver --ez check_update true` 立刻检查新版本；`--ez update_test true` 让「下载并安装」改用 `Android/data/app.orchard.tv/files/update-test.apk`（到 Aerial 重启为止），发版前就能测整条流程。做法：装一个只把 `versionName` 改低的包，推一个带新代码的包当 update-test.apk。
+删掉的原因有两条：一是这个分支的主人是自己打包装电视，官网的版本号对他没有意义；二是少一条"能把新 APK 交给系统安装器"的通道，家长控制的分支不该带着这个能力（见 `docs/SECURITY-REVIEW.md` 3.4）。
+
+升级怎么做：重新构建，用 `tools/install.sh` 或 `adb install -r` 覆盖安装。注意**签名必须一致**，否则装不上（要卸载重装，`clear_kid` 之后所有数据和密码都会没）。
 
 ## 诊断报告（system/Diagnostics.kt）
 

@@ -40,7 +40,7 @@ Made for the Xiaomi, TCL and other TVs sold in China. It starts at boot and surv
 - **Screensaver**: Apple TV's 114 aerial films, in 4K or 4K Dolby Vision where the TV supports it, or your photos, or a clock.
 - **Wallpaper**: Bing's photo of the day, fourteen built-ins, photos you upload by scanning a code with your phone, or aerial films that play behind the apps after ten still seconds on Home and stop on the frame showing at any key.
 - **Personalize**: one or two rows, clock size and corner, app names, focus style and key sounds.
-- **Parental controls** (this branch): locked apps need a D-pad combination before they open; a group of apps gets a daily budget, a per-session limit, a rest between sessions and allowed hours, set per weekday. When time runs out a full-screen wall offers a maths question for five more minutes, or a parent's password for ten to fifty. See [docs/PARENTAL.md](docs/PARENTAL.md) and the security review in [docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md).
+- **Parental controls** (this branch, redesigned in 1.36): hold OK on any app to lock it. The first lock asks for a D-pad password right there, with or without Children's Mode on; the password covers one visit, and going Home, switching apps or switching the TV off locks it again. A group of apps gets a daily budget, a per-session limit, a rest between sessions and allowed hours, set per weekday. The wall speaks to the child: outside the hours it says it is still early, and a maths question buys fifteen minutes once a day; when a session runs out it says "you have watched a long time", counts the rest down by the clock (leaving and coming back does not restart it), and a maths question buys five more; when the day is gone there is no question left, only "call a grown-up" - the time password, then ten to fifty minutes. The questions follow the child's age set in Settings. See [docs/PARENTAL.md](docs/PARENTAL.md) and the security review in [docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md).
 
 <p align="center">
   <img src="site/img/folder.jpg" width="49%" alt="An open folder">
@@ -107,7 +107,7 @@ adb shell am start -n app.orchard.tv/.MainActivity
 
 On Windows, use an agent, or follow the Windows steps in the [install guide](site/en/agent.md).
 
-**Updating**: from 1.32, Control Center shows New Version when there is one; choose Download and Install there and confirm in the TV's own installer (checked on Xiaomi and TCL). Aerial comes back afterwards with every setting kept. On TVs that do not let apps install apps, updating means running the install command again: the update page has a QR code that opens this TV's command on a phone, ready to copy or to hand to an agent. 1.31 and earlier have no such button, so this once, run the install command again.
+**Updating**: this branch has **no in-app update check at all** - Control Center shows the version from the installed package, with no network call, no download, and no permission to install apps. Rebuild and install over the old one with `tools/install.sh` or `adb install -r`; the signature must match, and settings and passwords are kept.
 
 ### Undo
 

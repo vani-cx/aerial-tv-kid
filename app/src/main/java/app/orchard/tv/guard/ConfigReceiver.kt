@@ -6,20 +6,15 @@ import android.content.Intent
 import app.orchard.tv.apps.TileSheet
 import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.system.DiagLog
-import app.orchard.tv.update.Updates
 import kotlinx.coroutines.launch
 
 /**
  * Options set from a computer over ADB, e.g.
  *   adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver --ez keep_adb true
  *   ... --ez own_screensaver true   (keep Aerial as the system screensaver; see GuardSetup)
- *   ... --ez clear_pin true         (turn the parental PIN off, for an owner who forgot it)
  *   ... --ez clear_kid true         (forget both parental passwords, locked apps and time limits)
  *   ... --ez large_clock true --ez clock_right false --ez one_row_home true
  *                                   (Home's layout, as in Personalize; for screenshots of each)
- *   ... --ez check_update true      (look for a new version now, not within three hours)
- *   ... --ez update_test true       ("Download and Install" takes files/update-test.apk instead,
- *                                   until Aerial restarts; for trying an update before a release)
  * The manifest requires the sender to hold WRITE_SECURE_SETTINGS, which the ADB shell has and
  * ordinary apps cannot get, so no other app on the TV can flip these.
  */
@@ -36,17 +31,15 @@ class ConfigReceiver : BroadcastReceiver() {
             resultData = "exporting $name"
             return
         }
-        if (intent.getBooleanExtra("clear_pin", false)) {
-            AerialSettings.init(context)
-            AerialSettings.choosePin(null)
-        }
         // The parental passwords are hashed with PBKDF2 and cannot be recovered, by design. An owner
         // who forgets them clears the whole feature from a computer; this is the way back in.
         if (intent.getBooleanExtra("clear_kid", false)) {
             app.orchard.tv.parental.Parental.init(context)
             app.orchard.tv.parental.Parental.chooseEnabled(false)
             app.orchard.tv.parental.Parental.clearAdmin()
-            app.orchard.tv.parental.Parental.clearCombo()
+            app.orchard.tv.parental.Parental.clearAppCombo()
+            app.orchard.tv.parental.Parental.clearKidCombo()
+            app.orchard.tv.parental.Parental.chooseKidComboSame(true)
             app.orchard.tv.parental.Parental.chooseLocked(emptySet())
             app.orchard.tv.parental.Parental.groups.forEach { app.orchard.tv.parental.Parental.removeGroup(it.id) }
             GuardSetup.releaseWatch(context)
@@ -62,15 +55,6 @@ class ConfigReceiver : BroadcastReceiver() {
         if (intent.hasExtra("diag")) DiagLog.setEnabled(context, intent.getBooleanExtra("diag", false))
         for (key in listOf("mode_switch", "soft_layer")) {
             if (intent.hasExtra(key)) DiagLog.setOption(context, key, intent.getBooleanExtra(key, false))
-        }
-        if (intent.hasExtra("update_test")) {
-            Updates.testApk = if (intent.getBooleanExtra("update_test", false)) {
-                java.io.File(context.getExternalFilesDir(null) ?: context.filesDir, "update-test.apk")
-            } else null
-        }
-        if (intent.getBooleanExtra("check_update", false)) {
-            Updates.init(context)
-            Updates.checkIfStale(force = true)
         }
         if (intent.hasExtra("keep_adb")) GuardSetup.setKeepAdb(context, intent.getBooleanExtra("keep_adb", false))
         if (intent.hasExtra("own_screensaver")) GuardSetup.setOwnScreensaver(context, intent.getBooleanExtra("own_screensaver", false))

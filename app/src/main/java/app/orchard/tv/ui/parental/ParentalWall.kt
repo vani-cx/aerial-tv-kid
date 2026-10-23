@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,7 +39,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.foundation.focusable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.key.KeyEvent
@@ -58,6 +58,8 @@ import app.orchard.tv.parental.Parental
 import app.orchard.tv.parental.Reason
 import app.orchard.tv.parental.Usage
 import app.orchard.tv.parental.Verdict
+import app.orchard.tv.parental.clock
+import app.orchard.tv.parental.minuteOfDay
 import app.orchard.tv.ui.components.Pressable
 import app.orchard.tv.ui.theme.Glyph
 import app.orchard.tv.ui.theme.GlyphIcon
@@ -71,8 +73,9 @@ import kotlinx.coroutines.withContext
 import kotlin.random.Random
 
 /**
- * The block screen: why the app stopped, then the way out — the maths question (five minutes, once
- * a session), a parent's password (10…50 minutes), or the direction combo for a locked app.
+ * The block screen: why the app stopped, then the way out — the maths question (15 minutes outside
+ * the allowed hours, 5 after a rest), the time password (10…50 minutes), or the app password for a
+ * locked app.
  *
  * Compose UI on Aerial's 960×540 canvas, hosted by [app.orchard.tv.parental.BlockActivity] over an
  * app that is already playing, and by HomeScreen as an overlay before an app opens.
@@ -93,16 +96,23 @@ fun ParentalWallHost(
     var wrongAdmin by remember { mutableStateOf(false) }
     var wrongMath by remember { mutableStateOf(false) }
     var waitSec by remember { mutableStateOf(0L) }
+    var question by remember { mutableStateOf(newQuestion(Parental.childAge)) }
+    /** What the child has typed into the maths box so far. */
+    var entered by remember { mutableStateOf("") }
+    /** Stops the one-second re-check while the "you may watch" note is on screen. */
+    var holding by remember { mutableStateOf(false) }
+    var noteRes by remember { mutableStateOf(R.string.kid_wall_note_rest) }
+    var noteMinutes by remember { mutableStateOf(Parental.REST_QUIZ_MINUTES) }
     val scope = rememberCoroutineScope()
     val rootFocus = remember { FocusRequester() }
     val firstAction = remember { FocusRequester() }
 
-    // The rules move while the wall is up: a break ends, a pass runs out, a parent opens the app
-    // from elsewhere. One look a second closes the wall by itself when it no longer applies.
+    // The rules move while the wall is up: a rest ends, a pass runs out. One look a second closes
+    // the wall by itself when it no longer applies.
     LaunchedEffect(pkg) {
         while (true) {
             val now = Parental.verdict(pkg)
-            if (now is Verdict.Allow) {
+            if (now is Verdict.Allow && !holding) {
                 onAllowed()
                 return@LaunchedEffect
             }
@@ -112,21 +122,33 @@ fun ParentalWallHost(
         }
     }
 
-    // A locked app asks for the combo straight away; a spent budget explains itself first.
+    // A locked app asks for its password straight away; a spent budget explains itself first.
     LaunchedEffect(pkg) {
-        if (lockMode && Parental.comboSet) step = Step.Combo
+        if (lockMode) step = Step.AppCombo
     }
 
     // The pad, the keypad and the buttons all take focus through this: the step decides who gets it.
     LaunchedEffect(step) {
         withFrameNanos { }
-        if (step == Step.Combo) runCatching { rootFocus.requestFocus() }
-        if (step == Step.Ask || step == Step.Math || step == Step.Pass) runCatching { firstAction.requestFocus() }
+        when (step) {
+            Step.AppCombo, Step.TimeCombo -> runCatching { rootFocus.requestFocus() }
+            Step.Math, Step.Done -> Unit
+            else -> runCatching { firstAction.requestFocus() }
+        }
+    }
+
+    // The note after a right answer stays a moment, then the app opens.
+    LaunchedEffect(step) {
+        if (step == Step.Done) {
+            delay(2_600)
+            onAllowed()
+        }
     }
 
     BackHandler {
         when (step) {
             Step.Ask -> onCancel()
+            Step.Done -> Unit
             else -> {
                 step = Step.Ask
                 combo = emptyList()
@@ -148,12 +170,18 @@ fun ParentalWallHost(
 
     fun submitCombo(dirs: List<Dir>) {
         scope.launch {
-            val ok = withContext(Dispatchers.Default) { Parental.verifyCombo(dirs) }
+            val ok = withContext(Dispatchers.Default) {
+                if (step == Step.AppCombo) Parental.verifyAppCombo(dirs) else Parental.verifyKidCombo(dirs)
+            }
             combo = emptyList()
             if (ok) {
-                Parental.markAppUnlocked(pkg)
                 wrongCombo = false
-                allowIfPossible()
+                if (step == Step.AppCombo) {
+                    Parental.markAppUnlocked(pkg)
+                    allowIfPossible()
+                } else {
+                    step = Step.Pass
+                }
             } else {
                 wrongCombo = true
                 waitSec = Parental.waitMs() / 1000
@@ -175,13 +203,35 @@ fun ParentalWallHost(
         }
     }
 
+    fun answerMath(right: Boolean) {
+        if (!right) {
+            wrongMath = true
+            entered = ""
+            question = newQuestion(Parental.childAge)
+            return
+        }
+        holding = true
+        val quiz = blocked ?: return
+        // Outside the hours: wall-clock minutes that override the window. After a rest: five more
+        // minutes inside the session, which counts towards the day like everything else.
+        if (quiz.reason == Reason.Window) {
+            Usage.grantWindowQuiz(quiz.group.id, quiz.quizMinutes)
+            noteRes = if (quiz.quizMinutes == Parental.WINDOW_QUIZ_MINUTES) R.string.kid_wall_note_window else R.string.kid_wall_note_rest
+        } else {
+            Usage.grantRestQuiz(quiz.group.id, quiz.quizMinutes)
+            noteRes = R.string.kid_wall_note_rest
+        }
+        noteMinutes = quiz.quizMinutes
+        step = Step.Done
+    }
+
     fun onKey(e: KeyEvent): Boolean {
         if (e.type != KeyEventType.KeyDown) return false
         val code = e.nativeKeyEvent.keyCode
         when (step) {
-            Step.Combo -> {
+            Step.AppCombo, Step.TimeCombo -> {
                 if (e.nativeKeyEvent.repeatCount > 0) return false
-                val length = Parental.comboLength
+                val length = if (step == Step.AppCombo) Parental.appComboLength else Parental.kidComboLengthShown
                 when (code) {
                     NativeKeyEvent.KEYCODE_DPAD_UP -> combo = add(combo, Dir.Up, length)
                     NativeKeyEvent.KEYCODE_DPAD_DOWN -> combo = add(combo, Dir.Down, length)
@@ -201,6 +251,19 @@ fun ParentalWallHost(
                 password = next
                 return true
             }
+            Step.Math -> {
+                when {
+                    code in NativeKeyEvent.KEYCODE_0..NativeKeyEvent.KEYCODE_9 -> {
+                        // Three boxes: the largest answer here is 188 (89 + 99).
+                        if (entered.length < 3) entered += '0' + (code - NativeKeyEvent.KEYCODE_0)
+                    }
+                    code == NativeKeyEvent.KEYCODE_DEL -> entered = entered.dropLast(1)
+                    code == NativeKeyEvent.KEYCODE_DPAD_CENTER || code == NativeKeyEvent.KEYCODE_ENTER ||
+                        code == NativeKeyEvent.KEYCODE_NUMPAD_ENTER -> answerMath(entered.toIntOrNull() == question.answer)
+                    else -> return false
+                }
+                return true
+            }
             else -> return false
         }
     }
@@ -214,12 +277,13 @@ fun ParentalWallHost(
             .onPreviewKeyEvent(::onKey),
         contentAlignment = Alignment.Center,
     ) {
-        Panel(width = if (step == Step.Admin) 700.dp else 640.dp) {
+        Panel(width = if (step == Step.Admin) 700.dp else 660.dp) {
             GlyphIcon(
                 when (step) {
-                    Step.Combo -> Glyph.Switches
+                    Step.AppCombo, Step.TimeCombo -> Glyph.Switches
                     Step.Admin -> Glyph.Shield
                     Step.Math -> Glyph.Check
+                    Step.Done -> Glyph.Check
                     else -> Glyph.Moon
                 },
                 Palette.SecondaryLabel, 28.dp,
@@ -230,22 +294,49 @@ fun ParentalWallHost(
                     verdict = verdict,
                     appLabel = appLabel,
                     firstAction = firstAction,
-                    onMath = { wrongMath = false; step = Step.Math },
-                    onCombo = { wrongCombo = false; combo = emptyList(); step = Step.Combo },
-                    onParent = { wrongAdmin = false; password = ""; step = Step.Admin },
+                    onMath = {
+                        wrongMath = false
+                        entered = ""
+                        question = newQuestion(Parental.childAge)
+                        step = Step.Math
+                    },
+                    onEnter = { wrongCombo = false; combo = emptyList(); step = Step.AppCombo },
+                    onParent = {
+                        wrongCombo = false
+                        wrongAdmin = false
+                        password = ""
+                        combo = emptyList()
+                        step = if (Parental.kidDoorSet) Step.TimeCombo else Step.Admin
+                    },
                     onHome = onCancel,
                 )
 
-                Step.Combo -> ComboPad(
+                Step.AppCombo -> ComboPad(
+                    title = stringResource(R.string.kid_wall_locked_title),
+                    hint = stringResource(R.string.kid_wall_locked_body, appLabel),
                     entered = combo,
-                    length = Parental.comboLength,
+                    length = Parental.appComboLength,
                     error = when {
                         waitSec > 0 -> waitMessage(LocalContext.current, waitSec)
                         wrongCombo -> stringResource(R.string.kid_combo_wrong)
                         else -> null
                     },
-                    onTap = { dir -> combo = add(combo, dir, Parental.comboLength) },
-                    onConfirm = { if (combo.size == Parental.comboLength) submitCombo(combo) },
+                    onTap = { dir -> combo = add(combo, dir, Parental.appComboLength) },
+                    onConfirm = { if (combo.size == Parental.appComboLength) submitCombo(combo) },
+                )
+
+                Step.TimeCombo -> ComboPad(
+                    title = stringResource(R.string.kid_wall_time_title),
+                    hint = stringResource(R.string.kid_wall_time_hint),
+                    entered = combo,
+                    length = Parental.kidComboLengthShown,
+                    error = when {
+                        waitSec > 0 -> waitMessage(LocalContext.current, waitSec)
+                        wrongCombo -> stringResource(R.string.kid_combo_wrong)
+                        else -> null
+                    },
+                    onTap = { dir -> combo = add(combo, dir, Parental.kidComboLengthShown) },
+                    onConfirm = { if (combo.size == Parental.kidComboLengthShown) submitCombo(combo) },
                 )
 
                 Step.Admin -> AdminPad(
@@ -270,21 +361,30 @@ fun ParentalWallHost(
                 )
 
                 Step.Math -> MathPad(
+                    question = question,
+                    entered = entered,
                     wrong = wrongMath,
-                    firstAction = firstAction,
-                    onWrong = { wrongMath = true },
-                    onRight = {
-                        group?.let { Usage.extendSession(it.id, 5) }
-                        allowIfPossible()
-                    },
+                    onDigit = { if (entered.length < 3) entered += it },
+                    onDelete = { entered = entered.dropLast(1) },
+                    onSubmit = { answerMath(entered.toIntOrNull() == question.answer) },
                 )
+
+                Step.Done -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    BasicText(stringResource(R.string.kid_wall_note_title), style = Type.LargeTitle.copy(textAlign = TextAlign.Center))
+                    Spacer(Modifier.height(10.dp))
+                    BasicText(
+                        stringResource(noteRes, noteMinutes),
+                        style = Type.Body.copy(color = Palette.SecondaryLabel, textAlign = TextAlign.Center),
+                    )
+                }
             }
             Spacer(Modifier.height(14.dp))
             BasicText(
                 when (step) {
-                    Step.Ask -> stringResource(if (Parental.adminSet) R.string.kid_wall_ask_hint else R.string.kid_wall_no_admin)
-                    Step.Combo -> stringResource(R.string.kid_combo_hint)
+                    Step.Ask -> stringResource(R.string.kid_wall_ask_hint)
+                    Step.AppCombo, Step.TimeCombo -> stringResource(R.string.kid_combo_hint)
                     Step.Pass -> stringResource(R.string.kid_wall_pick_minutes_hint)
+                    Step.Math -> stringResource(R.string.kid_math_hint)
                     else -> stringResource(R.string.kid_wall_back_hint)
                 },
                 style = Type.Caption.copy(textAlign = TextAlign.Center),
@@ -293,7 +393,7 @@ fun ParentalWallHost(
     }
 }
 
-private enum class Step { Ask, Combo, Admin, Pass, Math }
+private enum class Step { Ask, AppCombo, TimeCombo, Admin, Pass, Math, Done }
 
 internal fun typeChar(password: String, ch: Char): String =
     if (password.length < Parental.ADMIN_LENGTH) password + ch else password
@@ -331,6 +431,9 @@ internal fun waitMessage(context: Context, waitSec: Long): String =
     if (waitSec >= 60) context.getString(R.string.kid_wait_minutes, ((waitSec + 59) / 60).toInt())
     else context.getString(R.string.kid_admin_wait, waitSec)
 
+/** "07:30" for a rest countdown. */
+internal fun restClock(seconds: Int): String = "%02d:%02d".format(seconds / 60, seconds % 60)
+
 @Composable
 private fun Panel(width: Dp, content: @Composable ColumnScope.() -> Unit) {
     Column(
@@ -345,17 +448,6 @@ private fun Panel(width: Dp, content: @Composable ColumnScope.() -> Unit) {
     )
 }
 
-/** "25 minutes" / "1 hour 5 minutes", for the numbers the rules talk in. */
-@Composable
-private fun duration(seconds: Int): String {
-    val minutes = (seconds + 59) / 60
-    return when {
-        minutes < 60 -> stringResource(R.string.kid_minutes, minutes)
-        minutes % 60 == 0 -> stringResource(R.string.kid_hours, minutes / 60)
-        else -> stringResource(R.string.kid_hours_minutes, minutes / 60, minutes % 60)
-    }
-}
-
 /** The message and the ways out, for the rule that is in force. */
 @Composable
 private fun ColumnScope.Ask(
@@ -363,64 +455,107 @@ private fun ColumnScope.Ask(
     appLabel: String,
     firstAction: FocusRequester,
     onMath: () -> Unit,
-    onCombo: () -> Unit,
+    onEnter: () -> Unit,
     onParent: () -> Unit,
     onHome: () -> Unit,
 ) {
     val blocked = verdict as? Verdict.Blocked
     val locked = verdict is Verdict.Locked
-    val title = when {
-        blocked == null || locked -> stringResource(R.string.kid_wall_locked_title)
-        blocked.reason == Reason.Daily -> stringResource(R.string.kid_wall_daily_title)
-        blocked.reason == Reason.Session -> stringResource(R.string.kid_wall_session_title)
-        blocked.reason == Reason.Break -> stringResource(R.string.kid_wall_break_title)
-        else -> stringResource(R.string.kid_wall_window_title)
+    val reason = blocked?.reason
+    val context = LocalContext.current
+    val nowMinute = minuteOfDay(System.currentTimeMillis())
+
+    val title: String
+    val body: String
+    when {
+        locked || blocked == null -> {
+            title = stringResource(R.string.kid_wall_locked_title)
+            body = stringResource(R.string.kid_wall_locked_body, appLabel)
+        }
+        reason == Reason.Daily -> {
+            title = stringResource(R.string.kid_wall_daily_title)
+            body = stringResource(R.string.kid_wall_daily_body)
+        }
+        reason == Reason.Break -> {
+            title = stringResource(R.string.kid_wall_break_title)
+            body = if (blocked.restSec > 0) {
+                stringResource(R.string.kid_wall_break_body, restClock(blocked.restSec))
+            } else {
+                stringResource(R.string.kid_wall_break_body_no_clock)
+            }
+        }
+        else -> {
+            // Outside the allowed hours: which line depends on when the next stretch starts.
+            val next = blocked.nextAtMinute
+            val tomorrow = next <= nowMinute
+            val hour = nowMinute / 60
+            title = when {
+                tomorrow -> stringResource(R.string.kid_wall_late_title)
+                hour in 12..13 -> stringResource(R.string.kid_wall_nap_title)
+                hour < 12 -> stringResource(R.string.kid_wall_early_title)
+                else -> stringResource(R.string.kid_wall_later_title)
+            }
+            body = when {
+                tomorrow -> stringResource(R.string.kid_wall_late_body, clock(next))
+                hour in 12..13 -> stringResource(R.string.kid_wall_nap_body)
+                hour < 12 -> stringResource(R.string.kid_wall_early_body)
+                else -> stringResource(R.string.kid_wall_later_body, clock(next))
+            }
+        }
     }
-    val body = when {
-        blocked == null || locked -> stringResource(R.string.kid_wall_locked_body, appLabel)
-        blocked.reason == Reason.Daily -> stringResource(
-            R.string.kid_wall_daily_body, appLabel, duration(blocked.usedSec), duration(blocked.limitMinutes * 60),
-        )
-        blocked.reason == Reason.Session -> stringResource(
-            R.string.kid_wall_session_body, appLabel, duration(blocked.usedSec), duration(blocked.limitMinutes * 60),
-        )
-        blocked.reason == Reason.Break -> stringResource(R.string.kid_wall_break_body, appLabel, duration(blocked.waitMinutes * 60))
-        else -> stringResource(R.string.kid_wall_window_body, appLabel, duration(blocked.waitMinutes * 60))
-    }
+
     BasicText(title, style = Type.LargeTitle.copy(textAlign = TextAlign.Center))
     Spacer(Modifier.height(8.dp))
     BasicText(body, style = Type.Body.copy(color = Palette.SecondaryLabel, textAlign = TextAlign.Center))
-
-    val sessionGroup = if (blocked?.reason == Reason.Session) blocked?.group else null
-    val quizLeft = sessionGroup != null && !Usage.quizUsed(sessionGroup.id)
-    val comboOffered = locked && Parental.comboSet
-    val parentOffered = Parental.adminSet
+    if (reason == Reason.Break && blocked.restSec > 0) {
+        Spacer(Modifier.height(10.dp))
+        BasicText(
+            stringResource(R.string.kid_wall_rest_left, restClock(blocked.restSec)),
+            style = Type.Clock.copy(fontSize = 30.sp, lineHeight = 34.sp),
+        )
+    }
 
     Spacer(Modifier.height(20.dp))
     Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         var firstTaken = false
         fun nextRequester(): FocusRequester? = if (firstTaken) null else { firstTaken = true; firstAction }
 
-        if (quizLeft) {
-            WallButton(stringResource(R.string.kid_wall_math), primary = true, focusRequester = nextRequester(), onClick = onMath)
-        } else if (blocked?.reason == Reason.Session) {
-            BasicText(stringResource(R.string.kid_wall_math_used), style = Type.Caption.copy(color = Palette.TertiaryLabel))
-        }
-        if (comboOffered) {
-            WallButton(stringResource(R.string.kid_wall_combo), primary = blocked == null, focusRequester = nextRequester(), onClick = onCombo)
-        }
-        if (parentOffered) {
+        val quiz = blocked != null && blocked.offerQuiz
+        if (quiz) {
             WallButton(
-                stringResource(R.string.kid_wall_parent),
-                primary = blocked != null && !quizLeft && !comboOffered,
+                stringResource(R.string.kid_wall_math),
+                primary = true,
                 focusRequester = nextRequester(),
-                onClick = onParent,
+                onClick = onMath,
             )
+        }
+        if (locked) {
+            WallButton(
+                stringResource(R.string.kid_wall_locked_enter),
+                primary = true,
+                focusRequester = nextRequester(),
+                onClick = onEnter,
+            )
+        }
+        if (blocked != null && (Parental.kidDoorSet || Parental.adminSet)) {
+            WallButton(stringResource(R.string.kid_wall_parent), primary = blockedOfferPrimary(blocked), focusRequester = nextRequester(), onClick = onParent)
         }
         // Always the way out: Back does the same thing, but a child should not have to guess.
         WallButton(stringResource(R.string.kid_wall_home), focusRequester = nextRequester(), onClick = onHome)
     }
+
+    if (reason == Reason.Daily) {
+        Spacer(Modifier.height(12.dp))
+        BasicText(
+            stringResource(R.string.kid_wall_daily_hint),
+            style = Type.Caption.copy(color = Palette.TertiaryLabel, textAlign = TextAlign.Center),
+        )
+    }
 }
+
+/** The parent's button leads when the child cannot ask for time here. */
+private fun blockedOfferPrimary(blocked: Verdict.Blocked): Boolean =
+    !blocked.offerQuiz && blocked.reason != Reason.Daily
 
 @Composable
 private fun WallButton(
@@ -449,32 +584,30 @@ private fun WallButton(
 // ---- The direction combo ----
 
 /**
- * The pad for the combo. Every direction key is taken at the wall's root before the focus system
- * sees it (see [ParentalWallHost]'s onKey), so the arrows here are only a target for a finger and
+ * The pad for a combo. Every direction key is taken at the wall's root before the focus system sees
+ * it (see [ParentalWallHost]'s onKey), so the arrows here are only a target for a finger and
  * deliberately cannot take focus: the D-pad must never land on them.
  */
 @Composable
 internal fun ComboPad(
+    title: String,
+    hint: String,
     entered: List<Dir>,
     length: Int,
     error: String?,
     onTap: (Dir) -> Unit,
     onConfirm: () -> Unit,
-    /** False when the caller already draws its own title and hint (the settings gate does). */
-    showHeader: Boolean = true,
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        if (showHeader) {
-            BasicText(stringResource(R.string.kid_combo_title), style = Type.LargeTitle)
-            Spacer(Modifier.height(6.dp))
-            BasicText(
-                error ?: stringResource(R.string.kid_combo_hint),
-                style = Type.Caption.copy(color = if (error != null) Palette.Red else Palette.SecondaryLabel, textAlign = TextAlign.Center),
-            )
-        }
+        BasicText(title, style = Type.LargeTitle)
+        Spacer(Modifier.height(6.dp))
+        BasicText(
+            error ?: hint,
+            style = Type.Caption.copy(color = if (error != null) Palette.Red else Palette.SecondaryLabel, textAlign = TextAlign.Center),
+        )
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            repeat(length) { i ->
+            repeat(length.coerceAtLeast(1)) { i ->
                 val dir = entered.getOrNull(i)
                 Box(
                     Modifier.size(34.dp).clip(CircleShape)
@@ -638,64 +771,141 @@ private fun KeyCap(
 
 // ---- The maths question ----
 
-private class Question(val a: Int, val b: Int, val op: Char, val answer: Int, val options: List<Int>) {
-    val text: String get() = "$a $op $b = ?"
+internal class Question(val text: String, val answer: Int)
+
+/**
+ * One question for the child's age, as the owner asked: the maths gets harder as the child grows.
+ * 3–5 counts to ten, 6–7 to twenty, 8–9 adds and subtracts within a hundred and knows the tables,
+ * 10–12 divides and takes two steps.
+ */
+internal fun newQuestion(age: Int, random: Random = Random.Default): Question {
+    fun q(text: String, answer: Int) = Question(text, answer)
+    return when {
+        age <= 5 -> {
+            if (random.nextBoolean()) {
+                val a = (1..9).random(random)
+                val b = (1..(10 - a)).random(random)
+                q("$a + $b = ?", a + b)
+            } else {
+                val a = (2..10).random(random)
+                val b = (0..a).random(random)
+                q("$a - $b = ?", a - b)
+            }
+        }
+        age <= 7 -> {
+            if (random.nextBoolean()) {
+                val a = (2..15).random(random)
+                val b = (2..(20 - a).coerceAtLeast(2)).random(random)
+                q("$a + $b = ?", a + b)
+            } else {
+                val a = (9..20).random(random)
+                val b = (2..a).random(random)
+                q("$a - $b = ?", a - b)
+            }
+        }
+        age <= 9 -> {
+            when (random.nextInt(3)) {
+                0 -> {
+                    val a = (12..79).random(random)
+                    val b = (5..(99 - a).coerceAtLeast(5)).random(random)
+                    q("$a + $b = ?", a + b)
+                }
+                1 -> {
+                    val a = (21..99).random(random)
+                    val b = (2..a).random(random)
+                    q("$a - $b = ?", a - b)
+                }
+                else -> {
+                    val a = (2..9).random(random)
+                    val b = (2..9).random(random)
+                    q("$a × $b = ?", a * b)
+                }
+            }
+        }
+        else -> {
+            when (random.nextInt(3)) {
+                0 -> {
+                    val a = (12..89).random(random)
+                    val b = (12..99).random(random)
+                    q("$a + $b = ?", a + b)
+                }
+                1 -> {
+                    val b = (3..9).random(random)
+                    val answer = (3..12).random(random)
+                    q("${b * answer} ÷ $b = ?", answer)
+                }
+                else -> {
+                    val a = (2..9).random(random)
+                    val b = (2..9).random(random)
+                    val c = (1..20).random(random)
+                    q("$a × $b + $c = ?", a * b + c)
+                }
+            }
+        }
+    }
 }
 
-private fun newQuestion(random: Random): Question {
-    val op = listOf('+', '-', '×').random(random)
-    val a: Int
-    val b: Int
-    when (op) {
-        '+' -> { a = (11..89).random(random); b = (11..49).random(random) }
-        '-' -> { a = (41..99).random(random); b = (10..(a - 10)).random(random) }
-        else -> { a = (3..9).random(random); b = (3..9).random(random) }
-    }
-    val answer = when (op) {
-        '+' -> a + b
-        '-' -> a - b
-        else -> a * b
-    }
-    val options = linkedSetOf(answer)
-    while (options.size < 3) {
-        val candidate = answer + (1..9).random(random) * if (random.nextBoolean()) 1 else -1
-        if (candidate > 0) options += candidate
-    }
-    return Question(a, b, op, answer, options.shuffled(random))
-}
-
-/** Three answers to pick from with the D-pad; a wrong one swaps in a new question. */
+/**
+ * The question, the answer typed so far and a keypad. A wrong answer says so, clears the box and
+ * puts a new question up, as the owner asked; the remote's number keys work as well as the pad
+ * (the host takes them at the root).
+ */
 @Composable
 private fun MathPad(
+    question: Question,
+    entered: String,
     wrong: Boolean,
-    firstAction: FocusRequester,
-    onWrong: () -> Unit,
-    onRight: () -> Unit,
+    onDigit: (Char) -> Unit,
+    onDelete: () -> Unit,
+    onSubmit: () -> Unit,
 ) {
-    var question by remember { mutableStateOf(newQuestion(Random.Default)) }
+    val first = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        runCatching { first.requestFocus() }
+    }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         BasicText(stringResource(R.string.kid_math_title), style = Type.LargeTitle)
         Spacer(Modifier.height(6.dp))
         BasicText(
             if (wrong) stringResource(R.string.kid_math_wrong) else stringResource(R.string.kid_math_hint),
-            style = Type.Caption.copy(color = if (wrong) Palette.Red else Palette.SecondaryLabel),
+            style = Type.Caption.copy(color = if (wrong) Palette.Red else Palette.SecondaryLabel, textAlign = TextAlign.Center),
         )
-        Spacer(Modifier.height(16.dp))
-        BasicText(question.text, style = Type.Clock.copy(fontSize = 38.sp, lineHeight = 42.sp))
-        Spacer(Modifier.height(20.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            question.options.forEachIndexed { i, value ->
-                WallButton(
-                    label = value.toString(),
-                    focusRequester = if (i == 0) firstAction else null,
-                    onClick = {
-                        if (value == question.answer) {
-                            onRight()
-                        } else {
-                            onWrong()
-                            question = newQuestion(Random.Default)
-                        }
-                    },
+        Spacer(Modifier.height(12.dp))
+        BasicText(question.text, style = Type.Clock.copy(fontSize = 40.sp, lineHeight = 44.sp))
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            repeat(3) { i ->
+                val ch = entered.getOrNull(i)
+                Box(
+                    Modifier.size(40.dp).clip(RoundedCornerShape(10.dp))
+                        .background(if (ch != null) Palette.FillStrong else Color.Transparent)
+                        .border(1.5.dp, if (ch != null) Palette.Focus else Palette.TertiaryLabel, RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center,
+                ) { BasicText(ch?.toString().orEmpty(), style = Type.Headline.copy(color = Palette.Label)) }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            listOf("123", "456", "789").forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    row.forEach { ch ->
+                        KeyCap(
+                            label = ch.toString(),
+                            focusRequester = if (ch == '1') first else null,
+                            onClick = { onDigit(ch) },
+                        )
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                KeyCap(label = "0", onClick = { onDigit('0') })
+                KeyCap(label = stringResource(R.string.kid_admin_delete), wide = true, onClick = onDelete)
+                KeyCap(
+                    label = stringResource(R.string.kid_math_ok),
+                    wide = true,
+                    enabled = entered.isNotEmpty(),
+                    onClick = onSubmit,
                 )
             }
         }
