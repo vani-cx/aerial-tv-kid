@@ -205,7 +205,6 @@
     <string name="kid_auth_why">这一步需要管理员密码。</string>
     <string name="kid_app_combo">应用锁定密码</string>
     <string name="kid_app_combo_hint">方向密码，用来打开锁定的应用；观看时长是另外一套规则。</string>
-    <string name="kid_combo_mode_hint">要修改或删除，请先打开儿童模式。</string>
     <string name="kid_kid_combo">儿童时间锁密码</string>
     <string name="kid_kid_combo_hint">时间锁拦截页上点“家长”会先问它，再选 10 到 50 分钟。</string>
     <string name="kid_combo_same">与应用锁定密码相同</string>
@@ -223,7 +222,7 @@
     <string name="kid_combo_mismatch">两次输入不一样，请重新设置。</string>
     <string name="kid_combo_app_title">设置应用锁定密码</string>
     <string name="kid_combo_kid_title">设置儿童时间锁密码</string>
-    <string name="kid_combo_app_rule">以后要修改或删除它，需要在设置中打开儿童模式。</string>
+    <string name="kid_combo_app_rule">以后要修改或删除它，输入管理员密码就行，不必打开儿童模式。</string>
     <string name="kid_combo_hint">用遥控器上下左右输入，按 OK 确认。</string>
     <string name="kid_combo_ok">OK 确认</string>
     <string name="kid_combo_wrong">密码不对，请重试。</string>
@@ -246,8 +245,9 @@
     <string name="kid_group_apps">App</string>
     <string name="kid_group_apps_hint">这一组里有哪些 App。</string>
     <string name="kid_group_enabled">这一天限制</string>
-    <string name="kid_group_days">按周内每天设置</string>
-    <string name="kid_group_same_all">每天相同</string>
+    <string name="kid_group_days">按周内每天设置（可多选）</string>
+    <string name="kid_group_same_all">每天</string>
+    <string name="kid_group_unsaved">还没有保存：点「完成」才会添加，点「取消」或返回就不加。</string>
     <string name="kid_group_daily">每日总时长</string>
     <string name="kid_group_daily_hint">这一天这一组的 App 加起来能看多久。</string>
     <string name="kid_group_session">每次使用时长</string>

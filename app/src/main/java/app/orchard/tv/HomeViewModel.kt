@@ -285,6 +285,22 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * The children's panel asks for the admin password on the way in — every time, except within a
+     * minute of leaving it. Inside the panel nothing asks again: the entry is the gate.
+     */
+    fun whenKidUnlocked(action: () -> Unit) {
+        if (Parental.adminSet && !Parental.kidOpen) {
+            overlay = Overlay.KidAdmin {
+                overlay = Overlay.None
+                Parental.noteKidEntry()
+                action()
+            }
+        } else {
+            action()
+        }
+    }
+
     /** Every launchable app, including the hidden ones and those inside folders, by name. */
     fun appEntries(): List<AppEntry> =
         all.filter { it.folder == null && it.source == null }.sortedBy { it.label.lowercase() }

@@ -206,7 +206,6 @@
     <string name="kid_auth_why">This step needs the admin password.</string>
     <string name="kid_app_combo">App Lock Password</string>
     <string name="kid_app_combo_hint">A direction password: it opens a locked app. Watching time is a separate set of rules.</string>
-    <string name="kid_combo_mode_hint">To change or delete it, turn Children\'s Mode on.</string>
     <string name="kid_kid_combo">Time-Lock Password</string>
     <string name="kid_kid_combo_hint">The parent button on the time wall asks for this one, then offers 10 to 50 minutes.</string>
     <string name="kid_combo_same">Same as the app one</string>
@@ -224,7 +223,7 @@
     <string name="kid_combo_mismatch">The two do not match. Start again.</string>
     <string name="kid_combo_app_title">Set the App Lock Password</string>
     <string name="kid_combo_kid_title">Set the Time-Lock Password</string>
-    <string name="kid_combo_app_rule">To change or delete it later, turn Children\'s Mode on in Settings.</string>
+    <string name="kid_combo_app_rule">Changing or deleting it later only needs the admin password — Children\'s Mode can stay off.</string>
     <string name="kid_combo_hint">Up, down, left, right on the remote, then OK.</string>
     <string name="kid_combo_ok">OK</string>
     <string name="kid_combo_wrong">Wrong password. Try again.</string>
@@ -247,8 +246,9 @@
     <string name="kid_group_apps">Apps</string>
     <string name="kid_group_apps_hint">Which apps this group is.</string>
     <string name="kid_group_enabled">Limited This Day</string>
-    <string name="kid_group_days">Day by Day</string>
-    <string name="kid_group_same_all">Same Every Day</string>
+    <string name="kid_group_days">Days (pick one or more)</string>
+    <string name="kid_group_same_all">Every Day</string>
+    <string name="kid_group_unsaved">Not saved yet — Done adds this group, Cancel drops it.</string>
     <string name="kid_group_daily">Daily Total</string>
     <string name="kid_group_daily_hint">How long the group may run today, all its apps together.</string>
     <string name="kid_group_session">Per Session</string>

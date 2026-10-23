@@ -31,7 +31,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -80,6 +79,23 @@ import kotlinx.coroutines.withContext
  */
 @Composable
 fun KidSettingsSheet(visible: Boolean, apps: List<AppEntry>, onDismiss: () -> Unit) {
+    // Held above the animation, so that closing the sheet always starts the next visit at the top
+    // rather than on whatever screen (or half-made group) the last one stopped at.
+    var screen by remember { mutableStateOf<Screen>(Screen.Root) }
+    var gate by remember { mutableStateOf<Gate?>(null) }
+    /** A new group that is not saved yet: nothing is kept unless the parent presses Done. */
+    var draft by remember { mutableStateOf<Group?>(null) }
+    val defaultGroupName = stringResource(R.string.kid_group_default)
+    LaunchedEffect(visible) {
+        // Every visit starts at the top: no gate, no screen and no half-made group left over from
+        // the last time (that leftover was one way Back could land on the group screen).
+        if (visible) {
+            screen = Screen.Root
+            gate = null
+            draft = null
+        }
+    }
+
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn(tween(180)),
@@ -87,14 +103,16 @@ fun KidSettingsSheet(visible: Boolean, apps: List<AppEntry>, onDismiss: () -> Un
         modifier = Modifier.fillMaxSize(),
     ) {
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.65f)), contentAlignment = Alignment.Center) {
-            var screen by remember { mutableStateOf<Screen>(Screen.Root) }
-            var gate by remember { mutableStateOf<Gate?>(null) }
-            val defaultGroupName = stringResource(R.string.kid_group_default)
-
-            BackHandler {
+            // Back belongs to the gate while one is up: closing the password prompt must not also
+            // close (or leave) the sheet behind it, which is how a cancel used to land on the
+            // group screen.
+            BackHandler(enabled = gate == null) {
                 when (screen) {
                     Screen.Root -> onDismiss()
-                    else -> screen = Screen.Root
+                    else -> {
+                        screen = Screen.Root
+                        draft = null
+                    }
                 }
             }
 
@@ -113,31 +131,75 @@ fun KidSettingsSheet(visible: Boolean, apps: List<AppEntry>, onDismiss: () -> Un
                     Screen.Root -> Root(
                         onPickLocked = { screen = Screen.Apps(null) },
                         onNewGroup = {
-                            val id = Parental.newGroupId()
-                            Parental.saveGroup(Group(id = id, name = defaultGroupName, packages = emptySet()))
-                            screen = Screen.EditGroup(id)
+                            // Not stored yet: the group lives on this screen only, and Done is
+                            // what adds it — Back throws it away.
+                            val created = Group(id = Parental.newGroupId(), name = defaultGroupName, packages = emptySet())
+                            draft = created
+                            screen = Screen.EditGroup(created.id, fresh = true)
                         },
-                        onEdit = { screen = Screen.EditGroup(it) },
-                        // Without an admin password there is nothing to check: the sheet itself was
-                        // reachable without one, and a gate nobody can pass would be a dead end.
-                        askAdmin = { then -> if (Parental.adminSet) gate = Gate.Verify(then) else then() },
+                        onEdit = {
+                            draft = null
+                            screen = Screen.EditGroup(it)
+                        },
                         onSetAdmin = { gate = Gate.CreateAdmin },
                         onSetAppCombo = { gate = Gate.CreateAppCombo },
                         onSetKidCombo = { gate = Gate.CreateKidCombo },
                     )
 
-                    is Screen.Apps -> AppPicker(
-                        apps = apps,
-                        groupId = s.groupId,
-                        onBack = { screen = Screen.Root },
-                    )
+                    is Screen.Apps -> {
+                        val fresh = s.fresh
+                        val owner = when {
+                            s.groupId == null -> null
+                            fresh -> draft
+                            else -> Parental.groups.firstOrNull { it.id == s.groupId }
+                        }
+                        AppPicker(
+                            apps = apps,
+                            title = stringResource(if (s.groupId == null) R.string.kid_pick_locked else R.string.kid_pick_apps),
+                            chosen = if (s.groupId == null) Parental.lockedPackages else owner?.packages.orEmpty(),
+                            onToggle = { pkg ->
+                                if (s.groupId == null) {
+                                    val locked = Parental.lockedPackages
+                                    Parental.chooseLocked(if (pkg in locked) locked - pkg else locked + pkg)
+                                } else {
+                                    val group = owner
+                                    if (group != null) {
+                                        val next = if (pkg in group.packages) group.packages - pkg else group.packages + pkg
+                                        val edited = group.copy(packages = next)
+                                        if (fresh) draft = edited else Parental.saveGroup(edited)
+                                    }
+                                }
+                            },
+                            onBack = { screen = if (s.groupId == null) Screen.Root else Screen.EditGroup(s.groupId, fresh) },
+                        )
+                    }
 
-                    is Screen.EditGroup -> GroupEditor(
-                        id = s.id,
-                        onPickApps = { screen = Screen.Apps(s.id) },
-                        onBack = { screen = Screen.Root },
-                        askAdmin = { then -> if (Parental.adminSet) gate = Gate.Verify(then) else then() },
-                    )
+                    is Screen.EditGroup -> {
+                        val group = if (s.fresh) draft else Parental.groups.firstOrNull { it.id == s.id }
+                        if (group == null) {
+                            LaunchedEffect(s.id) { screen = Screen.Root }
+                        } else {
+                            GroupEditor(
+                                group = group,
+                                fresh = s.fresh,
+                                onChange = { if (s.fresh) draft = it else Parental.saveGroup(it) },
+                                onSave = {
+                                    Parental.saveGroup(group)
+                                    draft = null
+                                    screen = Screen.Root
+                                },
+                                onPickApps = { screen = Screen.Apps(group.id, s.fresh) },
+                                onBack = {
+                                    draft = null
+                                    screen = Screen.Root
+                                },
+                                onDeleted = {
+                                    draft = null
+                                    screen = Screen.Root
+                                },
+                            )
+                        }
+                    }
                 }
             }
 
@@ -150,13 +212,19 @@ fun KidSettingsSheet(visible: Boolean, apps: List<AppEntry>, onDismiss: () -> Un
 
 private sealed interface Screen {
     data object Root : Screen
-    /** [groupId] null picks the locked apps; otherwise the group's own apps. */
-    data class Apps(val groupId: String?) : Screen
-    data class EditGroup(val id: String) : Screen
+    /**
+     * [groupId] null picks the locked apps; otherwise the group's own apps. [fresh] marks a group
+     * that has not been saved yet, so the picks go to the draft instead of the store.
+     */
+    data class Apps(val groupId: String?, val fresh: Boolean = false) : Screen
+    data class EditGroup(val id: String, val fresh: Boolean = false) : Screen
 }
 
+/**
+ * The panels this sheet puts up. Only the ones that *make* a password: checking it happens once, on
+ * the way into the sheet (see HomeViewModel.whenKidUnlocked), so no row asks again.
+ */
 private sealed interface Gate {
-    data class Verify(val then: () -> Unit) : Gate
     data object CreateAdmin : Gate
     data object CreateAppCombo : Gate
     data object CreateKidCombo : Gate
@@ -170,17 +238,6 @@ private fun GateOverlay(gate: Gate, onClose: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         when (gate) {
-            is Gate.Verify -> AdminGate(
-                title = stringResource(R.string.kid_auth_title),
-                subtitle = stringResource(R.string.kid_auth_why),
-                askTwice = false,
-                // Close this gate *before* running what it was guarding: a following gate (the
-                // direction password) puts itself in then(), and closing afterwards used to wipe
-                // it on the same frame — that is why the combo could never be set.
-                onDone = { onClose(); gate.then() },
-                onCancel = onClose,
-            )
-
             Gate.CreateAdmin -> AdminGate(
                 title = stringResource(R.string.kid_admin_new),
                 subtitle = stringResource(R.string.kid_admin_hint),
@@ -203,7 +260,6 @@ private fun ColumnScope.Root(
     onPickLocked: () -> Unit,
     onNewGroup: () -> Unit,
     onEdit: (String) -> Unit,
-    askAdmin: (() -> Unit) -> Unit,
     onSetAdmin: () -> Unit,
     onSetAppCombo: () -> Unit,
     onSetKidCombo: () -> Unit,
@@ -237,7 +293,7 @@ private fun ColumnScope.Root(
                         }
                     }
                     Chip(stringResource(R.string.kid_off), !Parental.enabled, next()) {
-                        if (Parental.enabled) askAdmin {
+                        if (Parental.enabled) {
                             Parental.chooseEnabled(false)
                             GuardSetup.releaseWatch(context)
                         }
@@ -270,21 +326,17 @@ private fun ColumnScope.Root(
                     Chip(stringResource(if (Parental.adminSet) R.string.kid_admin_change else R.string.kid_admin_new), false, next(), onClick = onSetAdmin)
                     if (Parental.adminSet) {
                         Chip(stringResource(R.string.kid_clear), false, next()) {
-                            askAdmin {
-                                Parental.clearAdmin()
-                                Parental.chooseEnabled(false)
-                                GuardSetup.releaseWatch(context)
-                            }
+                            Parental.clearAdmin()
+                            Parental.chooseEnabled(false)
+                            GuardSetup.releaseWatch(context)
                         }
                     }
                 }
             }
-            // Locking works with the children's mode off; changing the password only inside it,
-            // as the owner asked.
-            RowItem(
-                stringResource(R.string.kid_app_combo),
-                stringResource(if (Parental.enabled) R.string.kid_app_combo_hint else R.string.kid_combo_mode_hint),
-            ) {
+            // Both password rows work whenever the sheet is open: the admin password is the gate,
+            // and a row whose chips cannot even be focused is how the owner could not set them at
+            // all (the old "turn Children's Mode on first" rule skipped these rows on the D-pad).
+            RowItem(stringResource(R.string.kid_app_combo), stringResource(R.string.kid_app_combo_hint)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     BasicText(
                         if (Parental.appComboSet) stringResource(R.string.kid_combo_set, Parental.appComboLength)
@@ -294,11 +346,11 @@ private fun ColumnScope.Root(
                     )
                     Chip(
                         stringResource(if (Parental.appComboSet) R.string.kid_admin_change else R.string.kid_admin_new),
-                        false, next(), enabled = Parental.enabled,
-                    ) { if (Parental.enabled) askAdmin(onSetAppCombo) }
+                        false, next(),
+                    ) { onSetAppCombo() }
                     if (Parental.appComboSet) {
-                        Chip(stringResource(R.string.kid_clear), false, next(), enabled = Parental.enabled) {
-                            if (Parental.enabled) askAdmin { Parental.clearAppCombo() }
+                        Chip(stringResource(R.string.kid_clear), false, next()) {
+                            Parental.clearAppCombo()
                         }
                     }
                 }
@@ -316,11 +368,11 @@ private fun ColumnScope.Root(
                     )
                     Chip(
                         stringResource(if (Parental.kidComboSet && !Parental.kidComboSame) R.string.kid_admin_change else R.string.kid_admin_new),
-                        false, next(), enabled = Parental.enabled,
-                    ) { if (Parental.enabled) askAdmin(onSetKidCombo) }
+                        false, next(),
+                    ) { onSetKidCombo() }
                     if (!Parental.kidComboSame && Parental.kidComboSet) {
-                        Chip(stringResource(R.string.kid_combo_use_app), false, next(), enabled = Parental.enabled) {
-                            if (Parental.enabled) askAdmin { Parental.chooseKidComboSame(true) }
+                        Chip(stringResource(R.string.kid_combo_use_app), false, next()) {
+                            Parental.chooseKidComboSame(true)
                         }
                     }
                 }
@@ -377,8 +429,8 @@ private fun ColumnScope.Root(
                             )
                         }
                         Chip(stringResource(R.string.kid_edit), false, next()) { onEdit(group.id) }
-                        Chip(stringResource(R.string.kid_reset), false, next()) { askAdmin { Usage.resetToday(group.id) } }
-                        Chip(stringResource(R.string.kid_clear), false, next()) { askAdmin { Parental.removeGroup(group.id) } }
+                        Chip(stringResource(R.string.kid_reset), false, next()) { Usage.resetToday(group.id) }
+                        Chip(stringResource(R.string.kid_clear), false, next()) { Parental.removeGroup(group.id) }
                     }
                 }
             }
@@ -401,24 +453,20 @@ private fun ColumnScope.Root(
 // ---- Apps ----
 
 @Composable
-private fun AppPicker(apps: List<AppEntry>, groupId: String?, onBack: () -> Unit) {
-    val group = groupId?.let { id -> Parental.groups.firstOrNull { it.id == id } }
-    val chosen = if (group == null) Parental.lockedPackages else group.packages
+private fun AppPicker(
+    apps: List<AppEntry>,
+    title: String,
+    chosen: Set<String>,
+    onToggle: (String) -> Unit,
+    onBack: () -> Unit,
+) {
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         withFrameNanos { }
         runCatching { first.requestFocus() }
     }
 
-    fun toggle(pkg: String) {
-        val next = if (pkg in chosen) chosen - pkg else chosen + pkg
-        if (group == null) Parental.chooseLocked(next) else Parental.saveGroup(group.copy(packages = next))
-    }
-
-    BasicText(
-        if (group == null) stringResource(R.string.kid_pick_locked) else stringResource(R.string.kid_pick_apps),
-        style = Type.Headline,
-    )
+    BasicText(title, style = Type.Headline)
     Spacer(Modifier.height(10.dp))
     Column(Modifier.verticalScroll(rememberScrollState())) {
         apps.chunked(4).forEachIndexed { rowIndex, row ->
@@ -429,7 +477,7 @@ private fun AppPicker(apps: List<AppEntry>, groupId: String?, onBack: () -> Unit
                         on = app.packageName in chosen,
                         focusRequester = if (rowIndex == 0 && i == 0) first else null,
                         modifier = Modifier.weight(1f),
-                        onClick = { toggle(app.packageName) },
+                        onClick = { onToggle(app.packageName) },
                     )
                 }
                 // Keep the last row's cells the same width as the rows above.
@@ -491,13 +539,19 @@ private val SESSION_CHOICES = listOf(15, 20, 30, 45, 60, 90, 0)
 private val BREAK_CHOICES = listOf(0, 5, 10, 15, 20, 30, 60)
 
 @Composable
-private fun GroupEditor(id: String, onPickApps: () -> Unit, onBack: () -> Unit, askAdmin: (() -> Unit) -> Unit) {
-    val group = Parental.groups.firstOrNull { it.id == id }
-    if (group == null) {
-        LaunchedEffect(id) { onBack() }
-        return
-    }
-    var day by remember { mutableIntStateOf(weekdayIndex(System.currentTimeMillis())) }
+private fun GroupEditor(
+    group: Group,
+    fresh: Boolean,
+    onChange: (Group) -> Unit,
+    onSave: () -> Unit,
+    onPickApps: () -> Unit,
+    onBack: () -> Unit,
+    onDeleted: () -> Unit,
+) {
+    // Which weekdays the knobs below apply to. Several at once, as the owner asked: tap Mon and
+    // Tue and the next change lands on both.
+    var sel by remember(group.id) { mutableStateOf(setOf(weekdayIndex(System.currentTimeMillis()))) }
+    val primary = sel.minOrNull() ?: 0
     val names = stringArrayResource(R.array.kid_day_names)
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) {
@@ -508,20 +562,33 @@ private fun GroupEditor(id: String, onPickApps: () -> Unit, onBack: () -> Unit, 
     var taken = false
     fun next(): FocusRequester? = if (taken) null else { taken = true; first }
 
-    fun editDay(change: (DayRule) -> DayRule) {
+    /** Applies one change to every selected day. */
+    fun editSel(change: (DayRule) -> DayRule) {
         val days = group.days.toMutableList()
-        days[day] = change(days[day])
-        Parental.saveGroup(group.copy(days = days))
+        val targets = sel.ifEmpty { setOf(primary) }
+        targets.forEach { i -> if (i in days.indices) days[i] = change(days[i]) }
+        onChange(group.copy(days = days))
     }
 
+    /** True when every selected day agrees on [rule] — a chip then shows as chosen. */
+    fun allAgree(rule: (DayRule) -> Boolean): Boolean =
+        sel.all { i -> group.days.getOrNull(i)?.let(rule) == true }
+
     BasicText(group.name, style = Type.LargeTitle)
+    if (fresh) {
+        Spacer(Modifier.height(4.dp))
+        BasicText(
+            stringResource(R.string.kid_group_unsaved),
+            style = Type.Caption.copy(color = Palette.Orange),
+        )
+    }
     Spacer(Modifier.height(8.dp))
     Column(Modifier.verticalScroll(rememberScrollState())) {
         Card {
             RowItem(stringResource(R.string.kid_group_name), null, first = true) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     stringArrayResource(R.array.kid_group_names).forEach { name ->
-                        Chip(name, group.name == name, next()) { Parental.saveGroup(group.copy(name = name)) }
+                        Chip(name, group.name == name, next()) { onChange(group.copy(name = name)) }
                     }
                 }
             }
@@ -537,11 +604,11 @@ private fun GroupEditor(id: String, onPickApps: () -> Unit, onBack: () -> Unit, 
             }
             RowItem(stringResource(R.string.kid_group_enabled), null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Chip(stringResource(R.string.kid_on), group.days[day].enabled, next()) {
-                        editDay { it.copy(enabled = true) }
+                    Chip(stringResource(R.string.kid_on), allAgree { it.enabled }, next()) {
+                        editSel { it.copy(enabled = true) }
                     }
-                    Chip(stringResource(R.string.kid_off), !group.days[day].enabled, next()) {
-                        editDay { it.copy(enabled = false) }
+                    Chip(stringResource(R.string.kid_off), allAgree { !it.enabled }, next()) {
+                        editSel { it.copy(enabled = false) }
                     }
                 }
             }
@@ -552,12 +619,22 @@ private fun GroupEditor(id: String, onPickApps: () -> Unit, onBack: () -> Unit, 
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             names.forEachIndexed { i, name ->
-                Chip(name, day == i, next()) { day = i }
+                Chip(name, i in sel, next()) {
+                    // A multi-select: tap to add or drop a day. One day always stays, or the knobs
+                    // below would have nothing to edit.
+                    sel = when {
+                        i !in sel -> sel + i
+                        sel.size > 1 -> sel - i
+                        else -> sel
+                    }
+                }
             }
-            Chip(stringResource(R.string.kid_group_same_all), false, next()) {
-                // Every day gets today's rule: the week set up once, then tweaked.
-                val rule = group.days[day]
-                Parental.saveGroup(group.copy(days = List(7) { rule }))
+            Chip(stringResource(R.string.kid_group_same_all), sel.size == names.size, next()) {
+                // One rule for the whole week: today's (or the first chosen day's) rule is copied to
+                // all seven and all seven stay selected.
+                val rule = group.days[primary]
+                sel = (0 until names.size).toSet()
+                onChange(group.copy(days = List(names.size) { rule }))
             }
         }
 
@@ -566,8 +643,8 @@ private fun GroupEditor(id: String, onPickApps: () -> Unit, onBack: () -> Unit, 
             RowItem(stringResource(R.string.kid_group_daily), stringResource(R.string.kid_group_daily_hint), first = true) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     DAILY_CHOICES.forEach { minutes ->
-                        Chip(label(minutes), group.days[day].dailyMinutes == minutes, next()) {
-                            editDay { it.copy(dailyMinutes = minutes) }
+                        Chip(label(minutes), allAgree { it.dailyMinutes == minutes }, next()) {
+                            editSel { it.copy(dailyMinutes = minutes) }
                         }
                     }
                 }
@@ -575,8 +652,8 @@ private fun GroupEditor(id: String, onPickApps: () -> Unit, onBack: () -> Unit, 
             RowItem(stringResource(R.string.kid_group_session), stringResource(R.string.kid_group_session_hint)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SESSION_CHOICES.forEach { minutes ->
-                        Chip(label(minutes), group.days[day].sessionMinutes == minutes, next()) {
-                            editDay { it.copy(sessionMinutes = minutes) }
+                        Chip(label(minutes), allAgree { it.sessionMinutes == minutes }, next()) {
+                            editSel { it.copy(sessionMinutes = minutes) }
                         }
                     }
                 }
@@ -584,8 +661,8 @@ private fun GroupEditor(id: String, onPickApps: () -> Unit, onBack: () -> Unit, 
             RowItem(stringResource(R.string.kid_group_break), stringResource(R.string.kid_group_break_hint)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     BREAK_CHOICES.forEach { minutes ->
-                        Chip(label(minutes), group.days[day].breakMinutes == minutes, next()) {
-                            editDay { it.copy(breakMinutes = minutes) }
+                        Chip(label(minutes), allAgree { it.breakMinutes == minutes }, next()) {
+                            editSel { it.copy(breakMinutes = minutes) }
                         }
                     }
                 }
@@ -596,12 +673,12 @@ private fun GroupEditor(id: String, onPickApps: () -> Unit, onBack: () -> Unit, 
         Card {
             RowItem(stringResource(R.string.kid_group_windows), stringResource(R.string.kid_group_windows_hint), first = true) {
                 Chip(stringResource(R.string.kid_group_window_add), false, next()) {
-                    val end = group.days[day].windows.maxOfOrNull { it.end } ?: (18 * 60)
+                    val end = group.days[primary].windows.maxOfOrNull { it.end } ?: (18 * 60)
                     val start = (end + 30).coerceAtMost(23 * 60)
-                    editDay { it.copy(windows = it.windows + Window(start, (start + 60).coerceAtMost(24 * 60))) }
+                    editSel { it.copy(windows = it.windows + Window(start, (start + 60).coerceAtMost(24 * 60))) }
                 }
             }
-            val windows = group.days[day].windows
+            val windows = group.days[primary].windows
             if (windows.isEmpty()) {
                 RowItem(stringResource(R.string.kid_group_window_none), null) {
                     BasicText("—", style = Type.Body.copy(color = Palette.TertiaryLabel))
@@ -610,17 +687,17 @@ private fun GroupEditor(id: String, onPickApps: () -> Unit, onBack: () -> Unit, 
             windows.forEachIndexed { index, window ->
                 RowItem(stringResource(R.string.kid_group_window_n, index + 1), null) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        StepChip("−", next()) { editDay { d -> d.copy(windows = d.windows.replace(index, window.copy(start = (window.start - 30).coerceAtLeast(0)))) } }
+                        StepChip("−", next()) { editSel { d -> d.copy(windows = d.windows.replace(index, window.copy(start = (window.start - 30).coerceAtLeast(0)))) } }
                         BasicText(clock(window.start), style = Type.Body)
-                        StepChip("+", next()) { editDay { d -> d.copy(windows = d.windows.replace(index, window.copy(start = (window.start + 30).coerceIn(0, window.end - 30)))) } }
+                        StepChip("+", next()) { editSel { d -> d.copy(windows = d.windows.replace(index, window.copy(start = (window.start + 30).coerceIn(0, window.end - 30)))) } }
                         Spacer(Modifier.width(6.dp))
                         BasicText("–", style = Type.Body.copy(color = Palette.TertiaryLabel))
                         Spacer(Modifier.width(6.dp))
-                        StepChip("−", next()) { editDay { d -> d.copy(windows = d.windows.replace(index, window.copy(end = (window.end - 30).coerceAtLeast(window.start + 30)))) } }
+                        StepChip("−", next()) { editSel { d -> d.copy(windows = d.windows.replace(index, window.copy(end = (window.end - 30).coerceAtLeast(window.start + 30)))) } }
                         BasicText(clock(window.end), style = Type.Body)
-                        StepChip("+", next()) { editDay { d -> d.copy(windows = d.windows.replace(index, window.copy(end = (window.end + 30).coerceAtMost(24 * 60)))) } }
+                        StepChip("+", next()) { editSel { d -> d.copy(windows = d.windows.replace(index, window.copy(end = (window.end + 30).coerceAtMost(24 * 60)))) } }
                         Chip(stringResource(R.string.kid_clear), false, next()) {
-                            editDay { d -> d.copy(windows = d.windows.filterIndexed { i, _ -> i != index }) }
+                            editSel { d -> d.copy(windows = d.windows.filterIndexed { i, _ -> i != index }) }
                         }
                     }
                 }
@@ -628,9 +705,17 @@ private fun GroupEditor(id: String, onPickApps: () -> Unit, onBack: () -> Unit, 
         }
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Chip(stringResource(R.string.kid_back), true, next(), onClick = onBack)
-            Chip(stringResource(R.string.kid_group_delete), false, next()) {
-                askAdmin { Parental.removeGroup(id); onBack() }
+            if (fresh) {
+                // Nothing is in the store yet, so Done is the only thing that adds the group and
+                // Cancel drops it. Back does the same as Cancel (see the sheet's BackHandler).
+                Chip(stringResource(R.string.kid_done), true, next(), onClick = onSave)
+                Chip(stringResource(R.string.kid_cancel), false, next(), onClick = onBack)
+            } else {
+                Chip(stringResource(R.string.kid_back), true, next(), onClick = onBack)
+                Chip(stringResource(R.string.kid_group_delete), false, next()) {
+                    Parental.removeGroup(group.id)
+                    onDeleted()
+                }
             }
         }
         Spacer(Modifier.height(10.dp))

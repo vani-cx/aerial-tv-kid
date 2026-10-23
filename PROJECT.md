@@ -13,7 +13,7 @@
 |---|---|
 | 仓库 | `aerial-tv-kid`（`kid-control` 分支是默认分支，`main` 只作上游镜像） |
 | 上游 | [pengchujin/aerial-tv](https://github.com/pengchujin/aerial-tv) 1.35（versionCode 37） |
-| 本分支 | **1.36（versionCode 38）** |
+| 本分支 | **1.38（versionCode 40）** |
 | 目标设备 | 坚果 N1 投影仪（个人使用环境） |
 | 编译状态 | [x] `assembleStandardRelease` / `assembleGuardRelease` 通过（Gradle 8.14.3 + JDK 17 + SDK 36） |
 | 真机状态 | [ ] 未在真机上完整验证，[docs/PARENTAL.md](docs/PARENTAL.md) 末尾有 21 条清单 |
@@ -180,7 +180,7 @@
 | 项 | 改动 |
 |---|---|
 | `values/strings.xml`、`values-zh/strings.xml` | 各 +33 条、−12 条旧键（`cc_update*`、`pin_*`、`kid_wall_session/window*` 等），中英一一对应 |
-| `app/build.gradle.kts` | `versionCode 37 → 38`、`versionName 1.35 → 1.36`；1.37 再改 `applicationId = com.vani.aerialkid`、`versionCode 39`、`versionName 1.37` |
+| `app/build.gradle.kts` | `versionCode 37 → 38`、`versionName 1.35 → 1.36`；1.37 再改 `applicationId = com.vani.aerialkid`、`versionCode 39`、`versionName 1.37`；1.38 是 `versionCode 40` |
 | `AndroidManifest.xml` | 去掉 FileProvider、`REQUEST_INSTALL_PACKAGES`；保留 `BlockActivity`（`exported=false`、`singleInstance`、`excludeFromRecents`、独立 `taskAffinity`） |
 | `tools/install.sh` | 去掉 `appops set ... REQUEST_INSTALL_PACKAGES allow` |
 | `docs/ARCHITECTURE.md`、`docs/HANDOFF.md`、`README.md`、`README.en.md` | 同步删掉 `update/`、`PinPad.kt` 条目，改写「升级」章节；README 顶部加了这个分支的说明 |
@@ -194,6 +194,7 @@
 | `70d438c` | 1.36：删 4 位密码与更新检查，锁定解耦，四类拦截，分龄数学题 |
 | `ec26474` | 加 `PROJECT.md`、两份 README 的分支说明 |
 | 1.37 | 改包名 `com.vani.aerialkid` + 正式签名；密码输入改成圆点；家长放行期间退出 App 延迟 1 分钟再上锁 |
+| 1.38 | 修 4 个面板缺陷：两个方向密码的行在儿童模式关着时选不中；分组日期不能多选（「每天」现在会把周一到周日全选）；「新建分组」没点完成就存了；退出密码框会跳页。另按户主要求改密码规则：**进面板验证一次，离开 1 分钟以上再进要重输，面板内部不再逐项要密码** |
 
 ---
 

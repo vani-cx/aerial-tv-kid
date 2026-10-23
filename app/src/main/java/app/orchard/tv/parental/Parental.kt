@@ -120,6 +120,9 @@ object Parental {
     /** How long one admin entry keeps Settings open, so a parent is not asked at every row. */
     private const val ADMIN_WINDOW_MS = 10 * 60 * 1000L
 
+    /** Re-entry into the children's panel: free within a minute of leaving it, a password after. */
+    private const val KID_WINDOW_MS = 60_000L
+
     /** Wrong entries allowed before waiting: a direction combo has too few combinations to guess at. */
     private const val MAX_FAILS = 5
 
@@ -170,6 +173,8 @@ object Parental {
     private var kidComboHash: String? = null
     private var kidComboLength = DEFAULT_COMBO
     private var adminAt = 0L
+    /** When the children's panel was last left; see [kidOpen]. */
+    private var kidAt = 0L
     private var fails = 0
 
     /** Rounds of [MAX_FAILS] wrong entries so far, each doubling the wait before the next try. */
@@ -239,7 +244,24 @@ object Parental {
         adminAt = System.currentTimeMillis() + ADMIN_WINDOW_MS
     }
 
-    fun closeAdmin() { adminAt = 0L }
+    /**
+     * The children's panel has its own, much shorter window: a parent who leaves it and comes back
+     * within [KID_WINDOW_MS] is not asked again, and anything longer is. The clock starts at the
+     * moment the panel is left, not at the moment the password was typed, so a long visit does not
+     * spend the grace while the parent is still sitting in it.
+     */
+    val kidOpen: Boolean get() = System.currentTimeMillis() < kidAt
+
+    fun noteKidEntry() { kidAt = System.currentTimeMillis() + KID_WINDOW_MS }
+
+    fun noteKidExit() {
+        if (kidAt != 0L) kidAt = System.currentTimeMillis() + KID_WINDOW_MS
+    }
+
+    fun closeAdmin() {
+        adminAt = 0L
+        kidAt = 0L
+    }
 
     /** Milliseconds still to wait after too many wrong entries; 0 when entries are allowed. */
     fun waitMs(): Long = (blockedUntil - System.currentTimeMillis()).coerceAtLeast(0L)

@@ -608,7 +608,7 @@ fun HomeScreen(
                 vm.overlay = Overlay.None
                 onStartScreensaver()
             },
-            onKid = { vm.whenUnlocked { vm.overlay = Overlay.Kid } },
+            onKid = { vm.whenKidUnlocked { vm.overlay = Overlay.Kid } },
         )
 
         val lockSetup = overlay as? Overlay.LockSetup
@@ -634,7 +634,11 @@ fun HomeScreen(
         KidSettingsSheet(
             visible = overlay is Overlay.Kid,
             apps = vm.appEntries(),
-            onDismiss = { vm.overlay = Overlay.Wallpaper },
+            onDismiss = {
+                // The minute of grace for coming back runs from here, not from the password.
+                Parental.noteKidExit()
+                vm.overlay = Overlay.Wallpaper
+            },
         )
 
         val adminGate = overlay as? Overlay.KidAdmin
